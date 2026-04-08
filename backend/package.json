@@ -1,0 +1,19 @@
+{
+  "name": "cleancare-backend",
+  "version": "1.0.0",
+  "description": "CleanCare API — Node.js + Express + MongoDB (Vercel serverless)",
+  "main": "api/index.js",
+  "scripts": {
+    "dev": "node api/index.js",
+    "start": "node api/index.js"
+  },
+  "keywords": ["cleancare", "laundry", "iot", "express", "mongodb"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "mongoose": "^9.4.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "cleancare-firmware",
+  "version": "1.0.0",
+  "description": "CleanCare — Firmware ESP32 (Arduino/PlatformIO)",
+  "scripts": {},
+  "keywords": ["cleancare", "esp32", "arduino", "iot", "relay"],
+  "author": "",
+  "license": "ISC"
+}

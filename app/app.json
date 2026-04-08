@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "CleanCare",
+    "slug": "cleancare",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "cleancare",
+    "splash": {
+      "backgroundColor": "#3B82F6"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "uy.cleancare.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CleanCare necesita la cámara para escanear códigos QR de las máquinas"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#3B82F6"
+      },
+      "package": "uy.cleancare.app",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": ["expo-router", "expo-camera"]
+  }
+}
