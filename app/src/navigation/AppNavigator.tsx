@@ -1,12 +1,16 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import LoginScreen from '../screens/LoginScreen';
+import RegistroScreen from '../screens/RegistroScreen';
 import ScanScreen from '../screens/ScanScreen';
 import MachineScreen from '../screens/MachineScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import { colors } from '../constants/colors';
 
 export type RootStackParamList = {
+  Login: undefined;
+  Registro: undefined;
   Scan: undefined;
   Machine: {
     maquina_id: string;
@@ -22,7 +26,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Scan"
+        initialRouteName="Login"
         screenOptions={{
           headerStyle: { backgroundColor: colors.primary },
           headerTintColor: colors.white,
@@ -31,9 +35,19 @@ export default function AppNavigator() {
         }}
       >
         <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Registro"
+          component={RegistroScreen}
+          options={{ title: 'Crear cuenta' }}
+        />
+        <Stack.Screen
           name="Scan"
           component={ScanScreen}
-          options={{ title: 'Escanear QR' }}
+          options={{ title: 'Escanear QR', headerBackVisible: false }}
         />
         <Stack.Screen
           name="Machine"

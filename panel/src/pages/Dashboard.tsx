@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { obtenerResumen, listarUsos, ResumenItem, Uso } from '../services/api';
+import { obtenerResumen, listarUsos, ResumenItem, Uso, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
-const EDIFICIO_DEFAULT = 'edificio-central';
+function getUsuario(): Usuario | null {
+  const raw = localStorage.getItem('cleancare_usuario');
+  return raw ? JSON.parse(raw) : null;
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const usuario = getUsuario();
+  const edificioId = usuario?.edificio_id || 'edificio-central';
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [anio, setAnio] = useState(now.getFullYear());
@@ -30,7 +35,7 @@ export default function Dashboard() {
     setError('');
     try {
       const [resumenData, usosData] = await Promise.all([
-        obtenerResumen(EDIFICIO_DEFAULT, mes, anio),
+        obtenerResumen(edificioId, mes, anio),
         listarUsos(),
       ]);
       setResumen(resumenData);
@@ -52,6 +57,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('cleancare_token');
+    localStorage.removeItem('cleancare_usuario');
     navigate('/login');
   };
 

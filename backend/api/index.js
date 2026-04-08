@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const { verificarToken, soloAdmin } = require('../lib/auth');
 
+const authHandler = require('./auth');
 const usoHandler = require('./uso');
 const usosHandler = require('./usos');
 const resumenHandler = require('./resumen');
@@ -10,16 +12,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Rutas
-app.post('/api/uso', usoHandler);
-app.get('/api/usos', usosHandler);
-app.get('/api/resumen', resumenHandler);
-app.get('/api/maquinas', maquinasHandler);
-
-// Health check
+// Rutas públicas
 app.get('/api', (req, res) => {
   res.json({ ok: true, service: 'CleanCare API', version: '1.0.0' });
 });
+app.post('/api/auth', authHandler);
+
+// Rutas protegidas (requieren token)
+app.post('/api/uso', verificarToken, usoHandler);
+app.get('/api/usos', verificarToken, usosHandler);
+app.get('/api/maquinas', verificarToken, maquinasHandler);
+
+// Rutas solo admin
+app.get('/api/resumen', verificarToken, soloAdmin, resumenHandler);
 
 // Vercel: exportar el app como serverless function
 module.exports = app;

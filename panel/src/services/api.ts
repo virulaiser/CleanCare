@@ -5,6 +5,37 @@ const api = axios.create({
   timeout: 10000,
 });
 
+// Inyectar token en cada request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('cleancare_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Redirigir a login si el token expira
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('cleancare_token');
+      localStorage.removeItem('cleancare_usuario');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+export interface Usuario {
+  id: string;
+  email: string;
+  nombre: string;
+  rol: string;
+  edificio_id: string;
+  unidad?: string;
+}
+
 export interface Uso {
   _id: string;
   maquina_id: string;
@@ -19,6 +50,11 @@ export interface ResumenItem {
   _id: string;
   total_usos: number;
   minutos_totales: number;
+}
+
+export async function login(email: string, password: string): Promise<{ token: string; usuario: Usuario }> {
+  const { data } = await api.post('/api/auth?action=login', { email, password });
+  return data;
 }
 
 export async function obtenerResumen(edificioId: string, mes: number, anio: number): Promise<ResumenItem[]> {

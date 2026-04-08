@@ -52,7 +52,6 @@ export default function MachineScreen({ route, navigation }: Props) {
         maquina_id,
         edificio_id,
         duracion_min: duracionSeleccionada,
-        residente_id: 'residente-temp', // TODO: auth real
       });
 
       await fetchEstado();

@@ -10,10 +10,11 @@ module.exports = async (req, res) => {
       return res.status(405).json({ ok: false, error: 'Método no permitido' });
     }
 
-    const { maquina_id, edificio_id, duracion_min, residente_id, tipo } = req.body;
+    const { maquina_id, edificio_id, duracion_min, tipo } = req.body;
+    const residente_id = req.usuario.unidad || req.usuario.email;
 
-    if (!maquina_id || !edificio_id || !duracion_min || !residente_id) {
-      return res.status(400).json({ ok: false, error: 'Faltan campos requeridos: maquina_id, edificio_id, duracion_min, residente_id' });
+    if (!maquina_id || !edificio_id || !duracion_min) {
+      return res.status(400).json({ ok: false, error: 'Faltan campos requeridos: maquina_id, edificio_id, duracion_min' });
     }
 
     const uso = await Uso.create({

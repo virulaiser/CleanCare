@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { login } from '../services/api';
 import { colors } from '../constants/colors';
 
 export default function Login() {
@@ -7,17 +8,26 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    // TODO: autenticación real con JWT
-    if (email === 'admin@cleancare.uy' && password === 'admin') {
-      localStorage.setItem('cleancare_token', 'temp-token');
+    try {
+      const { token, usuario } = await login(email, password);
+      if (usuario.rol !== 'admin') {
+        setError('Acceso solo para administradores');
+        return;
+      }
+      localStorage.setItem('cleancare_token', token);
+      localStorage.setItem('cleancare_usuario', JSON.stringify(usuario));
       navigate('/dashboard');
-    } else {
-      setError('Credenciales incorrectas');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error al conectar con el servidor');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -49,8 +59,8 @@ export default function Login() {
           style={styles.input}
         />
 
-        <button type="submit" style={styles.button}>
-          Ingresar
+        <button type="submit" style={{ ...styles.button, opacity: loading ? 0.6 : 1 }} disabled={loading}>
+          {loading ? 'Ingresando...' : 'Ingresar'}
         </button>
       </form>
     </div>

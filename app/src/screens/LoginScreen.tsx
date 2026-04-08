@@ -1,0 +1,134 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { loginUsuario, getToken } from '../services/api.service';
+import { colors } from '../constants/colors';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+
+export default function LoginScreen({ navigation }: Props) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getToken().then((token) => {
+      if (token) navigation.replace('Scan');
+      else setLoading(false);
+    });
+  }, [navigation]);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Completá email y contraseña');
+      return;
+    }
+    setLoading(true);
+    try {
+      await loginUsuario(email.trim().toLowerCase(), password);
+      navigation.replace('Scan');
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.error || 'No se pudo conectar con el servidor');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>CleanCare</Text>
+      <Text style={styles.subtitle}>Ingresá con tu cuenta</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor={colors.textSecondary}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Contraseña"
+        placeholderTextColor={colors.textSecondary}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <Text style={styles.buttonText}>Ingresar</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
+        <Text style={styles.linkText}>No tenés cuenta? Registrate</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: colors.bgPage,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bgPage,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.primary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  input: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: colors.textPrimary,
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    borderRadius: 999,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  buttonText: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  linkText: {
+    color: colors.accent,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+});

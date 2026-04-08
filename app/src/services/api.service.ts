@@ -1,4 +1,5 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -6,6 +7,24 @@ const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
 });
+
+// Inyectar token en cada request
+api.interceptors.request.use(async (config) => {
+  const token = await AsyncStorage.getItem('cleancare_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export interface Usuario {
+  id: string;
+  email: string;
+  nombre: string;
+  rol: string;
+  edificio_id: string;
+  unidad?: string;
+}
 
 export interface Uso {
   _id?: string;
@@ -27,13 +46,40 @@ export interface Maquina {
   activa: boolean;
 }
 
-export interface ResumenItem {
-  _id: string;
-  total_usos: number;
-  minutos_totales: number;
+export async function loginUsuario(email: string, password: string): Promise<{ token: string; usuario: Usuario }> {
+  const { data } = await api.post('/api/auth?action=login', { email, password });
+  await AsyncStorage.setItem('cleancare_token', data.token);
+  await AsyncStorage.setItem('cleancare_usuario', JSON.stringify(data.usuario));
+  return data;
 }
 
-export async function registrarUso(uso: Omit<Uso, '_id' | 'fecha'>): Promise<Uso> {
+export async function registrarUsuario(campos: {
+  email: string;
+  password: string;
+  nombre: string;
+  edificio_id: string;
+  unidad?: string;
+}): Promise<{ token: string; usuario: Usuario }> {
+  const { data } = await api.post('/api/auth?action=registro', campos);
+  await AsyncStorage.setItem('cleancare_token', data.token);
+  await AsyncStorage.setItem('cleancare_usuario', JSON.stringify(data.usuario));
+  return data;
+}
+
+export async function getUsuarioGuardado(): Promise<Usuario | null> {
+  const raw = await AsyncStorage.getItem('cleancare_usuario');
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function getToken(): Promise<string | null> {
+  return AsyncStorage.getItem('cleancare_token');
+}
+
+export async function logout(): Promise<void> {
+  await AsyncStorage.multiRemove(['cleancare_token', 'cleancare_usuario']);
+}
+
+export async function registrarUso(uso: { maquina_id: string; edificio_id: string; duracion_min: number }): Promise<Uso> {
   const { data } = await api.post('/api/uso', uso);
   return data.uso;
 }
@@ -41,13 +87,6 @@ export async function registrarUso(uso: Omit<Uso, '_id' | 'fecha'>): Promise<Uso
 export async function listarUsos(): Promise<Uso[]> {
   const { data } = await api.get('/api/usos');
   return data.usos;
-}
-
-export async function obtenerResumen(edificioId: string, mes: number, anio: number): Promise<ResumenItem[]> {
-  const { data } = await api.get('/api/resumen', {
-    params: { edificioId, mes, anio },
-  });
-  return data.resumen;
 }
 
 export async function listarMaquinas(edificioId: string): Promise<Maquina[]> {
