@@ -52,6 +52,16 @@ export interface ResumenItem {
   minutos_totales: number;
 }
 
+export interface Maquina {
+  _id: string;
+  maquina_id: string;
+  edificio_id: string;
+  tipo: string;
+  ip_local: string;
+  nombre: string;
+  activa: boolean;
+}
+
 export async function login(email: string, password: string): Promise<{ token: string; usuario: Usuario }> {
   const { data } = await api.post('/api/auth?action=login', { email, password });
   return data;
@@ -67,4 +77,20 @@ export async function obtenerResumen(edificioId: string, mes: number, anio: numb
 export async function listarUsos(): Promise<Uso[]> {
   const { data } = await api.get('/api/usos');
   return data.usos;
+}
+
+export async function listarMaquinas(edificioId: string): Promise<Maquina[]> {
+  const { data } = await api.get('/api/maquinas', {
+    params: { edificioId },
+  });
+  return data.maquinas;
+}
+
+export async function crearMaquina(maquina: { nombre: string; tipo: string; ip_local: string; edificio_id: string }): Promise<Maquina> {
+  const { data } = await api.post('/api/maquinas', maquina);
+  return data.maquina;
+}
+
+export async function eliminarMaquina(maquinaId: string): Promise<void> {
+  await api.delete('/api/maquinas', { params: { maquinaId } });
 }

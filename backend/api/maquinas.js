@@ -1,24 +1,78 @@
+const crypto = require('crypto');
 const connectDB = require('../lib/mongodb');
 const Maquina = require('../models/Maquina');
 
-// GET /api/maquinas/:edificioId — Listar máquinas del edificio
 module.exports = async (req, res) => {
   try {
     await connectDB();
 
-    if (req.method !== 'GET') {
-      return res.status(405).json({ ok: false, error: 'Método no permitido' });
+    if (req.method === 'GET') {
+      return await listar(req, res);
+    }
+    if (req.method === 'POST') {
+      return await crear(req, res);
+    }
+    if (req.method === 'DELETE') {
+      return await eliminar(req, res);
     }
 
-    const { edificioId } = req.query;
-
-    if (!edificioId) {
-      return res.status(400).json({ ok: false, error: 'Falta parámetro: edificioId' });
-    }
-
-    const maquinas = await Maquina.find({ edificio_id: edificioId, activa: true }).lean();
-    res.json({ ok: true, total: maquinas.length, maquinas });
+    return res.status(405).json({ ok: false, error: 'Método no permitido' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 };
+
+async function listar(req, res) {
+  const { edificioId } = req.query;
+
+  if (!edificioId) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro: edificioId' });
+  }
+
+  const maquinas = await Maquina.find({ edificio_id: edificioId, activa: true }).lean();
+  res.json({ ok: true, total: maquinas.length, maquinas });
+}
+
+async function crear(req, res) {
+  const { nombre, tipo, ip_local, edificio_id } = req.body;
+
+  if (!nombre || !tipo || !ip_local || !edificio_id) {
+    return res.status(400).json({ ok: false, error: 'Faltan campos: nombre, tipo, ip_local, edificio_id' });
+  }
+
+  // Generar código alfanumérico: prefijo por tipo + 6 chars random
+  const prefijo = tipo === 'secadora' ? 'SEC' : 'LAV';
+  const sufijo = crypto.randomBytes(3).toString('hex').toUpperCase();
+  const maquina_id = `${prefijo}-${sufijo}`;
+
+  const maquina = await Maquina.create({
+    maquina_id,
+    edificio_id,
+    tipo,
+    ip_local,
+    nombre,
+    activa: true,
+  });
+
+  res.status(201).json({ ok: true, maquina });
+}
+
+async function eliminar(req, res) {
+  const { maquinaId } = req.query;
+
+  if (!maquinaId) {
+    return res.status(400).json({ ok: false, error: 'Falta parámetro: maquinaId' });
+  }
+
+  const result = await Maquina.findOneAndUpdate(
+    { maquina_id: maquinaId },
+    { activa: false },
+    { new: true }
+  );
+
+  if (!result) {
+    return res.status(404).json({ ok: false, error: 'Máquina no encontrada' });
+  }
+
+  res.json({ ok: true, maquina: result });
+}

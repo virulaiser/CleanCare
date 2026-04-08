@@ -66,7 +66,11 @@ export default function Dashboard() {
       {/* Header */}
       <header style={styles.header}>
         <h1 style={styles.logo}>CleanCare</h1>
-        <button onClick={handleLogout} style={styles.logoutBtn}>Cerrar sesión</button>
+        <nav style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => navigate('/dashboard')} style={{ ...styles.logoutBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Dashboard</button>
+          <button onClick={() => navigate('/maquinas')} style={styles.logoutBtn}>Máquinas</button>
+          <button onClick={handleLogout} style={styles.logoutBtn}>Cerrar sesión</button>
+        </nav>
       </header>
 
       <main style={styles.main}>

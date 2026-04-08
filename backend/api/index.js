@@ -25,6 +25,8 @@ app.get('/api/maquinas', verificarToken, maquinasHandler);
 
 // Rutas solo admin
 app.get('/api/resumen', verificarToken, soloAdmin, resumenHandler);
+app.post('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
+app.delete('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
 
 // Vercel: exportar el app como serverless function
 module.exports = app;
