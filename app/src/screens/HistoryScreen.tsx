@@ -23,7 +23,7 @@ export default function HistoryScreen() {
   const fetchUsos = useCallback(async () => {
     try {
       setError(null);
-      const data = await listarUsos();
+      const data = await listarUsos(true);
       setUsos(data);
     } catch {
       setError('No se pudieron cargar los usos.');
@@ -58,23 +58,31 @@ export default function HistoryScreen() {
     );
   }
 
-  const renderItem = ({ item }: { item: Uso }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
+  const renderItem = ({ item }: { item: Uso }) => {
+    const isWasher = item.tipo !== 'secadora';
+    const completed = item.completado;
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.typeBadge, { backgroundColor: isWasher ? '#DBEAFE' : '#FEF3C7' }]}>
+            <Text style={[styles.typeBadgeText, { color: isWasher ? '#3B82F6' : '#D97706' }]}>
+              {isWasher ? '🫧 Lavado' : '🌀 Secado'}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: completed ? '#DCFCE7' : '#FEF2F2' }]}>
+            <Text style={[styles.statusBadgeText, { color: completed ? '#16A34A' : '#EF4444' }]}>
+              {completed ? 'Completado' : 'Cancelado'}
+            </Text>
+          </View>
+        </View>
         <Text style={styles.machineId}>{item.maquina_id}</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{item.duracion_min} min</Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.detail}>{item.duracion_min} min</Text>
+          {item.fecha && <Text style={styles.fecha}>{formatFecha(item.fecha)}</Text>}
         </View>
       </View>
-      <Text style={styles.detail}>Edificio: {item.edificio_id}</Text>
-      {item.residente_id && (
-        <Text style={styles.detail}>Residente: {item.residente_id}</Text>
-      )}
-      {item.fecha && (
-        <Text style={styles.fecha}>{formatFecha(item.fecha)}</Text>
-      )}
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -129,26 +137,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  badge: {
-    backgroundColor: colors.bgBlueLight,
+  typeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  typeBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
   },
-  badgeText: {
-    fontSize: 13,
+  statusBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.primary,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
   detail: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: 2,
   },
   fecha: {
     fontSize: 13,
     color: colors.textSecondary,
-    marginTop: 8,
   },
   errorText: {
     fontSize: 16,

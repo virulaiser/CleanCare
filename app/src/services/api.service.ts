@@ -96,8 +96,10 @@ export async function registrarUso(uso: {
   return data.uso;
 }
 
-export async function listarUsos(): Promise<Uso[]> {
-  const { data } = await api.get('/api/usos');
+export async function listarUsos(soloMios: boolean = false): Promise<Uso[]> {
+  const { data } = await api.get('/api/usos', {
+    params: soloMios ? { mis: 'true' } : {},
+  });
   return data.usos;
 }
 

@@ -19,8 +19,9 @@ export default function Home() {
             <a href="#contacto" style={styles.navLink}>Contacto</a>
           </div>
           <div style={styles.navActions}>
+            <button onClick={() => navigate('/registro')} style={styles.navBtnSolid}>Registrarse</button>
             <button onClick={() => navigate('/login')} style={styles.navBtnOutline}>Portal Admin</button>
-            <a href="https://wa.me/59897789834" target="_blank" rel="noopener noreferrer" style={styles.navBtnSolid}>Contactanos</a>
+            <a href="https://wa.me/59897789834" target="_blank" rel="noopener noreferrer" style={styles.navBtnOutline}>Contactanos</a>
           </div>
         </div>
       </nav>

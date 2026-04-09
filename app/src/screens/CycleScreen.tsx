@@ -1,9 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Vibration, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Vibration, Alert, AppState } from 'react-native';
+import { Audio } from 'expo-av';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { registrarUso } from '../services/api.service';
 import { colors } from '../constants/colors';
+
+async function playNotificationSound() {
+  try {
+    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+    const { sound } = await Audio.Sound.createAsync(
+      require('../../assets/notification.wav')
+    );
+    await sound.playAsync();
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if ('didJustFinish' in status && status.didJustFinish) {
+        sound.unloadAsync();
+      }
+    });
+  } catch {
+    // Si no hay archivo de sonido, solo vibrar
+  }
+}
 
 // Duración del ciclo en segundos (modificar esta variable para cambiar el tiempo)
 const CYCLE_DURATION_SECONDS = 60;
@@ -107,6 +125,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         clearInterval(interval);
         setIsComplete(true);
         Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+        playNotificationSound();
         registrarUso({
           maquina_id,
           edificio_id,

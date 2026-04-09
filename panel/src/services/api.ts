@@ -67,6 +67,19 @@ export async function login(email: string, password: string): Promise<{ token: s
   return data;
 }
 
+export async function registro(campos: {
+  email: string;
+  password: string;
+  nombre: string;
+  telefono?: string;
+  apartamento?: string;
+  edificio_id: string;
+  unidad?: string;
+}): Promise<{ token: string; usuario: Usuario }> {
+  const { data } = await api.post('/api/auth?action=registro', campos);
+  return data;
+}
+
 export async function obtenerResumen(edificioId: string, mes: number, anio: number): Promise<ResumenItem[]> {
   const { data } = await api.get('/api/resumen', {
     params: { edificioId, mes, anio },
