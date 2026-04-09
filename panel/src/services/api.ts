@@ -43,6 +43,10 @@ export interface Uso {
   tipo?: string;
   duracion_min: number;
   residente_id: string;
+  estado?: 'activo' | 'completado' | 'cancelado' | 'averia';
+  completado?: boolean;
+  fecha_inicio?: string;
+  fecha_fin?: string;
   fecha: string;
 }
 
@@ -90,6 +94,16 @@ export async function obtenerResumen(edificioId: string, mes: number, anio: numb
 export async function listarUsos(): Promise<Uso[]> {
   const { data } = await api.get('/api/usos');
   return data.usos;
+}
+
+export async function listarMisUsos(): Promise<Uso[]> {
+  const { data } = await api.get('/api/usos', { params: { mis: 'true' } });
+  return data.usos;
+}
+
+export async function loginUsuario(email: string, password: string): Promise<{ token: string; usuario: Usuario }> {
+  const { data } = await api.post('/api/auth?action=login', { email, password });
+  return data;
 }
 
 export async function listarMaquinas(edificioId: string): Promise<Maquina[]> {

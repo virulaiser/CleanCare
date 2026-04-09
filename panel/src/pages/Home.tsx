@@ -20,7 +20,7 @@ export default function Home() {
             <a href="#contacto" style={styles.navLink}>Contacto</a>
           </div>
           <div className="nav-actions" style={styles.navActions}>
-            <button onClick={() => navigate('/registro')} style={styles.navBtnSolid}>Usuarios</button>
+            <button onClick={() => navigate('/usuarios')} style={styles.navBtnSolid}>Usuarios</button>
             <button onClick={() => navigate('/login')} style={styles.navBtnOutline}>Administración</button>
           </div>
           <button className="nav-hamburger" onClick={() => setMenuOpen(true)}>☰</button>
@@ -37,7 +37,7 @@ export default function Home() {
           <a href="#como-funciona" onClick={() => setMenuOpen(false)}>Cómo funciona</a>
           <a href="#contacto" onClick={() => setMenuOpen(false)}>Contacto</a>
           <div className="mobile-divider" />
-          <button className="mobile-btn-primary" onClick={() => { navigate('/registro'); setMenuOpen(false); }}>Usuarios</button>
+          <button className="mobile-btn-primary" onClick={() => { navigate('/usuarios'); setMenuOpen(false); }}>Usuarios</button>
           <button className="mobile-btn-outline" onClick={() => { navigate('/login'); setMenuOpen(false); }}>Administración</button>
         </div>
       )}
@@ -168,7 +168,7 @@ export default function Home() {
             <a href="https://wa.me/59897789834" target="_blank" rel="noopener noreferrer" style={{ ...styles.btnPrimary, fontSize: 18, padding: '16px 40px' }}>
               Solicitar visita gratuita
             </a>
-            <button onClick={() => navigate('/registro')} style={{ ...styles.btnSecondary, fontSize: 18, padding: '16px 40px', cursor: 'pointer' }}>
+            <button onClick={() => navigate('/usuarios')} style={{ ...styles.btnSecondary, fontSize: 18, padding: '16px 40px', cursor: 'pointer' }}>
               Registrarse como usuario
             </button>
           </div>
@@ -210,7 +210,7 @@ export default function Home() {
             <a href="#inicio" style={styles.footerLink}>Inicio</a>
             <a href="#servicios" style={styles.footerLink}>Servicios</a>
             <a href="#contacto" style={styles.footerLink}>Contacto</a>
-            <span onClick={() => navigate('/registro')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Usuarios</span>
+            <span onClick={() => navigate('/usuarios')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Usuarios</span>
             <span onClick={() => navigate('/login')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Administración</span>
           </div>
         </div>

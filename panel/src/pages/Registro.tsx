@@ -65,8 +65,7 @@ export default function Registro() {
         <div style={styles.navInner}>
           <span style={styles.logo} onClick={() => navigate('/')}>CleanCare</span>
           <div style={styles.navActions}>
-            <button onClick={() => navigate('/')} style={styles.navBtnOutline}>Volver</button>
-            <button onClick={() => navigate('/login')} style={styles.navBtnOutline}>Portal Admin</button>
+            <button onClick={() => navigate('/usuarios')} style={styles.navBtnOutline}>Volver</button>
           </div>
         </div>
       </nav>
@@ -125,7 +124,7 @@ export default function Registro() {
           </button>
 
           <p style={styles.loginLink}>
-            ¿Ya tenés cuenta? <span onClick={() => navigate('/login')} style={styles.link}>Ingresá al portal</span>
+            ¿Ya tenés cuenta? <span onClick={() => navigate('/usuarios')} style={styles.link}>Ingresá</span>
           </p>
         </form>
       </div>

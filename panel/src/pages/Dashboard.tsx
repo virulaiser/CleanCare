@@ -75,7 +75,7 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem('cleancare_token');
     localStorage.removeItem('cleancare_usuario');
-    navigate('/login');
+    navigate('/');
   };
 
   return (

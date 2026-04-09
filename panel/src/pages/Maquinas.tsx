@@ -144,7 +144,7 @@ export default function Maquinas() {
         <nav style={styles.navLinks}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtnActive}>Máquinas</button>
-          <button onClick={() => { localStorage.removeItem('cleancare_token'); localStorage.removeItem('cleancare_usuario'); navigate('/login'); }} style={styles.navBtn}>Cerrar sesión</button>
+          <button onClick={() => { localStorage.removeItem('cleancare_token'); localStorage.removeItem('cleancare_usuario'); navigate('/'); }} style={styles.navBtn}>Cerrar sesión</button>
         </nav>
       </header>
 
