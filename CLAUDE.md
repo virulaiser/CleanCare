@@ -9,7 +9,7 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 ## Arquitectura del sistema
 
 ```
-[QR en máquina] → [App React Native] ←→ [ESP32 por WiFi local]
+[QR en máquina] → [App React Native] ←→ [ESP32 por BLE]
                         ↓
                  [Backend API — Vercel]
                         ↓
@@ -19,10 +19,10 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 ```
 
 ### Reglas de comunicación — CRÍTICO
-- El **ESP32** solo se comunica con la **app móvil** (WiFi local, HTTP directo por IP)
+- El **ESP32** se comunica con la **app móvil** via **BLE** (Bluetooth Low Energy)
 - El **backend** solo se comunica con la **app móvil** y el **panel web** (nunca con el ESP32)
 - La **app móvil** es el único punto que habla con ambos (ESP32 + backend)
-- Flujo: escanear QR → conectar ESP32 → activar relay → confirmar estado → POST al backend
+- Flujo: escanear QR → conectar ESP32 BLE → activar relay → confirmar estado → POST al backend
 
 ---
 
@@ -36,7 +36,10 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 | Panel web | React + Vite + TypeScript | React 19 / Vite 6 |
 | Auth | JWT + bcryptjs | jsonwebtoken 9.0.3 |
 | Deploy backend/panel | Vercel (serverless) | — |
-| Hardware | ESP32 + relay | Arduino |
+| Hardware | ESP32 (BLE) + relay | PlatformIO / Arduino |
+| BLE | react-native-ble-plx | Expo config plugin |
+| Notificaciones | expo-notifications | Background alerts |
+| Audio | expo-av | Sonido de finalización |
 
 ---
 
@@ -47,9 +50,12 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 | Backend API | https://backend-one-tau-21.vercel.app |
 | Panel web | https://panel-three-blush.vercel.app |
 | Landing page | https://panel-three-blush.vercel.app/ |
-| Panel login | https://panel-three-blush.vercel.app/login |
-| Panel dashboard | https://panel-three-blush.vercel.app/dashboard |
-| Panel máquinas | https://panel-three-blush.vercel.app/maquinas |
+| Login usuario | https://panel-three-blush.vercel.app/usuarios |
+| Registro usuario | https://panel-three-blush.vercel.app/registro |
+| Mi cuenta | https://panel-three-blush.vercel.app/mi-cuenta |
+| Admin login | https://panel-three-blush.vercel.app/login |
+| Admin dashboard | https://panel-three-blush.vercel.app/dashboard |
+| Admin máquinas | https://panel-three-blush.vercel.app/maquinas |
 | Repositorio | https://github.com/virulaiser/CleanCare |
 
 ### Credenciales admin
@@ -65,43 +71,48 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 ```
 cleancare/
 ├── CLAUDE.md
+├── TODO.md
 ├── .env                            # Variables de entorno (NO commitear)
 ├── .env.example
 ├── .gitignore
 │
-├── app/                            # React Native (Expo SDK 55)
+├── app/                            # React Native (Expo SDK 54)
 │   ├── App.tsx                     # Entry point
-│   ├── app.json                    # Config Expo (scheme cleancare://)
+│   ├── app.json                    # Config Expo (scheme cleancare://, BLE plugin)
 │   ├── tsconfig.json
 │   ├── assets/
-│   │   └── icon.png
+│   │   ├── icon.png
+│   │   └── notification.wav        # Sonido de finalización de ciclo
 │   └── src/
 │       ├── constants/
 │       │   └── colors.ts           # Paleta CleanCare compartida
 │       ├── navigation/
-│       │   └── AppNavigator.tsx     # Stack: Login → Registro → Scan → Machine → History
+│       │   └── AppNavigator.tsx     # Stack: Onboarding → Login → Scan → Cycle → History → BleTest
 │       ├── screens/
+│       │   ├── OnboardingScreen.tsx # Intro del sistema (se muestra 1 vez)
 │       │   ├── LoginScreen.tsx      # Login con JWT + auto-redirect
-│       │   ├── RegistroScreen.tsx   # Registro de nuevos usuarios
-│       │   ├── ScanScreen.tsx       # Cámara QR + parseo cleancare://
-│       │   ├── MachineScreen.tsx    # Estado ESP32, selector duración, activar
-│       │   └── HistoryScreen.tsx    # Lista de usos con pull-to-refresh
+│       │   ├── RegistroScreen.tsx   # Registro (nombre, email, password, tel, apto, edificio)
+│       │   ├── ScanScreen.tsx       # Cámara QR + modal lavar/secar
+│       │   ├── CycleScreen.tsx      # Animación máquina + timer + notif background + reportar avería
+│       │   ├── MachineScreen.tsx    # Estado ESP32 WiFi (legacy, para cuando haya ESP32 WiFi)
+│       │   ├── HistoryScreen.tsx    # Historial personal con badges estado
+│       │   └── BleTestScreen.tsx    # Test conexión BLE con ESP32
 │       └── services/
-│           ├── api.service.ts       # Axios + JWT interceptor + AsyncStorage
-│           └── esp32.service.ts     # HTTP directo al ESP32 (timeout 5s)
+│           ├── api.service.ts       # Axios + JWT + iniciarUso/actualizarUso/listarUsos
+│           └── esp32.service.ts     # HTTP directo al ESP32 WiFi (legacy)
 │
 ├── backend/                        # Node.js + Express → Vercel serverless
 │   ├── api/
 │   │   ├── index.js                # Router Express (dev local + Vercel export)
 │   │   ├── auth.js                 # POST /api/auth?action=login|registro
-│   │   ├── uso.js                  # POST /api/uso (residente_id del JWT)
-│   │   ├── usos.js                 # GET /api/usos
+│   │   ├── uso.js                  # POST /api/uso (inicio) + PATCH (fin/avería)
+│   │   ├── usos.js                 # GET /api/usos (filtro ?mis=true)
 │   │   ├── resumen.js              # GET /api/resumen (solo admin)
 │   │   └── maquinas.js             # GET/POST/DELETE /api/maquinas
 │   ├── models/
-│   │   ├── Uso.js                  # Schema: maquina_id, edificio_id, duracion_min, etc.
+│   │   ├── Uso.js                  # Schema: estado, fecha_inicio, fecha_fin, completado
 │   │   ├── Maquina.js              # Schema: maquina_id (auto-gen), nombre, tipo, ip, activa
-│   │   └── Usuario.js              # Schema: email, password (bcrypt), rol, edificio_id
+│   │   └── Usuario.js              # Schema: usuario_id (auto-gen), email, tel, apto, edificio
 │   ├── lib/
 │   │   ├── mongodb.js              # Conexión singleton Mongoose
 │   │   └── auth.js                 # generarToken, verificarToken, soloAdmin
@@ -110,22 +121,31 @@ cleancare/
 │
 ├── panel/                          # React + Vite + TypeScript → Vercel
 │   ├── index.html
+│   ├── vercel.json                 # SPA rewrite para rutas client-side
 │   ├── vite.config.ts              # Proxy /api → localhost:3000 en dev
 │   ├── tsconfig.json
 │   └── src/
-│       ├── main.tsx                # Router: / → /login → /dashboard → /maquinas
-│       ├── styles/global.css
+│       ├── main.tsx                # Router: / → /usuarios → /registro → /mi-cuenta → /login → /dashboard → /maquinas
+│       ├── styles/global.css       # Reset + responsive media queries + hamburger menu
 │       ├── constants/colors.ts
-│       ├── services/api.ts         # Axios + JWT interceptor + auto-redirect 401
+│       ├── services/api.ts         # Axios + JWT + login/registro/listarMisUsos
 │       └── pages/
-│           ├── Home.tsx            # Landing page (hero, servicios, contacto)
-│           ├── Login.tsx           # Login real con JWT
-│           ├── Dashboard.tsx       # KPIs + resumen facturación + últimos usos
+│           ├── Home.tsx            # Landing page responsive (hero, servicios, contacto, hamburger mobile)
+│           ├── Usuarios.tsx        # Login de usuario residente
+│           ├── Registro.tsx        # Registro público con todos los campos
+│           ├── MiCuenta.tsx        # Resumen mensual de uso del residente
+│           ├── Login.tsx           # Login admin con JWT
+│           ├── Dashboard.tsx       # KPIs + resumen facturación + exportar CSV
 │           └── Maquinas.tsx        # CRUD máquinas + generación QR + impresión
 │
-└── firmware/                       # ESP32 Arduino
-    └── cleancare_esp32/
-        └── cleancare_esp32.ino     # POST /activar, GET /estado
+└── firmware/                       # ESP32
+    ├── cleancare_esp32/            # Firmware WiFi HTTP (legacy)
+    │   └── cleancare_esp32.ino
+    └── ble_test/                   # Firmware BLE (actual)
+        ├── platformio.ini          # Config PlatformIO
+        ├── ble_test.ino            # Fuente Arduino IDE
+        └── src/
+            └── main.cpp            # Fuente PlatformIO
 ```
 
 ---
@@ -151,14 +171,17 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 #### `usuarios`
 ```json
 {
-  "email": "admin@cleancare.uy",
+  "usuario_id": "USR-DD3FAD",
+  "email": "juan@email.com",
   "password": "$2a$10$...",
-  "nombre": "Admin CleanCare",
-  "rol": "admin",
+  "nombre": "Juan Pérez",
+  "telefono": "099123456",
+  "apartamento": "3B",
+  "rol": "residente",
   "edificio_id": "edificio-central",
-  "unidad": null,
+  "unidad": "apto-302",
   "activo": true,
-  "creado": "2026-04-08T..."
+  "creado": "2026-04-09T..."
 }
 ```
 
@@ -181,8 +204,12 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
   "edificio_id": "edificio-central",
   "tipo": "lavarropas",
   "duracion_min": 45,
-  "residente_id": "apto-302",
-  "fecha": "2026-04-08T15:52:56.202Z"
+  "residente_id": "3B",
+  "estado": "completado",
+  "completado": true,
+  "fecha_inicio": "2026-04-09T15:00:00.000Z",
+  "fecha_fin": "2026-04-09T15:45:00.000Z",
+  "fecha": "2026-04-09T15:00:00.000Z"
 }
 ```
 
@@ -200,8 +227,9 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 ### Protegidos (requieren Bearer token)
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/uso` | Registrar uso (residente_id del JWT) |
-| `GET` | `/api/usos` | Listar todos los usos |
+| `POST` | `/api/uso` | Iniciar ciclo (estado: activo, fecha_inicio) |
+| `PATCH` | `/api/uso?id=X` | Actualizar ciclo (completado/cancelado/averia, fecha_fin) |
+| `GET` | `/api/usos` | Listar usos (todos, o ?mis=true para filtrar por usuario) |
 | `GET` | `/api/maquinas?edificioId=X` | Listar máquinas activas |
 
 ### Solo admin
@@ -217,117 +245,80 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 
 - **Algoritmo**: HS256
 - **Expiración**: 7 días
-- **Payload**: `{ id, email, rol, edificio_id, unidad }`
+- **Payload**: `{ id, usuario_id, email, rol, edificio_id, unidad, apartamento }`
 - **Middleware**: `verificarToken` (todas las rutas protegidas), `soloAdmin` (admin-only)
-- **Password**: bcrypt con 10 rounds
+- **Password**: bcrypt con 10 rounds, mínimo 6 caracteres
+- **Validación email**: regex en backend y app
 - **App**: token en AsyncStorage
 - **Panel**: token en localStorage, interceptor axios auto-redirect en 401
 
 ---
 
-## Generación de máquinas y QR
+## ESP32 — BLE (Bluetooth Low Energy)
 
-Al crear una máquina desde el panel admin:
-1. Se genera un código alfanumérico único: `LAV-XXXXXX` o `SEC-XXXXXX` (crypto.randomBytes)
-2. Se guarda en MongoDB con nombre, tipo, IP local, edificio
-3. Se genera un QR con el formato: `cleancare://maquina?id={maquina_id}&ip={ip}&edificio={edificio_id}`
-4. El QR se puede ver en modal y se puede imprimir desde el panel
-5. La app escanea el QR, parsea el protocolo `cleancare://` y navega a MachineScreen
+### Firmware BLE (`firmware/ble_test/`)
+- **Nombre BLE**: `CleanCare-ESP32`
+- **Service UUID**: `12345678-1234-1234-1234-123456789abc`
+- **Control Char** (Write): `12345678-1234-1234-1234-123456789abd`
+- **Status Char** (Notify): `12345678-1234-1234-1234-123456789abe`
 
----
+### Comandos
+| Comando | Descripción |
+|---|---|
+| `ON:60` | Encender LED por 60 segundos |
+| `OFF` | Apagar LED inmediatamente |
+| `STATUS` | Pedir estado actual |
 
-## ESP32 — API local (WiFi)
+### Respuestas (Notify)
+| Respuesta | Significado |
+|---|---|
+| `ON:45` | LED encendido, 45 segundos restantes |
+| `OFF:0` | LED apagado |
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| `POST` | `/activar` | Enciende relay por N minutos (`{ "minutos": 45 }`) |
-| `GET` | `/estado` | Estado actual (`{ "estado": "funcionando", "minutos_restantes": 32 }`) |
+### Subir firmware
+```bash
+# Con PlatformIO (recomendado)
+cd firmware/ble_test
+pio run --target upload
+pio device monitor
 
-### QR contiene
-```
-cleancare://maquina?id=LAV-7DED11&ip=192.168.1.45&edificio=edificio-central
-```
-
----
-
-## Variables de entorno
-
-### Backend (.env raíz)
-```env
-MONGODB_URI=mongodb://nacho1:<password>@...
-JWT_SECRET=<secret>
-PORT=3000
-```
-
-### App (app/.env)
-```env
-EXPO_PUBLIC_API_URL=https://backend-one-tau-21.vercel.app
-```
-
-### Panel (Vercel env vars)
-```
-VITE_API_URL=https://backend-one-tau-21.vercel.app
+# Con Arduino IDE
+# Abrir firmware/ble_test/ble_test.ino
+# Board: ESP32 Dev Module
+# Upload + Serial Monitor 115200
 ```
 
 ---
 
-## Diseño y estilo — paleta CleanCare
+## Flujo completo — App (sin ESP32 físico)
 
-```js
-const colors = {
-  primary:        '#3B82F6',
-  primaryDark:    '#2563EB',
-  accent:         '#0EA5E9',
-  bgPage:         '#F8FAFC',
-  bgCard:         '#F1F5F9',
-  bgBlueLight:    '#DBEAFE',
-  textPrimary:    '#1E293B',
-  textSecondary:  '#94A3B8',
-  white:          '#FFFFFF',
-  border:         '#E5E7EB',
-  error:          '#EF4444',
-  success:        '#22C55E',
-}
-```
+1. Residente abre la app → OnboardingScreen (solo la primera vez)
+2. LoginScreen (o auto-login si hay token guardado)
+3. ScanScreen → escanea QR de la máquina
+4. Modal: "¿Querés lavar?" / "¿Querés secar?" (detecta tipo del QR)
+5. CycleScreen → POST /api/uso (estado: activo, fecha_inicio)
+6. Animación de máquina + timer descendente + notificación programada
+7. Si sale de la app → notificación suena con pantalla apagada
+8. Al terminar → vibración + sonido + PATCH /api/uso (estado: completado, fecha_fin)
+9. Si reporta avería → PATCH /api/uso (estado: averia)
 
-### Reglas de estilo — UX Design
-- **Botones**: `border-radius: 999px` (pill), fondo azul sólido, texto blanco
-- **Tipografía**: Inter (Google Fonts) o sistema sans-serif
-- **Cards**: fondo blanco, borde `#E5E7EB` 1px, border-radius 12px, sombra sutil
-- **Estilo general**: limpio, minimalista, blanco con acentos azules
-- **Íconos**: estilo outline, tamaño 24px
-- **Badges**: pill con fondo suave (azul para lavarropas, amarillo para secadoras)
-- **Navegación panel**: header fijo con logo + botones pill
-- **Landing page**: hero full-height, secciones alternas blanco/gris, CTA azul, footer oscuro
-- **Formularios**: inputs con borde gris, border-radius 8px, labels pequeñas arriba
-- **Modales**: overlay semi-transparente, card centrada con border-radius 16px
-- **Tablas**: headers gris secundario, filas separadas por borde sutil
-- **Estados**: verde para disponible/éxito, azul para activo, rojo para error, amarillo para secadoras
-- **Responsive**: grids con `auto-fit, minmax()`, flexWrap para formularios
-- **Animaciones**: transiciones suaves, sin animaciones excesivas
-- **Accesibilidad**: contraste suficiente, placeholders descriptivos, labels visibles
-- **Consistencia**: misma paleta y componentes en app, panel y landing
-
----
-
-## Flujo completo paso a paso
-
-1. Residente abre la app → LoginScreen (o auto-login si hay token)
-2. Escanea el QR de la máquina → ScanScreen
-3. App parsea `cleancare://maquina?id=LAV-7DED11&ip=192.168.1.45&edificio=edificio-central`
-4. App hace `GET http://{ip}/estado` → verifica que la máquina esté libre
-5. Usuario selecciona duración (30 / 45 / 60 min) y confirma
-6. App hace `POST http://{ip}/activar` con `{ minutos: 45 }`
-7. ESP32 activa el relay y responde `{ estado: "funcionando" }`
-8. App hace `POST /api/uso` con JWT → backend registra uso con residente_id del token
-9. App muestra estado y pollea `GET /estado` cada 30s
-10. Al finalizar, ESP32 apaga el relay
+### Flujo BLE (con ESP32)
+1. ScanScreen → botón "Test BLE"
+2. BleTestScreen → escanea BLE → encuentra "CleanCare-ESP32"
+3. Conecta + descubre servicios (log muestra tiempos)
+4. Botón "Encender LED" → envía `ON:60` via BLE
+5. ESP32 prende LED + notifica estado cada 2s
+6. Al terminar → ESP32 apaga LED + notifica `OFF:0`
 
 ### Flujo admin
-1. Admin ingresa al panel → Login con JWT
-2. Dashboard: ve KPIs y resumen de facturación por mes
+1. Admin ingresa al panel → /login con JWT
+2. Dashboard: KPIs + resumen facturación + exportar CSV
 3. Máquinas: crea máquinas, genera QR, imprime etiquetas
-4. Los QR impresos se pegan en las máquinas físicas
+
+### Flujo usuario web
+1. Landing (/) → botón "Usuarios"
+2. /usuarios → login de residente
+3. /mi-cuenta → resumen mensual con KPIs y tabla de historial
 
 ---
 
@@ -340,45 +331,47 @@ cd backend && node api/index.js
 # Panel — desarrollo local
 cd panel && npm run dev
 
-# App — desarrollo (Expo Go)
+# App — desarrollo (Expo Go, sin BLE)
 cd app && npx expo start --lan
+
+# App — development build (con BLE)
+cd app && npx expo run:android
+
+# Firmware — PlatformIO
+cd firmware/ble_test && pio run --target upload
 
 # Deploy a Vercel
 cd backend && npx vercel --prod
 cd panel && npx vercel --prod
-
-# Tests rápidos
-curl https://backend-one-tau-21.vercel.app/api
-curl -X POST https://backend-one-tau-21.vercel.app/api/auth?action=login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@cleancare.uy","password":"admin123"}'
 ```
 
 ---
 
 ## Convenciones de código
 
-- Lenguaje: **TypeScript** en app y panel, **JavaScript** en backend
+- Lenguaje: **TypeScript** en app y panel, **JavaScript** en backend, **C++** en firmware
 - Nombrado: camelCase para variables/funciones, PascalCase para componentes
 - Commits: `feat:`, `fix:`, `chore:`, `docs:` (Conventional Commits)
 - No commitear `.env` — usar `.env.example` con valores vacíos
 - Siempre manejar errores de red (el ESP32 puede estar offline)
-- Timeout de 5s para requests al ESP32 — mostrar error amigable si no responde
 - Estilos inline con objetos `styles` tipados en React (panel y app)
 - Axios interceptors para JWT en app (AsyncStorage) y panel (localStorage)
+- Panel responsive con media queries en global.css + hamburger menu mobile
 
 ---
 
 ## Consideraciones importantes
 
-- **Sin internet no funciona el registro de uso**, pero la activación del ESP32 sí (WiFi local)
-- El ESP32 y el celular deben estar en la **misma red WiFi** del edificio
-- La IP del ESP32 puede cambiar — considerar IP fija por MAC en el router
+- **Sin internet no funciona el registro de uso**, pero BLE funciona offline
+- **BLE requiere development build** (`npx expo run:android`), no funciona en Expo Go
+- **Expo Go** funciona para todo excepto BLE (QR, login, ciclo simulado, historial)
 - En Windows/Node.js usar siempre connection string estándar (no SRV) para MongoDB
 - MongoDB Atlas capa gratuita (512MB) — suficiente para empezar
-- Vercel funciones serverless timeout 10s — suficiente para estos endpoints
 - Soft-delete en máquinas preserva historial de usos
 - Los códigos de máquina son únicos (LAV/SEC + 6 hex chars)
+- Los códigos de usuario son únicos (USR + 6 hex chars)
+- Timer usa `Date.now()` para precisión incluso después de background
+- Notificaciones programadas con `expo-notifications` funcionan con pantalla apagada
 
 ---
 
