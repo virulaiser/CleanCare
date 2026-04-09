@@ -20,6 +20,17 @@ export default function RegistroScreen({ navigation }: Props) {
       Alert.alert('Error', 'Completá todos los campos obligatorios');
       return;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Error', 'Formato de email inválido');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
     setLoading(true);
     try {
       await registrarUsuario({

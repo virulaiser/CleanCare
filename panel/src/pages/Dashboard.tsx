@@ -55,6 +55,23 @@ export default function Dashboard() {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
 
+  function exportarCSV() {
+    if (resumen.length === 0) return;
+
+    const header = 'Máquina,Usos,Minutos';
+    const rows = resumen.map((r) => `${r._id},${r.total_usos},${r.minutos_totales}`);
+    rows.push(`TOTAL,${totalUsos},${totalMinutos}`);
+    const csv = [header, ...rows].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cleancare_resumen_${meses[mes - 1]}_${anio}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('cleancare_token');
     localStorage.removeItem('cleancare_usuario');
@@ -95,6 +112,16 @@ export default function Dashboard() {
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
+            <button
+              onClick={exportarCSV}
+              disabled={resumen.length === 0 || loading}
+              style={{
+                ...styles.exportBtn,
+                opacity: resumen.length === 0 || loading ? 0.5 : 1,
+              }}
+            >
+              Exportar CSV
+            </button>
           </div>
         </div>
 
@@ -315,5 +342,16 @@ const styles: Record<string, React.CSSProperties> = {
   emptyText: {
     color: colors.textSecondary,
     fontSize: 14,
+  },
+  exportBtn: {
+    padding: '8px 20px',
+    borderRadius: 999,
+    border: 'none',
+    backgroundColor: colors.success,
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
   },
 };

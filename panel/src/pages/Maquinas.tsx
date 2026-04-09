@@ -65,6 +65,12 @@ export default function Maquinas() {
       return;
     }
 
+    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!ipRegex.test(ipLocal)) {
+      setFormError('Formato de IP inválido (ej: 192.168.1.45)');
+      return;
+    }
+
     setCreando(true);
     try {
       await crearMaquina({ nombre, tipo, ip_local: ipLocal, edificio_id: edificioId });

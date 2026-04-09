@@ -40,6 +40,15 @@ async function crear(req, res) {
     return res.status(400).json({ ok: false, error: 'Faltan campos: nombre, tipo, ip_local, edificio_id' });
   }
 
+  const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (!ipRegex.test(ip_local)) {
+    return res.status(400).json({ ok: false, error: 'Formato de IP inválido (ej: 192.168.1.45)' });
+  }
+
+  if (!['lavarropas', 'secadora'].includes(tipo)) {
+    return res.status(400).json({ ok: false, error: 'Tipo debe ser "lavarropas" o "secadora"' });
+  }
+
   // Generar código alfanumérico: prefijo por tipo + 6 chars random
   const prefijo = tipo === 'secadora' ? 'SEC' : 'LAV';
   const sufijo = crypto.randomBytes(3).toString('hex').toUpperCase();

@@ -34,6 +34,15 @@ async function registro(req, res) {
     return res.status(400).json({ ok: false, error: 'Faltan campos: email, password, nombre, edificio_id' });
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ ok: false, error: 'Formato de email inválido' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' });
+  }
+
   const existe = await Usuario.findOne({ email });
   if (existe) {
     return res.status(409).json({ ok: false, error: 'Ya existe un usuario con ese email' });
