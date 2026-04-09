@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '../constants/colors';
 
 export default function Home() {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -11,37 +12,52 @@ export default function Home() {
       <nav style={styles.nav}>
         <div style={styles.navInner}>
           <span style={styles.logo}>CleanCare</span>
-          <div style={styles.navLinks}>
+          <div className="nav-links" style={styles.navLinks}>
             <a href="#inicio" style={styles.navLink}>Inicio</a>
             <a href="#nosotros" style={styles.navLink}>Nosotros</a>
             <a href="#servicios" style={styles.navLink}>Servicios</a>
             <a href="#como-funciona" style={styles.navLink}>Cómo funciona</a>
             <a href="#contacto" style={styles.navLink}>Contacto</a>
           </div>
-          <div style={styles.navActions}>
-            <button onClick={() => navigate('/registro')} style={styles.navBtnSolid}>Registrarse</button>
-            <button onClick={() => navigate('/login')} style={styles.navBtnOutline}>Portal Admin</button>
-            <a href="https://wa.me/59897789834" target="_blank" rel="noopener noreferrer" style={styles.navBtnOutline}>Contactanos</a>
+          <div className="nav-actions" style={styles.navActions}>
+            <button onClick={() => navigate('/registro')} style={styles.navBtnSolid}>Usuarios</button>
+            <button onClick={() => navigate('/login')} style={styles.navBtnOutline}>Administración</button>
           </div>
+          <button className="nav-hamburger" onClick={() => setMenuOpen(true)}>☰</button>
         </div>
       </nav>
 
+      {/* MOBILE MENU */}
+      {menuOpen && (
+        <div className="mobile-menu">
+          <button className="mobile-menu-close" onClick={() => setMenuOpen(false)}>✕</button>
+          <a href="#inicio" onClick={() => setMenuOpen(false)}>Inicio</a>
+          <a href="#nosotros" onClick={() => setMenuOpen(false)}>Nosotros</a>
+          <a href="#servicios" onClick={() => setMenuOpen(false)}>Servicios</a>
+          <a href="#como-funciona" onClick={() => setMenuOpen(false)}>Cómo funciona</a>
+          <a href="#contacto" onClick={() => setMenuOpen(false)}>Contacto</a>
+          <div className="mobile-divider" />
+          <button className="mobile-btn-primary" onClick={() => { navigate('/registro'); setMenuOpen(false); }}>Usuarios</button>
+          <button className="mobile-btn-outline" onClick={() => { navigate('/login'); setMenuOpen(false); }}>Administración</button>
+        </div>
+      )}
+
       {/* HERO */}
-      <section id="inicio" style={styles.hero}>
-        <div style={styles.heroContent}>
+      <section id="inicio" className="hero-section" style={styles.hero}>
+        <div className="hero-content" style={styles.heroContent}>
           <span style={styles.heroBadge}>Lavandería inteligente</span>
-          <h1 style={styles.heroTitle}>Lavandería inteligente<br />para tu edificio</h1>
-          <p style={styles.heroText}>
+          <h1 className="hero-title" style={styles.heroTitle}>Lavandería inteligente<br />para tu edificio</h1>
+          <p className="hero-text" style={styles.heroText}>
             Instalación y mantenimiento de equipos de lavandería autoservicio con control digital.
             Sin inversión del consorcio. Tecnología, mantenimiento continuo y gestión digital.
           </p>
-          <div style={styles.heroButtons}>
+          <div className="hero-buttons" style={styles.heroButtons}>
             <a href="https://wa.me/59897789834" target="_blank" rel="noopener noreferrer" style={styles.btnPrimary}>
               Solicitar visita gratuita
             </a>
             <a href="#como-funciona" style={styles.btnSecondary}>Ver cómo funciona</a>
           </div>
-          <div style={styles.heroStats}>
+          <div className="hero-stats" style={styles.heroStats}>
             <div style={styles.stat}><span style={styles.statNum}>50+</span><span style={styles.statLabel}>Edificios</span></div>
             <div style={styles.statDivider} />
             <div style={styles.stat}><span style={styles.statNum}>200+</span><span style={styles.statLabel}>Máquinas</span></div>
@@ -49,7 +65,7 @@ export default function Home() {
             <div style={styles.stat}><span style={styles.statNum}>10k+</span><span style={styles.statLabel}>Usos mensuales</span></div>
           </div>
         </div>
-        <div style={styles.heroVisual}>
+        <div className="hero-visual" style={styles.heroVisual}>
           <div style={styles.heroCard}>
             <div style={styles.heroCardIcon}>&#x1F9FA;</div>
             <div style={styles.heroCardTitle}>Lavarropas 3B</div>
@@ -60,11 +76,11 @@ export default function Home() {
       </section>
 
       {/* NOSOTROS */}
-      <section id="nosotros" style={styles.sectionGray}>
+      <section id="nosotros" className="section-padding" style={styles.sectionGray}>
         <div style={styles.container}>
-          <h2 style={styles.sectionTitle}>¿Por qué CleanCare?</h2>
-          <p style={styles.sectionSubtitle}>Tecnología, mantenimiento continuo y gestión digital sin inversión del consorcio</p>
-          <div style={styles.grid3}>
+          <h2 className="section-title" style={styles.sectionTitle}>¿Por qué CleanCare?</h2>
+          <p className="section-subtitle" style={styles.sectionSubtitle}>Tecnología, mantenimiento continuo y gestión digital sin inversión del consorcio</p>
+          <div className="grid-3" style={styles.grid3}>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>&#x1F4CA;</div>
               <h3 style={styles.featureTitle}>Gestión completa</h3>
@@ -85,11 +101,11 @@ export default function Home() {
       </section>
 
       {/* SERVICIOS */}
-      <section id="servicios" style={styles.sectionWhite}>
+      <section id="servicios" className="section-padding" style={styles.sectionWhite}>
         <div style={styles.container}>
-          <h2 style={styles.sectionTitle}>Nuestros servicios</h2>
-          <p style={styles.sectionSubtitle}>Todo lo que tu edificio necesita para una lavandería moderna</p>
-          <div style={styles.grid2}>
+          <h2 className="section-title" style={styles.sectionTitle}>Nuestros servicios</h2>
+          <p className="section-subtitle" style={styles.sectionSubtitle}>Todo lo que tu edificio necesita para una lavandería moderna</p>
+          <div className="grid-2" style={styles.grid2}>
             <div style={styles.serviceCard}>
               <div style={styles.serviceHeader}>
                 <span style={styles.serviceIcon}>&#x1F3E2;</span>
@@ -119,11 +135,11 @@ export default function Home() {
       </section>
 
       {/* CÓMO FUNCIONA */}
-      <section id="como-funciona" style={styles.sectionBlue}>
+      <section id="como-funciona" className="section-padding" style={styles.sectionBlue}>
         <div style={styles.container}>
-          <h2 style={{ ...styles.sectionTitle, color: colors.white }}>¿Cómo funciona?</h2>
-          <p style={{ ...styles.sectionSubtitle, color: 'rgba(255,255,255,0.8)' }}>En 3 simples pasos</p>
-          <div style={styles.grid3}>
+          <h2 className="section-title" style={{ ...styles.sectionTitle, color: colors.white }}>¿Cómo funciona?</h2>
+          <p className="section-subtitle" style={{ ...styles.sectionSubtitle, color: 'rgba(255,255,255,0.8)' }}>En 3 simples pasos</p>
+          <div className="grid-3" style={styles.grid3}>
             <div style={styles.stepCard}>
               <div style={styles.stepNumber}>1</div>
               <h3 style={styles.stepTitle}>Escaneá el QR</h3>
@@ -144,21 +160,26 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section style={styles.sectionWhite}>
+      <section className="section-padding" style={styles.sectionWhite}>
         <div style={{ ...styles.container, textAlign: 'center' as const, padding: '80px 24px' }}>
-          <h2 style={styles.sectionTitle}>¿Listo para modernizar tu lavandería?</h2>
-          <p style={styles.sectionSubtitle}>Contactanos y te visitamos sin costo para evaluar tu edificio</p>
-          <a href="https://wa.me/59897789834" target="_blank" rel="noopener noreferrer" style={{ ...styles.btnPrimary, fontSize: 18, padding: '16px 40px' }}>
-            Solicitar visita gratuita
-          </a>
+          <h2 className="section-title" style={styles.sectionTitle}>¿Listo para modernizar tu lavandería?</h2>
+          <p className="section-subtitle" style={styles.sectionSubtitle}>Contactanos y te visitamos sin costo para evaluar tu edificio</p>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const }}>
+            <a href="https://wa.me/59897789834" target="_blank" rel="noopener noreferrer" style={{ ...styles.btnPrimary, fontSize: 18, padding: '16px 40px' }}>
+              Solicitar visita gratuita
+            </a>
+            <button onClick={() => navigate('/registro')} style={{ ...styles.btnSecondary, fontSize: 18, padding: '16px 40px', cursor: 'pointer' }}>
+              Registrarse como usuario
+            </button>
+          </div>
         </div>
       </section>
 
       {/* CONTACTO */}
-      <section id="contacto" style={styles.sectionGray}>
+      <section id="contacto" className="section-padding" style={styles.sectionGray}>
         <div style={styles.container}>
-          <h2 style={styles.sectionTitle}>Contacto</h2>
-          <div style={styles.grid3}>
+          <h2 className="section-title" style={styles.sectionTitle}>Contacto</h2>
+          <div className="grid-3" style={styles.grid3}>
             <div style={styles.contactCard}>
               <div style={styles.contactIcon}>&#x1F4E7;</div>
               <h4 style={styles.contactLabel}>Email</h4>
@@ -180,16 +201,17 @@ export default function Home() {
 
       {/* FOOTER */}
       <footer style={styles.footer}>
-        <div style={styles.footerInner}>
+        <div className="footer-inner" style={styles.footerInner}>
           <div>
             <span style={styles.footerLogo}>CleanCare</span>
             <p style={styles.footerText}>Lavandería inteligente para edificios residenciales. Tecnología, mantenimiento y gestión digital.</p>
           </div>
-          <div style={styles.footerLinks}>
+          <div className="footer-links" style={styles.footerLinks}>
             <a href="#inicio" style={styles.footerLink}>Inicio</a>
             <a href="#servicios" style={styles.footerLink}>Servicios</a>
             <a href="#contacto" style={styles.footerLink}>Contacto</a>
-            <span onClick={() => navigate('/login')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Portal Admin</span>
+            <span onClick={() => navigate('/registro')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Usuarios</span>
+            <span onClick={() => navigate('/login')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Administración</span>
           </div>
         </div>
         <div style={styles.footerBottom}>
@@ -222,7 +244,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   navBtnSolid: {
     padding: '8px 20px', borderRadius: 999, backgroundColor: colors.primary,
-    color: colors.white, fontSize: 14, fontWeight: 500, textDecoration: 'none',
+    color: colors.white, fontSize: 14, fontWeight: 600, border: 'none',
+    cursor: 'pointer', fontFamily: 'inherit',
   },
 
   // HERO
@@ -249,7 +272,7 @@ const styles: Record<string, React.CSSProperties> = {
   btnSecondary: {
     display: 'inline-block', padding: '14px 32px', borderRadius: 999,
     border: `2px solid ${colors.border}`, color: colors.textPrimary, fontSize: 16, fontWeight: 600,
-    textDecoration: 'none', backgroundColor: 'transparent',
+    textDecoration: 'none', backgroundColor: 'transparent', fontFamily: 'inherit',
   },
   heroStats: { display: 'flex', alignItems: 'center', gap: 32 },
   stat: { display: 'flex', flexDirection: 'column' as const },
@@ -283,7 +306,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // GRIDS
   grid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 },
-  grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24 },
+  grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 },
 
   // FEATURE CARDS
   featureCard: {
@@ -332,7 +355,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   footerLogo: { fontSize: 22, fontWeight: 700, color: colors.white, display: 'block', marginBottom: 12 },
   footerText: { fontSize: 14, color: 'rgba(255,255,255,0.6)', maxWidth: 360, lineHeight: 1.6 },
-  footerLinks: { display: 'flex', gap: 24 },
+  footerLinks: { display: 'flex', gap: 24, flexWrap: 'wrap' as const },
   footerLink: { fontSize: 14, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' },
   footerBottom: {
     maxWidth: 1200, margin: '0 auto', padding: '20px 0',
