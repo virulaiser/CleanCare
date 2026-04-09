@@ -22,8 +22,22 @@
         "backgroundColor": "#3B82F6"
       },
       "package": "uy.cleancare.app",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_ADVERTISE"
+      ]
     },
-    "plugins": ["expo-router", "expo-camera", "expo-notifications"]
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-notifications",
+      [
+        "react-native-ble-plx",
+        { "isBackgroundEnabled": true, "modes": ["peripheral", "central"] }
+      ]
+    ]
   }
 }

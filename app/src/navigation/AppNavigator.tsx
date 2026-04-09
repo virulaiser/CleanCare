@@ -8,6 +8,7 @@ import ScanScreen from '../screens/ScanScreen';
 import MachineScreen from '../screens/MachineScreen';
 import CycleScreen from '../screens/CycleScreen';
 import HistoryScreen from '../screens/HistoryScreen';
+import BleTestScreen from '../screens/BleTestScreen';
 import { colors } from '../constants/colors';
 
 export type RootStackParamList = {
@@ -26,6 +27,7 @@ export type RootStackParamList = {
     tipo: 'lavarropas' | 'secadora';
   };
   History: undefined;
+  BleTest: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -76,6 +78,11 @@ export default function AppNavigator() {
           name="History"
           component={HistoryScreen}
           options={{ title: 'Historial de Usos' }}
+        />
+        <Stack.Screen
+          name="BleTest"
+          component={BleTestScreen}
+          options={{ title: 'Test BLE' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

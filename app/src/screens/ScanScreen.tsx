@@ -90,12 +90,20 @@ export default function ScanScreen({ navigation }: Props) {
         <View style={styles.scanFrame} />
         <Text style={styles.hint}>Apuntá la cámara al QR de la máquina</Text>
       </View>
-      <TouchableOpacity
-        style={styles.historyButton}
-        onPress={() => navigation.navigate('History')}
-      >
-        <Text style={styles.historyButtonText}>Ver historial</Text>
-      </TouchableOpacity>
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={styles.historyButton}
+          onPress={() => navigation.navigate('History')}
+        >
+          <Text style={styles.historyButtonText}>Ver historial</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.bleButton}
+          onPress={() => navigation.navigate('BleTest')}
+        >
+          <Text style={styles.bleButtonText}>Test BLE</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Modal de confirmación */}
       <Modal visible={!!parsedQR} transparent animationType="fade">
@@ -190,10 +198,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  historyButton: {
+  bottomBar: {
     position: 'absolute',
     bottom: 40,
     alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  historyButton: {
     backgroundColor: colors.white,
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -201,6 +213,17 @@ const styles = StyleSheet.create({
   },
   historyButtonText: {
     color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bleButton: {
+    backgroundColor: colors.textPrimary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 999,
+  },
+  bleButtonText: {
+    color: colors.white,
     fontSize: 14,
     fontWeight: '600',
   },
