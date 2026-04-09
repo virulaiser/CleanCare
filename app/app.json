@@ -24,6 +24,6 @@
       "package": "uy.cleancare.app",
       "permissions": ["CAMERA"]
     },
-    "plugins": ["expo-router", "expo-camera"]
+    "plugins": ["expo-router", "expo-camera", "expo-notifications"]
   }
 }

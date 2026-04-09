@@ -36,7 +36,10 @@ export interface Uso {
   tipo?: string;
   duracion_min: number;
   residente_id: string;
+  estado?: 'activo' | 'completado' | 'cancelado' | 'averia';
   completado?: boolean;
+  fecha_inicio?: string;
+  fecha_fin?: string;
   fecha?: string;
 }
 
@@ -85,6 +88,22 @@ export async function logout(): Promise<void> {
   await AsyncStorage.multiRemove(['cleancare_token', 'cleancare_usuario']);
 }
 
+export async function iniciarUso(uso: {
+  maquina_id: string;
+  edificio_id: string;
+  duracion_min: number;
+  tipo?: 'lavarropas' | 'secadora';
+}): Promise<Uso> {
+  const { data } = await api.post('/api/uso', uso);
+  return data.uso;
+}
+
+export async function actualizarUso(id: string, estado: 'completado' | 'cancelado' | 'averia'): Promise<Uso> {
+  const { data } = await api.patch(`/api/uso?id=${id}`, { estado });
+  return data.uso;
+}
+
+// Backward compatible alias
 export async function registrarUso(uso: {
   maquina_id: string;
   edificio_id: string;

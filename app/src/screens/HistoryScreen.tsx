@@ -60,7 +60,14 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: Uso }) => {
     const isWasher = item.tipo !== 'secadora';
-    const completed = item.completado;
+    const estado = item.estado || (item.completado ? 'completado' : 'cancelado');
+    const estadoConfig: Record<string, { bg: string; color: string; label: string }> = {
+      completado: { bg: '#DCFCE7', color: '#16A34A', label: 'Completado' },
+      cancelado:  { bg: '#FEF2F2', color: '#EF4444', label: 'Cancelado' },
+      averia:     { bg: '#FEF3C7', color: '#D97706', label: 'Avería' },
+      activo:     { bg: '#DBEAFE', color: '#3B82F6', label: 'En curso' },
+    };
+    const st = estadoConfig[estado] || estadoConfig.cancelado;
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
@@ -69,16 +76,16 @@ export default function HistoryScreen() {
               {isWasher ? '🫧 Lavado' : '🌀 Secado'}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: completed ? '#DCFCE7' : '#FEF2F2' }]}>
-            <Text style={[styles.statusBadgeText, { color: completed ? '#16A34A' : '#EF4444' }]}>
-              {completed ? 'Completado' : 'Cancelado'}
+          <View style={[styles.statusBadge, { backgroundColor: st.bg }]}>
+            <Text style={[styles.statusBadgeText, { color: st.color }]}>
+              {st.label}
             </Text>
           </View>
         </View>
         <Text style={styles.machineId}>{item.maquina_id}</Text>
         <View style={styles.cardFooter}>
           <Text style={styles.detail}>{item.duracion_min} min</Text>
-          {item.fecha && <Text style={styles.fecha}>{formatFecha(item.fecha)}</Text>}
+          {item.fecha_inicio && <Text style={styles.fecha}>{formatFecha(item.fecha_inicio)}</Text>}
         </View>
       </View>
     );

@@ -20,6 +20,7 @@ app.post('/api/auth', authHandler);
 
 // Rutas protegidas (requieren token)
 app.post('/api/uso', verificarToken, usoHandler);
+app.patch('/api/uso', verificarToken, usoHandler);
 app.get('/api/usos', verificarToken, usosHandler);
 app.get('/api/maquinas', verificarToken, maquinasHandler);
 
