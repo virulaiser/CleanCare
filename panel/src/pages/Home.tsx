@@ -56,6 +56,7 @@ export default function Home() {
               Solicitar visita gratuita
             </a>
             <a href="#como-funciona" style={styles.btnSecondary}>Ver cómo funciona</a>
+            <a href="#" onClick={(e) => e.preventDefault()} style={styles.btnDownload}>Bajar App</a>
           </div>
           <div className="hero-stats" style={styles.heroStats}>
             <div style={styles.stat}><span style={styles.statNum}>50+</span><span style={styles.statLabel}>Edificios</span></div>
@@ -273,6 +274,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-block', padding: '14px 32px', borderRadius: 999,
     border: `2px solid ${colors.border}`, color: colors.textPrimary, fontSize: 16, fontWeight: 600,
     textDecoration: 'none', backgroundColor: 'transparent', fontFamily: 'inherit',
+  },
+  btnDownload: {
+    display: 'inline-block', padding: '14px 32px', borderRadius: 999,
+    backgroundColor: colors.textPrimary, color: colors.white, fontSize: 16, fontWeight: 600,
+    textDecoration: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
   },
   heroStats: { display: 'flex', alignItems: 'center', gap: 32 },
   stat: { display: 'flex', flexDirection: 'column' as const },
