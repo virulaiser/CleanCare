@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -25,6 +25,7 @@ function parseQR(data: string): { maquina_id: string; ip: string; edificio_id: s
 export default function ScanScreen({ navigation }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [parsedQR, setParsedQR] = useState<{ maquina_id: string; ip: string; edificio_id: string } | null>(null);
 
   if (!permission) {
     return <View style={styles.container}><Text>Cargando...</Text></View>;
@@ -53,8 +54,29 @@ export default function ScanScreen({ navigation }: Props) {
       return;
     }
 
-    navigation.navigate('Machine', parsed);
-    setTimeout(() => setScanned(false), 2000);
+    setParsedQR(parsed);
+  };
+
+  const getTipoFromQR = (): 'lavarropas' | 'secadora' => {
+    if (parsedQR?.maquina_id.startsWith('SEC')) return 'secadora';
+    return 'lavarropas';
+  };
+
+  const handleConfirmCycle = () => {
+    if (!parsedQR) return;
+    const tipo = getTipoFromQR();
+    setParsedQR(null);
+    setScanned(false);
+    navigation.navigate('Cycle', {
+      maquina_id: parsedQR.maquina_id,
+      edificio_id: parsedQR.edificio_id,
+      tipo,
+    });
+  };
+
+  const handleCancelModal = () => {
+    setParsedQR(null);
+    setScanned(false);
   };
 
   return (
@@ -74,6 +96,45 @@ export default function ScanScreen({ navigation }: Props) {
       >
         <Text style={styles.historyButtonText}>Ver historial</Text>
       </TouchableOpacity>
+
+      {/* Modal de confirmación */}
+      <Modal visible={!!parsedQR} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconCircle}>
+              <Text style={styles.modalIcon}>
+                {getTipoFromQR() === 'lavarropas' ? '🫧' : '🌀'}
+              </Text>
+            </View>
+            <Text style={styles.modalTitle}>
+              {getTipoFromQR() === 'lavarropas' ? '¿Querés lavar?' : '¿Querés secar?'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              Máquina: {parsedQR?.maquina_id}
+            </Text>
+            <View style={styles.modalBadge}>
+              <Text style={[styles.modalBadgeText, {
+                color: getTipoFromQR() === 'lavarropas' ? colors.primary : '#D97706',
+              }]}>
+                {getTipoFromQR() === 'lavarropas' ? 'Lavarropas' : 'Secadora'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.modalConfirmBtn, {
+                backgroundColor: getTipoFromQR() === 'lavarropas' ? colors.primary : '#F59E0B',
+              }]}
+              onPress={handleConfirmCycle}
+            >
+              <Text style={styles.modalConfirmText}>
+                {getTipoFromQR() === 'lavarropas' ? 'Iniciar lavado' : 'Iniciar secado'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={handleCancelModal}>
+              <Text style={styles.modalCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -142,5 +203,74 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 32,
+    width: '85%',
+    alignItems: 'center',
+  },
+  modalIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.bgBlueLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalIcon: {
+    fontSize: 36,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontFamily: 'monospace',
+    marginBottom: 12,
+  },
+  modalBadge: {
+    backgroundColor: colors.bgBlueLight,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginBottom: 24,
+  },
+  modalBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalConfirmBtn: {
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    borderRadius: 999,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalConfirmText: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalCancelBtn: {
+    paddingVertical: 10,
+  },
+  modalCancelText: {
+    color: colors.textSecondary,
+    fontSize: 14,
   },
 });

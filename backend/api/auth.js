@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
 };
 
 async function registro(req, res) {
-  const { email, password, nombre, rol, edificio_id, unidad } = req.body;
+  const { email, password, nombre, rol, edificio_id, unidad, telefono, apartamento } = req.body;
 
   if (!email || !password || !nombre || !edificio_id) {
     return res.status(400).json({ ok: false, error: 'Faltan campos: email, password, nombre, edificio_id' });
@@ -52,6 +52,8 @@ async function registro(req, res) {
     email,
     password,
     nombre,
+    telefono,
+    apartamento,
     rol: rol || 'residente',
     edificio_id,
     unidad,
@@ -64,8 +66,11 @@ async function registro(req, res) {
     token,
     usuario: {
       id: usuario._id,
+      usuario_id: usuario.usuario_id,
       email: usuario.email,
       nombre: usuario.nombre,
+      telefono: usuario.telefono,
+      apartamento: usuario.apartamento,
       rol: usuario.rol,
       edificio_id: usuario.edificio_id,
       unidad: usuario.unidad,
@@ -97,8 +102,11 @@ async function login(req, res) {
     token,
     usuario: {
       id: usuario._id,
+      usuario_id: usuario.usuario_id,
       email: usuario.email,
       nombre: usuario.nombre,
+      telefono: usuario.telefono,
+      apartamento: usuario.apartamento,
       rol: usuario.rol,
       edificio_id: usuario.edificio_id,
       unidad: usuario.unidad,

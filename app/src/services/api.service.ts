@@ -19,8 +19,11 @@ api.interceptors.request.use(async (config) => {
 
 export interface Usuario {
   id: string;
+  usuario_id?: string;
   email: string;
   nombre: string;
+  telefono?: string;
+  apartamento?: string;
   rol: string;
   edificio_id: string;
   unidad?: string;
@@ -33,6 +36,7 @@ export interface Uso {
   tipo?: string;
   duracion_min: number;
   residente_id: string;
+  completado?: boolean;
   fecha?: string;
 }
 
@@ -59,6 +63,8 @@ export async function registrarUsuario(campos: {
   nombre: string;
   edificio_id: string;
   unidad?: string;
+  telefono?: string;
+  apartamento?: string;
 }): Promise<{ token: string; usuario: Usuario }> {
   const { data } = await api.post('/api/auth?action=registro', campos);
   await AsyncStorage.setItem('cleancare_token', data.token);
@@ -79,7 +85,13 @@ export async function logout(): Promise<void> {
   await AsyncStorage.multiRemove(['cleancare_token', 'cleancare_usuario']);
 }
 
-export async function registrarUso(uso: { maquina_id: string; edificio_id: string; duracion_min: number }): Promise<Uso> {
+export async function registrarUso(uso: {
+  maquina_id: string;
+  edificio_id: string;
+  duracion_min: number;
+  tipo?: 'lavarropas' | 'secadora';
+  completado?: boolean;
+}): Promise<Uso> {
   const { data } = await api.post('/api/uso', uso);
   return data.uso;
 }

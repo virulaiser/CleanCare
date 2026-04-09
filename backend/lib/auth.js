@@ -7,10 +7,12 @@ function generarToken(usuario) {
   return jwt.sign(
     {
       id: usuario._id,
+      usuario_id: usuario.usuario_id,
       email: usuario.email,
       rol: usuario.rol,
       edificio_id: usuario.edificio_id,
       unidad: usuario.unidad,
+      apartamento: usuario.apartamento,
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES }

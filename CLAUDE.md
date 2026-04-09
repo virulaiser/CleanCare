@@ -30,7 +30,7 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 
 | Componente | Tecnología | Versión |
 |---|---|---|
-| App móvil | React Native (Expo) | SDK 55 (expo 55.0.12, RN 0.83.4) |
+| App móvil | React Native (Expo) | SDK 54 (expo 54.0.33, RN 0.81.5) |
 | Backend API | Node.js + Express + Mongoose | Express 5.2.1 / Mongoose 9.4.1 |
 | Base de datos | MongoDB Atlas | Cluster en sa-east-1 |
 | Panel web | React + Vite + TypeScript | React 19 / Vite 6 |

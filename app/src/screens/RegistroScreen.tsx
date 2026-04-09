@@ -11,6 +11,8 @@ export default function RegistroScreen({ navigation }: Props) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [apartamento, setApartamento] = useState('');
   const [edificio, setEdificio] = useState('');
   const [unidad, setUnidad] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,6 +41,8 @@ export default function RegistroScreen({ navigation }: Props) {
         password,
         edificio_id: edificio,
         unidad: unidad || undefined,
+        telefono: telefono || undefined,
+        apartamento: apartamento || undefined,
       });
       navigation.replace('Scan');
     } catch (err: any) {
@@ -54,7 +58,9 @@ export default function RegistroScreen({ navigation }: Props) {
 
       <TextInput style={styles.input} placeholder="Nombre completo" placeholderTextColor={colors.textSecondary} value={nombre} onChangeText={setNombre} />
       <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textSecondary} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Contraseña" placeholderTextColor={colors.textSecondary} value={password} onChangeText={setPassword} secureTextEntry />
+      <TextInput style={styles.input} placeholder="Contraseña (mínimo 6 caracteres)" placeholderTextColor={colors.textSecondary} value={password} onChangeText={setPassword} secureTextEntry />
+      <TextInput style={styles.input} placeholder="Teléfono (ej: 099123456)" placeholderTextColor={colors.textSecondary} value={telefono} onChangeText={setTelefono} keyboardType="phone-pad" />
+      <TextInput style={styles.input} placeholder="Apartamento (ej: 3B)" placeholderTextColor={colors.textSecondary} value={apartamento} onChangeText={setApartamento} />
       <TextInput style={styles.input} placeholder="ID del edificio (ej: edificio-central)" placeholderTextColor={colors.textSecondary} value={edificio} onChangeText={setEdificio} />
       <TextInput style={styles.input} placeholder="Unidad (ej: apto-302) — opcional" placeholderTextColor={colors.textSecondary} value={unidad} onChangeText={setUnidad} />
 

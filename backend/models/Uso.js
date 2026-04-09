@@ -6,6 +6,7 @@ const usoSchema = new mongoose.Schema({
   tipo:         { type: String, enum: ['lavarropas', 'secadora'], default: 'lavarropas' },
   duracion_min: { type: Number, required: true, min: 1, max: 120 },
   residente_id: { type: String, required: true },
+  completado:   { type: Boolean, default: false },
   fecha:        { type: Date, default: Date.now }
 });
 
