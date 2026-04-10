@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const connectDB = require('../lib/mongodb');
 const Maquina = require('../models/Maquina');
+const Uso = require('../models/Uso');
 
 module.exports = async (req, res) => {
   try {
@@ -30,7 +31,18 @@ async function listar(req, res) {
   }
 
   const maquinas = await Maquina.find({ edificio_id: edificioId, activa: true }).lean();
-  res.json({ ok: true, total: maquinas.length, maquinas });
+
+  // Check active uses for each machine
+  const maquinaIds = maquinas.map(m => m.maquina_id);
+  const usosActivos = await Uso.find({ maquina_id: { $in: maquinaIds }, estado: 'activo' }).lean();
+  const ocupadasSet = new Set(usosActivos.map(u => u.maquina_id));
+
+  const conEstado = maquinas.map(m => ({
+    ...m,
+    ocupada: ocupadasSet.has(m.maquina_id),
+  }));
+
+  res.json({ ok: true, total: conEstado.length, maquinas: conEstado });
 }
 
 async function crear(req, res) {

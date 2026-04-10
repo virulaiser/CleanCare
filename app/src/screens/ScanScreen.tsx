@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, FlatList } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { obtenerBilletera } from '../services/api.service';
+import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, Maquina } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
@@ -29,10 +29,15 @@ export default function ScanScreen({ navigation }: Props) {
   const [scanned, setScanned] = useState(false);
   const [parsedQR, setParsedQR] = useState<{ maquina_id: string; edificio_id: string } | null>(null);
   const [saldo, setSaldo] = useState<number | null>(null);
+  const [maquinas, setMaquinas] = useState<(Maquina & { ocupada?: boolean })[]>([]);
+  const [showMaquinas, setShowMaquinas] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       obtenerBilletera().then(data => setSaldo(data.saldo)).catch(() => {});
+      getUsuarioGuardado().then(u => {
+        if (u?.edificio_id) listarMaquinas(u.edificio_id).then(m => setMaquinas(m as any)).catch(() => {});
+      });
     }, [])
   );
 
@@ -132,6 +137,12 @@ export default function ScanScreen({ navigation }: Props) {
           <Text style={styles.historyButtonText}>Historial</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={styles.maquinasButton}
+          onPress={() => setShowMaquinas(true)}
+        >
+          <Text style={styles.maquinasButtonText}>Máquinas</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.bleButton}
           onPress={() => navigation.navigate('BleTest')}
         >
@@ -173,6 +184,40 @@ export default function ScanScreen({ navigation }: Props) {
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalCancelBtn} onPress={handleCancelModal}>
               <Text style={styles.modalCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal disponibilidad máquinas */}
+      <Modal visible={showMaquinas} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Máquinas</Text>
+            <FlatList
+              data={maquinas}
+              keyExtractor={(item) => item.maquina_id}
+              renderItem={({ item }) => (
+                <View style={[styles.maqRow, { backgroundColor: item.ocupada ? '#FEF2F2' : '#F0FDF4' }]}>
+                  <View style={[styles.maqDot, { backgroundColor: item.ocupada ? '#EF4444' : '#22C55E' }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{item.nombre}</Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                      {item.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}
+                    </Text>
+                  </View>
+                  <Text style={{
+                    fontSize: 12, fontWeight: '700',
+                    color: item.ocupada ? '#DC2626' : '#16A34A',
+                  }}>
+                    {item.ocupada ? 'Ocupada' : 'Disponible'}
+                  </Text>
+                </View>
+              )}
+              ListEmptyComponent={<Text style={{ textAlign: 'center', color: colors.textSecondary, padding: 20 }}>No hay máquinas</Text>}
+            />
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowMaquinas(false)}>
+              <Text style={styles.modalCancelText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -284,6 +329,30 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  maquinasButton: {
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 999,
+  },
+  maquinasButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  maqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  maqDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   // Modal
   modalOverlay: {

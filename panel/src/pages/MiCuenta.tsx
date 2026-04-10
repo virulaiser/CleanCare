@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listarMisUsos, obtenerBilletera, Uso, Usuario, Transaccion } from '../services/api';
+import { listarMisUsos, obtenerBilletera, listarMaquinas, Uso, Maquina, Usuario, Transaccion } from '../services/api';
 import { colors } from '../constants/colors';
 
 function getUsuario(): Usuario | null {
@@ -28,6 +28,7 @@ export default function MiCuenta() {
   const [anio, setAnio] = useState(now.getFullYear());
   const [usos, setUsos] = useState<Uso[]>([]);
   const [saldo, setSaldo] = useState<number | null>(null);
+  const [maquinasDisp, setMaquinasDisp] = useState<(Maquina & { ocupada?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -45,12 +46,15 @@ export default function MiCuenta() {
     setLoading(true);
     setError('');
     try {
-      const [data, billetera] = await Promise.all([
+      const edificio = usuario?.edificio_id || '';
+      const [data, billetera, maqData] = await Promise.all([
         listarMisUsos(),
         obtenerBilletera(),
+        edificio ? listarMaquinas(edificio) : Promise.resolve([]),
       ]);
       setUsos(data);
       setSaldo(billetera.saldo);
+      setMaquinasDisp(maqData as (Maquina & { ocupada?: boolean })[]);
     } catch {
       setError('Error al cargar tus usos.');
     } finally {
@@ -108,6 +112,35 @@ export default function MiCuenta() {
             {loading ? '...' : saldo ?? 0} fichas
           </span>
         </div>
+
+        {/* Disponibilidad de máquinas */}
+        {maquinasDisp.length > 0 && (
+          <div style={styles.card}>
+            <h3 style={styles.cardTitle}>Máquinas de tu edificio</h3>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {maquinasDisp.map((m) => (
+                <div key={m.maquina_id} style={{
+                  padding: '12px 20px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
+                  backgroundColor: m.ocupada ? '#FEF2F2' : '#F0FDF4',
+                  border: `1px solid ${m.ocupada ? '#FECACA' : '#BBF7D0'}`,
+                }}>
+                  <span style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    backgroundColor: m.ocupada ? '#EF4444' : '#22C55E',
+                  }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>{m.nombre}</span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999,
+                    backgroundColor: m.ocupada ? '#FEE2E2' : '#DCFCE7',
+                    color: m.ocupada ? '#DC2626' : '#16A34A',
+                  }}>
+                    {m.ocupada ? 'Ocupada' : 'Disponible'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* KPIs */}
         <div style={styles.kpiRow}>
