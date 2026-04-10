@@ -135,7 +135,6 @@ export default function Maquinas() {
       </head>
       <body>
         <h2>${maquina.nombre}</h2>
-        <div class="code">${maquina.maquina_id}</div>
         <div class="tipo">${maquina.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}</div>
         <div id="qr"></div>
         <div class="footer">Escaneá este código con la app CleanCare</div>
@@ -254,7 +253,6 @@ export default function Maquinas() {
         <div style={styles.modalOverlay} onClick={() => setQrMaquina(null)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>{qrMaquina.nombre}</h3>
-            <p style={styles.modalCode}>{qrMaquina.maquina_id}</p>
             <p style={styles.modalTipo}>{qrMaquina.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}</p>
             <div ref={qrRef} style={styles.qrContainer}>
               <QRCode value={buildQRValue(qrMaquina)} size={220} level="M" />
