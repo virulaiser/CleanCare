@@ -212,6 +212,30 @@ export async function listarEdificios(): Promise<Edificio[]> {
   return data.edificios;
 }
 
+// --- Tips ---
+
+export interface Tip {
+  _id: string;
+  texto: string;
+  tipo: 'lavarropas' | 'secadora' | 'ambos';
+  activo: boolean;
+  creado: string;
+}
+
+export async function listarTips(): Promise<Tip[]> {
+  const { data } = await api.get('/api/tips');
+  return data.tips;
+}
+
+export async function crearTip(texto: string, tipo: string): Promise<Tip> {
+  const { data } = await api.post('/api/tips', { texto, tipo });
+  return data.tip;
+}
+
+export async function eliminarTip(id: string): Promise<void> {
+  await api.delete('/api/tips', { params: { id } });
+}
+
 export async function crearEdificio(campos: { nombre: string; direccion?: string; admin_nombre?: string; admin_telefono?: string }): Promise<Edificio> {
   const { data } = await api.post('/api/edificios', campos);
   return data.edificio;

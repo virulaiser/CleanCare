@@ -13,6 +13,7 @@ const resumenCreditosHandler = require('./resumen-creditos');
 const cronAsignacionHandler = require('./cron-asignacion');
 const usuariosHandler = require('./usuarios');
 const edificiosHandler = require('./edificios');
+const tipsHandler = require('./tips');
 
 const app = express();
 app.use(cors());
@@ -24,6 +25,7 @@ app.get('/api', (req, res) => {
 });
 app.post('/api/auth', authHandler);
 app.get('/api/edificios', edificiosHandler);
+app.get('/api/tips', tipsHandler);
 
 // Rutas protegidas (requieren token)
 app.post('/api/uso', verificarToken, usoHandler);
@@ -46,6 +48,8 @@ app.post('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
 app.delete('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
 app.post('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
 app.delete('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
+app.post('/api/tips', verificarToken, soloAdmin, tipsHandler);
+app.delete('/api/tips', verificarToken, soloAdmin, tipsHandler);
 
 // Cron (protegido por CRON_SECRET, no por JWT)
 app.get('/api/cron/asignacion-mensual', cronAsignacionHandler);

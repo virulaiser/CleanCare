@@ -11,6 +11,7 @@ const Usuario = require('./models/Usuario');
 const Uso = require('./models/Uso');
 const Transaccion = require('./models/Transaccion');
 const ConfigEdificio = require('./models/ConfigEdificio');
+const Tip = require('./models/Tip');
 
 async function seed() {
   await connectDB();
@@ -25,6 +26,7 @@ async function seed() {
     Uso.deleteMany({}),
     Transaccion.deleteMany({}),
     ConfigEdificio.deleteMany({}),
+    Tip.deleteMany({}),
   ]);
   console.log('  OK — todas las colecciones vacías');
 
@@ -180,6 +182,22 @@ async function seed() {
 
   await Uso.insertMany(usosData);
   console.log(`  OK — ${TOTAL_USOS} usos creados (rango: ${DIAS_RANGO} días)`);
+
+  // 8. Crear tips de ejemplo
+  console.log('Creando tips...');
+  await Tip.insertMany([
+    { texto: 'No colocar championes ni calzado en la máquina', tipo: 'lavarropas' },
+    { texto: 'No lavar prendas con plumas (camperas de pluma, almohadas)', tipo: 'lavarropas' },
+    { texto: 'No mezclar ropa de mascotas con ropa personal', tipo: 'ambos' },
+    { texto: 'Vaciá los bolsillos antes de poner la ropa', tipo: 'lavarropas' },
+    { texto: 'No sobrecargues la máquina, dejá espacio para que la ropa se mueva', tipo: 'ambos' },
+    { texto: 'Separá la ropa blanca de la de color', tipo: 'lavarropas' },
+    { texto: 'No secar prendas delicadas ni de lycra', tipo: 'secadora' },
+    { texto: 'Limpiá el filtro de pelusas antes de usar la secadora', tipo: 'secadora' },
+    { texto: 'Cerrá los cierres y abrochá los botones antes de lavar', tipo: 'lavarropas' },
+    { texto: 'No dejes la ropa húmeda en la máquina por mucho tiempo', tipo: 'ambos' },
+  ]);
+  console.log('  OK — 10 tips creados');
 
   console.log('\n=== Seed completado ===');
   console.log('  2 edificios: Torre Norte, Torre Sur');

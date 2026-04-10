@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Vibration, Alert, AppState } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Vibration, Alert, AppState, Modal } from 'react-native';
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { iniciarUso, actualizarUso } from '../services/api.service';
+import { iniciarUso, actualizarUso, obtenerTipRandom } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 // BLE UUIDs (deben coincidir con el firmware ESP32)
@@ -140,6 +140,8 @@ export default function CycleScreen({ navigation, route }: Props) {
   const [isComplete, setIsComplete] = useState(false);
   const [bleState, setBleState] = useState<BleState>('scanning');
   const [bleLog, setBleLog] = useState('Buscando ESP32...');
+  const [tipTexto, setTipTexto] = useState<string | null>(null);
+  const [showTip, setShowTip] = useState(false);
 
   const startTimeRef = useRef(Date.now());
   const usoIdRef = useRef<string | null>(null);
@@ -150,6 +152,17 @@ export default function CycleScreen({ navigation, route }: Props) {
 
   const isWasher = tipo === 'lavarropas';
   const accentColor = isWasher ? colors.primary : '#F59E0B';
+
+  // --- Tip: fetch random tip and show after 5s ---
+  useEffect(() => {
+    obtenerTipRandom(tipo).then(t => {
+      if (t) {
+        setTipTexto(t);
+        const timer = setTimeout(() => setShowTip(true), 5000);
+        return () => clearTimeout(timer);
+      }
+    });
+  }, [tipo]);
 
   // --- BLE: buscar, conectar, enviar ON ---
   useEffect(() => {
@@ -576,6 +589,20 @@ export default function CycleScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Tip popup */}
+      <Modal visible={showTip && !!tipTexto} transparent animationType="fade">
+        <View style={styles.tipOverlay}>
+          <View style={styles.tipCard}>
+            <Text style={styles.tipIcon}>💡</Text>
+            <Text style={styles.tipTitle}>Consejo</Text>
+            <Text style={styles.tipText}>{tipTexto}</Text>
+            <TouchableOpacity style={styles.tipBtn} onPress={() => setShowTip(false)}>
+              <Text style={styles.tipBtnText}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -666,4 +693,23 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: colors.white, fontSize: 18, fontWeight: '700' },
   secondaryButton: { paddingVertical: 12, paddingHorizontal: 24 },
   secondaryButtonText: { fontSize: 16, fontWeight: '600' },
+
+  // Tip popup
+  tipOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  tipCard: {
+    backgroundColor: '#FFFBEB', borderRadius: 20, padding: 32,
+    width: '85%', alignItems: 'center',
+    borderWidth: 2, borderColor: '#FDE68A',
+  },
+  tipIcon: { fontSize: 40, marginBottom: 8 },
+  tipTitle: { fontSize: 20, fontWeight: '700', color: '#92400E', marginBottom: 12 },
+  tipText: { fontSize: 16, color: '#78350F', textAlign: 'center', lineHeight: 24, marginBottom: 20 },
+  tipBtn: {
+    backgroundColor: '#F59E0B', paddingVertical: 12, paddingHorizontal: 32,
+    borderRadius: 999,
+  },
+  tipBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });

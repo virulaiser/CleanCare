@@ -146,6 +146,15 @@ export async function obtenerBilletera(): Promise<{ saldo: number; transacciones
   return data;
 }
 
+// --- Tips ---
+
+export async function obtenerTipRandom(tipo: string): Promise<string | null> {
+  try {
+    const { data } = await api.get('/api/tips', { params: { random: 'true', tipo } });
+    return data.tip?.texto || null;
+  } catch { return null; }
+}
+
 // --- Edificios ---
 
 export interface Edificio {
