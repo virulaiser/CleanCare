@@ -223,7 +223,6 @@ export default function Maquinas() {
               <thead>
                 <tr>
                   <th style={styles.th}>Nombre</th>
-                  <th style={styles.th}>Código</th>
                   <th style={styles.th}>Tipo</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
@@ -231,10 +230,7 @@ export default function Maquinas() {
               <tbody>
                 {maquinas.map((m) => (
                   <tr key={m._id}>
-                    <td style={styles.td}>{m.nombre}</td>
-                    <td style={styles.tdCode}>
-                      <span style={{ cursor: 'pointer' }} onClick={() => setIdMaquina(m)}>{m.maquina_id}</span>
-                    </td>
+                    <td style={{ ...styles.td, cursor: 'pointer' }} onClick={() => setIdMaquina(m)}>{m.nombre}</td>
                     <td style={styles.td}>
                       <span style={m.tipo === 'secadora' ? styles.badgeSecadora : styles.badgeLavarropas}>
                         {m.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}

@@ -13,7 +13,6 @@ export default function Home() {
         <div style={styles.navInner}>
           <span style={styles.logo}>CleanCare</span>
           <div className="nav-links" style={styles.navLinks}>
-            <a href="#inicio" style={styles.navLink}>Inicio</a>
             <a href="#nosotros" style={styles.navLink}>Nosotros</a>
             <a href="#servicios" style={styles.navLink}>Servicios</a>
             <a href="#como-funciona" style={styles.navLink}>Cómo funciona</a>
@@ -31,7 +30,6 @@ export default function Home() {
       {menuOpen && (
         <div className="mobile-menu">
           <button className="mobile-menu-close" onClick={() => setMenuOpen(false)}>✕</button>
-          <a href="#inicio" onClick={() => setMenuOpen(false)}>Inicio</a>
           <a href="#nosotros" onClick={() => setMenuOpen(false)}>Nosotros</a>
           <a href="#servicios" onClick={() => setMenuOpen(false)}>Servicios</a>
           <a href="#como-funciona" onClick={() => setMenuOpen(false)}>Cómo funciona</a>

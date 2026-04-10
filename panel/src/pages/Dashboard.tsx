@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { obtenerResumen, listarUsos, ResumenItem, Uso, Usuario } from '../services/api';
+import { obtenerResumen, listarUsos, listarMaquinas, ResumenItem, Uso, Maquina, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
 function getUsuario(): Usuario | null {
@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [anio, setAnio] = useState(now.getFullYear());
   const [resumen, setResumen] = useState<ResumenItem[]>([]);
   const [usos, setUsos] = useState<Uso[]>([]);
+  const [maquinaMap, setMaquinaMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -34,10 +35,14 @@ export default function Dashboard() {
     setLoading(true);
     setError('');
     try {
-      const [resumenData, usosData] = await Promise.all([
+      const [resumenData, usosData, maquinasData] = await Promise.all([
         obtenerResumen(edificioId, mes, anio),
         listarUsos(),
+        listarMaquinas(edificioId),
       ]);
+      const map: Record<string, string> = {};
+      maquinasData.forEach((m) => { map[m.maquina_id] = m.nombre; });
+      setMaquinaMap(map);
       setResumen(resumenData);
       setUsos(usosData);
     } catch {
@@ -163,7 +168,7 @@ export default function Dashboard() {
               <tbody>
                 {resumen.map((item) => (
                   <tr key={item._id}>
-                    <td style={styles.td}>{item._id}</td>
+                    <td style={styles.td}>{maquinaMap[item._id] || item._id}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{item.total_usos}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{item.minutos_totales}</td>
                   </tr>
@@ -199,7 +204,7 @@ export default function Dashboard() {
                         hour: '2-digit', minute: '2-digit',
                       })}
                     </td>
-                    <td style={styles.td}>{uso.maquina_id}</td>
+                    <td style={styles.td}>{maquinaMap[uso.maquina_id] || uso.maquina_id}</td>
                     <td style={styles.td}>{uso.residente_id || '—'}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{uso.duracion_min} min</td>
                   </tr>
