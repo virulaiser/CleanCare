@@ -16,13 +16,15 @@ function buildQRValue(m: Maquina): string {
 export default function Maquinas() {
   const navigate = useNavigate();
   const usuario = getUsuario();
-  const edificioId = usuario?.edificio_id || 'edificio-central';
+  const defaultEdificioId = usuario?.edificio_id || '';
 
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [edificioId, setEdificioId] = useState(defaultEdificioId);
 
   // Form state
+  const [formEdificio, setFormEdificio] = useState(defaultEdificioId);
   const [tipo, setTipo] = useState<'lavarropas' | 'secadora' | 'ambos'>('lavarropas');
   const [creando, setCreando] = useState(false);
   const [formError, setFormError] = useState('');
@@ -51,9 +53,12 @@ export default function Maquinas() {
   }, [navigate]);
 
   useEffect(() => {
-    fetchMaquinas();
     listarEdificios().then(setEdificios).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (edificioId) fetchMaquinas();
+  }, [edificioId]);
 
   async function fetchMaquinas() {
     setLoading(true);
@@ -68,26 +73,27 @@ export default function Maquinas() {
     }
   }
 
-  // Generate auto-name: edificioId_N (next number)
-  function getNextName(tipoMaq: 'lavarropas' | 'secadora'): string {
+  // Generate auto-name: edificio_TIPO_N (next number)
+  function getNextName(tipoMaq: 'lavarropas' | 'secadora', ediId: string): string {
     const prefix = tipoMaq === 'secadora' ? 'SEC' : 'LAV';
-    const existing = maquinas.filter(m => m.tipo === tipoMaq);
-    return `${edificioId}_${prefix}_${existing.length}`;
+    const existing = maquinas.filter(m => m.tipo === tipoMaq && m.edificio_id === ediId);
+    return `${ediId}_${prefix}_${existing.length}`;
   }
 
   async function handleCrear(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
+    if (!formEdificio) { setFormError('Seleccioná un edificio'); return; }
     setCreando(true);
     try {
       if (tipo === 'ambos') {
-        const nameLav = getNextName('lavarropas');
-        const nameSec = getNextName('secadora');
-        await crearMaquina({ nombre: nameLav, tipo: 'lavarropas', edificio_id: edificioId });
-        await crearMaquina({ nombre: nameSec, tipo: 'secadora', edificio_id: edificioId });
+        const nameLav = getNextName('lavarropas', formEdificio);
+        const nameSec = getNextName('secadora', formEdificio);
+        await crearMaquina({ nombre: nameLav, tipo: 'lavarropas', edificio_id: formEdificio });
+        await crearMaquina({ nombre: nameSec, tipo: 'secadora', edificio_id: formEdificio });
       } else {
-        const name = getNextName(tipo);
-        await crearMaquina({ nombre: name, tipo, edificio_id: edificioId });
+        const name = getNextName(tipo, formEdificio);
+        await crearMaquina({ nombre: name, tipo, edificio_id: formEdificio });
       }
       setTipo('lavarropas');
       await fetchMaquinas();
@@ -172,6 +178,15 @@ export default function Maquinas() {
           {formError && <div style={styles.error}>{formError}</div>}
           <form onSubmit={handleCrear} style={styles.form}>
             <div style={styles.formGroup}>
+              <label style={styles.label}>Edificio</label>
+              <select style={styles.input} value={formEdificio} onChange={(e) => setFormEdificio(e.target.value)}>
+                <option value="">Seleccioná edificio</option>
+                {edificios.map((ed) => (
+                  <option key={ed.edificio_id} value={ed.edificio_id}>{ed.nombre} ({ed.edificio_id})</option>
+                ))}
+              </select>
+            </div>
+            <div style={styles.formGroup}>
               <label style={styles.label}>Tipo</label>
               <select style={styles.input} value={tipo} onChange={(e) => setTipo(e.target.value as 'lavarropas' | 'secadora' | 'ambos')}>
                 <option value="lavarropas">Lavarropas</option>
@@ -184,13 +199,20 @@ export default function Maquinas() {
             </button>
           </form>
           <p style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8 }}>
-            El nombre se genera automáticamente: {edificioId}_{tipo === 'ambos' ? 'LAV/SEC' : (tipo === 'secadora' ? 'SEC' : 'LAV')}_N
+            Nombre auto: {formEdificio || '???'}_{tipo === 'ambos' ? 'LAV/SEC' : (tipo === 'secadora' ? 'SEC' : 'LAV')}_N
           </p>
         </div>
 
         {/* Lista */}
         <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Máquinas activas — {edificioId}</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ ...styles.cardTitle, marginBottom: 0 }}>Máquinas activas</h3>
+            <select style={styles.input} value={edificioId} onChange={(e) => setEdificioId(e.target.value)}>
+              {edificios.map((ed) => (
+                <option key={ed.edificio_id} value={ed.edificio_id}>{ed.nombre}</option>
+              ))}
+            </select>
+          </div>
           {error && <div style={styles.error}>{error}</div>}
           {loading ? (
             <p style={styles.muted}>Cargando...</p>

@@ -53,9 +53,8 @@ export default function Registro() {
         edificio_id: edificio,
         unidad: unidad || undefined,
       });
-      setSuccess('¡Cuenta creada correctamente! Ya podés usar la app CleanCare.');
-      setNombre(''); setEmail(''); setPassword(''); setTelefono('');
-      setApartamento(''); setEdificio(''); setUnidad('');
+      setSuccess('¡Cuenta creada! Redirigiendo...');
+      setTimeout(() => navigate('/usuarios'), 1500);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Error al registrar. Intentá de nuevo.');
     } finally {

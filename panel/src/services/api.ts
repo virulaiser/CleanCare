@@ -191,8 +191,9 @@ export async function obtenerResumenCreditos(edificioId: string, mes: number, an
   return data;
 }
 
-export async function listarUsuariosEdificio(edificioId: string): Promise<{ usuario_id: string; nombre: string; apartamento: string; email: string; saldo: number }[]> {
-  const { data } = await api.get('/api/usuarios', { params: { edificioId } });
+export async function listarUsuariosEdificio(edificioId?: string): Promise<{ usuario_id: string; nombre: string; apartamento: string; email: string; edificio_id: string; saldo: number }[]> {
+  const params = edificioId ? { edificioId } : {};
+  const { data } = await api.get('/api/usuarios', { params });
   return data.usuarios;
 }
 

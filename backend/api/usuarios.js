@@ -11,15 +11,13 @@ module.exports = async (req, res) => {
     }
 
     const { edificioId } = req.query;
-    if (!edificioId) {
-      return res.status(400).json({ ok: false, error: 'edificioId requerido' });
-    }
 
-    const usuarios = await Usuario.find({
-      edificio_id: edificioId,
-      activo: true,
-      rol: 'residente'
-    }).select('usuario_id nombre email apartamento telefono').lean();
+    const filter = { activo: true, rol: 'residente' };
+    if (edificioId) filter.edificio_id = edificioId;
+
+    const usuarios = await Usuario.find(filter)
+      .select('usuario_id nombre email apartamento telefono edificio_id')
+      .lean();
 
     // Obtener saldo de cada usuario
     const conSaldo = await Promise.all(

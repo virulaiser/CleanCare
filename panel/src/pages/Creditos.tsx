@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   obtenerConfigEdificio, actualizarConfigEdificio,
   listarUsuariosEdificio, agregarCreditos, agregarCreditosMasivo,
-  obtenerResumenCreditos, obtenerBilleteraUsuario,
-  ResumenCreditoItem, ConfigEdificio, Transaccion, Usuario,
+  obtenerResumenCreditos, obtenerBilleteraUsuario, listarEdificios,
+  ResumenCreditoItem, ConfigEdificio, Transaccion, Edificio, Usuario,
 } from '../services/api';
 import { colors } from '../constants/colors';
 
@@ -35,7 +35,10 @@ export default function Creditos() {
   const [cuentaLoading, setCuentaLoading] = useState(false);
 
   // Usuarios
-  const [usuarios, setUsuarios] = useState<{ usuario_id: string; nombre: string; apartamento: string; email: string; saldo: number }[]>([]);
+  const [usuarios, setUsuarios] = useState<{ usuario_id: string; nombre: string; apartamento: string; email: string; edificio_id: string; saldo: number }[]>([]);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroEdificio, setFiltroEdificio] = useState('');
+  const [edificios, setEdificios] = useState<Edificio[]>([]);
 
   // Modal agregar créditos
   const [modalUsuario, setModalUsuario] = useState<string | null>(null);
@@ -72,10 +75,12 @@ export default function Creditos() {
     setLoading(true);
     setError('');
     try {
-      const [configData, usuariosData] = await Promise.all([
+      const [configData, usuariosData, edificiosData] = await Promise.all([
         obtenerConfigEdificio(edificioId),
-        listarUsuariosEdificio(edificioId),
+        listarUsuariosEdificio(),
+        listarEdificios(),
       ]);
+      setEdificios(edificiosData);
       setConfig(configData);
       setCreditosMensuales(configData.creditos_mensuales);
       setCostoLavado(configData.costo_lavado);
@@ -126,7 +131,7 @@ export default function Creditos() {
       setModalCantidad('');
       setModalDesc('');
       // Refresh
-      const usuariosData = await listarUsuariosEdificio(edificioId);
+      const usuariosData = await listarUsuariosEdificio();
       setUsuarios(usuariosData);
     } catch {
       alert('Error al agregar créditos');
@@ -141,7 +146,7 @@ export default function Creditos() {
       setMasivoMsg(`Se asignaron ${masivoCantidad} créditos a ${result.total_usuarios} usuarios`);
       setMasivoCantidad('');
       setMasivoDesc('');
-      const usuariosData = await listarUsuariosEdificio(edificioId);
+      const usuariosData = await listarUsuariosEdificio();
       setUsuarios(usuariosData);
       setTimeout(() => setMasivoMsg(''), 4000);
     } catch {
@@ -218,8 +223,27 @@ export default function Creditos() {
 
         {/* Usuarios + saldos */}
         <div style={styles.card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={styles.cardTitle}>Usuarios y saldos</h3>
+          <h3 style={styles.cardTitle}>Usuarios y saldos</h3>
+
+          {/* Buscador y filtros */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, email o apto..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={{ ...styles.input, flex: '1 1 250px' }}
+            />
+            <select
+              value={filtroEdificio}
+              onChange={(e) => setFiltroEdificio(e.target.value)}
+              style={{ ...styles.input, minWidth: 160 }}
+            >
+              <option value="">Todos los edificios</option>
+              {edificios.map((ed) => (
+                <option key={ed.edificio_id} value={ed.edificio_id}>{ed.nombre}</option>
+              ))}
+            </select>
           </div>
 
           {/* Masivo */}
@@ -230,26 +254,35 @@ export default function Creditos() {
           </div>
           {masivoMsg && <p style={{ fontSize: 13, color: masivoMsg.includes('Error') ? colors.error : colors.success, marginBottom: 12 }}>{masivoMsg}</p>}
 
-          {loading ? (
+          {(() => {
+            const q = busqueda.toLowerCase();
+            const filtered = usuarios.filter((u) => {
+              if (filtroEdificio && u.edificio_id !== filtroEdificio) return false;
+              if (q && !u.nombre.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q) && !(u.apartamento || '').toLowerCase().includes(q) && !String(u.saldo).includes(q)) return false;
+              return true;
+            });
+            return loading ? (
             <p style={styles.muted}>Cargando...</p>
-          ) : usuarios.length === 0 ? (
-            <p style={styles.muted}>No hay usuarios registrados en este edificio.</p>
+          ) : filtered.length === 0 ? (
+            <p style={styles.muted}>No hay usuarios que coincidan con el filtro.</p>
           ) : (
             <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>Nombre</th>
                   <th style={styles.th}>Apto</th>
+                  <th style={styles.th}>Edificio</th>
                   <th style={styles.th}>Email</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Saldo</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {usuarios.map((u) => (
+                {filtered.map((u) => (
                   <tr key={u.usuario_id}>
                     <td style={styles.td}>{u.nombre}</td>
                     <td style={styles.td}>{u.apartamento || '-'}</td>
+                    <td style={{ ...styles.td, fontSize: 12, fontFamily: 'monospace' }}>{u.edificio_id}</td>
                     <td style={styles.td}>{u.email}</td>
                     <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700, color: u.saldo <= 0 ? colors.error : colors.textPrimary }}>
                       {u.saldo}
@@ -272,7 +305,8 @@ export default function Creditos() {
                 ))}
               </tbody>
             </table>
-          )}
+          );
+          })()}
         </div>
 
         {/* Resumen mensual de consumo */}
