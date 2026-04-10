@@ -25,8 +25,8 @@ export default function RegistroScreen({ navigation }: Props) {
   }, []);
 
   const handleRegistro = async () => {
-    if (!nombre || !email || !password || !edificio) {
-      Alert.alert('Error', 'Completá todos los campos obligatorios');
+    if (!nombre || !email || !password || !edificio || !apartamento) {
+      Alert.alert('Error', 'Completá todos los campos obligatorios (nombre, email, contraseña, apartamento, edificio)');
       return;
     }
 

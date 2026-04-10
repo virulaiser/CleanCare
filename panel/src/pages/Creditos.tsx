@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import {
   obtenerConfigEdificio, actualizarConfigEdificio,
   listarUsuariosEdificio, agregarCreditos, agregarCreditosMasivo,
@@ -154,19 +155,22 @@ export default function Creditos() {
     }
   }
 
-  function exportarCSV() {
+  function exportarExcel() {
     if (resumen.length === 0) return;
-    const header = 'Usuario,Apartamento,Créditos usados,Créditos asignados,Devoluciones,Saldo actual';
-    const rows = resumen.map(r => `${r.nombre},${r.apartamento},${r.creditos_usados},${r.creditos_asignados},${r.devoluciones},${r.saldo_actual}`);
-    rows.push(`TOTAL,,${totalConsumo},,,`);
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `creditos_${meses[mes - 1]}_${anio}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const data = resumen.map(r => ({
+      'Usuario': r.nombre,
+      'Apartamento': r.apartamento,
+      'Créditos usados': r.creditos_usados,
+      'Créditos asignados': r.creditos_asignados,
+      'Devoluciones': r.devoluciones,
+      'Saldo actual': r.saldo_actual,
+    }));
+    data.push({ 'Usuario': 'TOTAL', 'Apartamento': '', 'Créditos usados': totalConsumo, 'Créditos asignados': 0, 'Devoluciones': 0, 'Saldo actual': 0 });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Créditos');
+    XLSX.writeFile(wb, `creditos_${meses[mes - 1]}_${anio}.xlsx`);
   }
 
   const handleLogout = () => {
@@ -320,7 +324,7 @@ export default function Creditos() {
               <select value={anio} onChange={(e) => setAnio(Number(e.target.value))} style={styles.select}>
                 {[2025, 2026, 2027].map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
-              <button onClick={exportarCSV} disabled={resumen.length === 0} style={{ ...styles.exportBtn, opacity: resumen.length === 0 ? 0.5 : 1 }}>Exportar CSV</button>
+              <button onClick={exportarExcel} disabled={resumen.length === 0} style={{ ...styles.exportBtn, opacity: resumen.length === 0 ? 0.5 : 1 }}>Exportar Excel</button>
             </div>
           </div>
 

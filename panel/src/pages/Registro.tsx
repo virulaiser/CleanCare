@@ -26,8 +26,8 @@ export default function Registro() {
     setError('');
     setSuccess('');
 
-    if (!nombre || !email || !password || !edificio) {
-      setError('Completá los campos obligatorios: nombre, email, contraseña y edificio');
+    if (!nombre || !email || !password || !edificio || !apartamento) {
+      setError('Completá los campos obligatorios: nombre, email, contraseña, apartamento y edificio');
       return;
     }
 
@@ -106,7 +106,7 @@ export default function Registro() {
 
           <div style={styles.row}>
             <div style={styles.field}>
-              <label style={styles.label}>Apartamento</label>
+              <label style={styles.label}>Apartamento *</label>
               <input style={styles.input} value={apartamento} onChange={(e) => setApartamento(e.target.value)} placeholder="Ej: 3B" />
             </div>
             <div style={styles.field}>

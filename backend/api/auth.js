@@ -31,8 +31,8 @@ module.exports = async (req, res) => {
 async function registro(req, res) {
   const { email, password, nombre, rol, edificio_id, unidad, telefono, apartamento } = req.body;
 
-  if (!email || !password || !nombre || !edificio_id) {
-    return res.status(400).json({ ok: false, error: 'Faltan campos: email, password, nombre, edificio_id' });
+  if (!email || !password || !nombre || !edificio_id || !apartamento) {
+    return res.status(400).json({ ok: false, error: 'Faltan campos: email, password, nombre, edificio_id, apartamento' });
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

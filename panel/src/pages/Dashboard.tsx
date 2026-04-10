@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { obtenerResumen, listarUsos, listarMaquinas, ResumenItem, Uso, Maquina, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
@@ -60,21 +61,20 @@ export default function Dashboard() {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
 
-  function exportarCSV() {
+  function exportarExcel() {
     if (resumen.length === 0) return;
 
-    const header = 'Máquina,Usos,Minutos';
-    const rows = resumen.map((r) => `${r._id},${r.total_usos},${r.minutos_totales}`);
-    rows.push(`TOTAL,${totalUsos},${totalMinutos}`);
-    const csv = [header, ...rows].join('\n');
+    const data = resumen.map((r) => ({
+      'Máquina': maquinaMap[r._id] || r._id,
+      'Usos': r.total_usos,
+      'Minutos': r.minutos_totales,
+    }));
+    data.push({ 'Máquina': 'TOTAL', 'Usos': totalUsos, 'Minutos': totalMinutos });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `cleancare_resumen_${meses[mes - 1]}_${anio}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+    XLSX.writeFile(wb, `cleancare_resumen_${meses[mes - 1]}_${anio}.xlsx`);
   }
 
   const handleLogout = () => {
@@ -119,14 +119,14 @@ export default function Dashboard() {
               ))}
             </select>
             <button
-              onClick={exportarCSV}
+              onClick={exportarExcel}
               disabled={resumen.length === 0 || loading}
               style={{
                 ...styles.exportBtn,
                 opacity: resumen.length === 0 || loading ? 0.5 : 1,
               }}
             >
-              Exportar CSV
+              Exportar Excel
             </button>
           </div>
         </div>
