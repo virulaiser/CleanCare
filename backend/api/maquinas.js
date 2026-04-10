@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const mongoose = require('mongoose');
 const connectDB = require('../lib/mongodb');
 const Maquina = require('../models/Maquina');
 
@@ -44,10 +44,8 @@ async function crear(req, res) {
     return res.status(400).json({ ok: false, error: 'Tipo debe ser "lavarropas" o "secadora"' });
   }
 
-  // Generar código alfanumérico: prefijo por tipo + 6 chars random
-  const prefijo = tipo === 'secadora' ? 'SEC' : 'LAV';
-  const sufijo = crypto.randomBytes(3).toString('hex').toUpperCase();
-  const maquina_id = `${prefijo}-${sufijo}`;
+  // Generar código único usando ObjectId (24 hex chars)
+  const maquina_id = new mongoose.Types.ObjectId().toHexString();
 
   const maquina = await Maquina.create({
     maquina_id,

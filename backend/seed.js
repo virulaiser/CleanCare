@@ -3,6 +3,7 @@
  * Uso: node backend/seed.js
  */
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+const mongoose = require('mongoose');
 const connectDB = require('./lib/mongodb');
 const Edificio = require('./models/Edificio');
 const Maquina = require('./models/Maquina');
@@ -33,22 +34,26 @@ async function seed() {
     edificio_id: 'EDI-NORTE',
     nombre: 'Torre Norte',
     direccion: 'Av. Rivera 1234',
+    admin_nombre: 'Carlos Gómez',
+    admin_telefono: '099111222',
   });
   const edSur = await Edificio.create({
     edificio_id: 'EDI-SUR',
     nombre: 'Torre Sur',
     direccion: 'Av. Italia 5678',
+    admin_nombre: 'María Rodríguez',
+    admin_telefono: '099333444',
   });
-  console.log(`  OK — ${edNorte.edificio_id}: ${edNorte.nombre}`);
-  console.log(`  OK — ${edSur.edificio_id}: ${edSur.nombre}`);
+  console.log(`  OK — ${edNorte.edificio_id}: ${edNorte.nombre} (Admin: ${edNorte.admin_nombre})`);
+  console.log(`  OK — ${edSur.edificio_id}: ${edSur.nombre} (Admin: ${edSur.admin_nombre})`);
 
-  // 3. Crear máquinas (1 lavadora + 1 secadora por edificio)
+  // 3. Crear máquinas (1 lavadora + 1 secadora por edificio, maquina_id = ObjectId hex)
   console.log('Creando máquinas...');
   const maquinas = await Maquina.insertMany([
-    { maquina_id: 'LAV-000001', edificio_id: 'EDI-NORTE', tipo: 'lavarropas', nombre: 'Lavarropas Piso 1', activa: true },
-    { maquina_id: 'SEC-000001', edificio_id: 'EDI-NORTE', tipo: 'secadora', nombre: 'Secadora Piso 1', activa: true },
-    { maquina_id: 'LAV-000002', edificio_id: 'EDI-SUR', tipo: 'lavarropas', nombre: 'Lavarropas Piso 2', activa: true },
-    { maquina_id: 'SEC-000002', edificio_id: 'EDI-SUR', tipo: 'secadora', nombre: 'Secadora Piso 2', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-NORTE', tipo: 'lavarropas', nombre: 'EDI-NORTE_LAV_0', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-NORTE', tipo: 'secadora', nombre: 'EDI-NORTE_SEC_0', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-SUR', tipo: 'lavarropas', nombre: 'EDI-SUR_LAV_0', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-SUR', tipo: 'secadora', nombre: 'EDI-SUR_SEC_0', activa: true },
   ]);
   maquinas.forEach(m => console.log(`  OK — ${m.maquina_id}: ${m.nombre} (${m.edificio_id})`));
 

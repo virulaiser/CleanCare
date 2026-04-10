@@ -152,6 +152,8 @@ export interface Edificio {
   edificio_id: string;
   nombre: string;
   direccion?: string;
+  admin_nombre?: string;
+  admin_telefono?: string;
 }
 
 export async function listarEdificios(): Promise<Edificio[]> {

@@ -202,6 +202,8 @@ export interface Edificio {
   edificio_id: string;
   nombre: string;
   direccion?: string;
+  admin_nombre?: string;
+  admin_telefono?: string;
 }
 
 export async function listarEdificios(): Promise<Edificio[]> {
@@ -209,7 +211,7 @@ export async function listarEdificios(): Promise<Edificio[]> {
   return data.edificios;
 }
 
-export async function crearEdificio(nombre: string, direccion?: string): Promise<Edificio> {
-  const { data } = await api.post('/api/edificios', { nombre, direccion });
+export async function crearEdificio(campos: { nombre: string; direccion?: string; admin_nombre?: string; admin_telefono?: string }): Promise<Edificio> {
+  const { data } = await api.post('/api/edificios', campos);
   return data.edificio;
 }

@@ -38,6 +38,8 @@ export default function Maquinas() {
   const [showEdificioModal, setShowEdificioModal] = useState(false);
   const [ediNombre, setEdiNombre] = useState('');
   const [ediDireccion, setEdiDireccion] = useState('');
+  const [ediAdminNombre, setEdiAdminNombre] = useState('');
+  const [ediAdminTel, setEdiAdminTel] = useState('');
   const [ediCreando, setEdiCreando] = useState(false);
   const [ediMsg, setEdiMsg] = useState('');
   const [edificios, setEdificios] = useState<Edificio[]>([]);
@@ -269,12 +271,20 @@ export default function Maquinas() {
             <h3 style={styles.modalTitle}>Agregar edificio</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20, textAlign: 'left' }}>
               <div>
-                <label style={styles.label}>Nombre *</label>
+                <label style={styles.label}>Nombre del edificio *</label>
                 <input style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: Torre Norte" value={ediNombre} onChange={(e) => setEdiNombre(e.target.value)} autoFocus />
               </div>
               <div>
                 <label style={styles.label}>Dirección (opcional)</label>
                 <input style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: Av. Rivera 1234" value={ediDireccion} onChange={(e) => setEdiDireccion(e.target.value)} />
+              </div>
+              <div>
+                <label style={styles.label}>Administrador — Nombre</label>
+                <input style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: Carlos Gómez" value={ediAdminNombre} onChange={(e) => setEdiAdminNombre(e.target.value)} />
+              </div>
+              <div>
+                <label style={styles.label}>Administrador — Teléfono</label>
+                <input style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: 099123456" value={ediAdminTel} onChange={(e) => setEdiAdminTel(e.target.value)} />
               </div>
             </div>
             {ediMsg && <p style={{ fontSize: 13, color: ediMsg.includes('Error') ? colors.error : colors.success, marginBottom: 12 }}>{ediMsg}</p>}
@@ -284,9 +294,16 @@ export default function Maquinas() {
               <div style={{ textAlign: 'left', marginBottom: 16 }}>
                 <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>Edificios existentes:</p>
                 {edificios.map((ed) => (
-                  <div key={ed.edificio_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${colors.border}`, fontSize: 13 }}>
-                    <span style={{ fontWeight: 600, color: colors.textPrimary }}>{ed.nombre}</span>
-                    <span style={{ fontFamily: 'monospace', color: colors.primary, fontSize: 12 }}>{ed.edificio_id}</span>
+                  <div key={ed.edificio_id} style={{ padding: '8px 0', borderBottom: `1px solid ${colors.border}`, fontSize: 13 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 600, color: colors.textPrimary }}>{ed.nombre}</span>
+                      <span style={{ fontFamily: 'monospace', color: colors.primary, fontSize: 12 }}>{ed.edificio_id}</span>
+                    </div>
+                    {(ed.admin_nombre || ed.admin_telefono) && (
+                      <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                        Admin: {ed.admin_nombre || '—'} {ed.admin_telefono ? `/ ${ed.admin_telefono}` : ''}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -300,9 +317,16 @@ export default function Maquinas() {
                   setEdiCreando(true);
                   setEdiMsg('');
                   try {
-                    await crearEdificio(ediNombre, ediDireccion || undefined);
+                    await crearEdificio({
+                      nombre: ediNombre,
+                      direccion: ediDireccion || undefined,
+                      admin_nombre: ediAdminNombre || undefined,
+                      admin_telefono: ediAdminTel || undefined,
+                    });
                     setEdiNombre('');
                     setEdiDireccion('');
+                    setEdiAdminNombre('');
+                    setEdiAdminTel('');
                     const updated = await listarEdificios();
                     setEdificios(updated);
                     setShowEdificioModal(false);

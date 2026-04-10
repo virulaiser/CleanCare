@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
 // GET /api/edificios — público, para dropdowns de registro
 async function listar(req, res) {
   const edificios = await Edificio.find({ activo: true })
-    .select('edificio_id nombre direccion')
+    .select('edificio_id nombre direccion admin_nombre admin_telefono')
     .sort({ nombre: 1 })
     .lean();
   res.json({ ok: true, edificios });
@@ -27,13 +27,13 @@ async function listar(req, res) {
 
 // POST /api/edificios — admin only
 async function crear(req, res) {
-  const { nombre, direccion } = req.body;
+  const { nombre, direccion, admin_nombre, admin_telefono } = req.body;
 
   if (!nombre) {
     return res.status(400).json({ ok: false, error: 'Falta campo: nombre' });
   }
 
-  const edificio = await Edificio.create({ nombre, direccion });
+  const edificio = await Edificio.create({ nombre, direccion, admin_nombre, admin_telefono });
   res.status(201).json({ ok: true, edificio });
 }
 
