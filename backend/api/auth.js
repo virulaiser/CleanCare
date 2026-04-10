@@ -1,6 +1,7 @@
 const connectDB = require('../lib/mongodb');
 const Usuario = require('../models/Usuario');
 const { generarToken } = require('../lib/auth');
+const { obtenerSaldo } = require('./billetera');
 
 module.exports = async (req, res) => {
   try {
@@ -61,9 +62,12 @@ async function registro(req, res) {
 
   const token = generarToken(usuario);
 
+  const saldo = await obtenerSaldo(usuario.usuario_id);
+
   res.status(201).json({
     ok: true,
     token,
+    saldo,
     usuario: {
       id: usuario._id,
       usuario_id: usuario.usuario_id,
@@ -97,9 +101,12 @@ async function login(req, res) {
 
   const token = generarToken(usuario);
 
+  const saldo = await obtenerSaldo(usuario.usuario_id);
+
   res.json({
     ok: true,
     token,
+    saldo,
     usuario: {
       id: usuario._id,
       usuario_id: usuario.usuario_id,

@@ -61,7 +61,6 @@ export interface Maquina {
   maquina_id: string;
   edificio_id: string;
   tipo: string;
-  ip_local: string;
   nombre: string;
   activa: boolean;
 }
@@ -113,11 +112,104 @@ export async function listarMaquinas(edificioId: string): Promise<Maquina[]> {
   return data.maquinas;
 }
 
-export async function crearMaquina(maquina: { nombre: string; tipo: string; ip_local: string; edificio_id: string }): Promise<Maquina> {
+export async function crearMaquina(maquina: { nombre: string; tipo: string; edificio_id: string }): Promise<Maquina> {
   const { data } = await api.post('/api/maquinas', maquina);
   return data.maquina;
 }
 
 export async function eliminarMaquina(maquinaId: string): Promise<void> {
   await api.delete('/api/maquinas', { params: { maquinaId } });
+}
+
+// --- Billetera / Créditos ---
+
+export interface Transaccion {
+  _id: string;
+  transaccion_id: string;
+  usuario_id: string;
+  edificio_id: string;
+  tipo: 'asignacion_mensual' | 'ajuste_admin' | 'uso_maquina' | 'devolucion';
+  cantidad: number;
+  descripcion: string;
+  referencia_id?: string;
+  creado_por?: string;
+  fecha: string;
+}
+
+export interface ConfigEdificio {
+  edificio_id: string;
+  creditos_mensuales: number;
+  costo_lavado: number;
+  costo_secado: number;
+  duracion_lavado: number;
+  duracion_secado: number;
+  activo: boolean;
+}
+
+export interface ResumenCreditoItem {
+  usuario_id: string;
+  nombre: string;
+  apartamento: string;
+  creditos_usados: number;
+  creditos_asignados: number;
+  devoluciones: number;
+  saldo_actual: number;
+}
+
+export async function obtenerBilletera(): Promise<{ saldo: number; transacciones: Transaccion[] }> {
+  const { data } = await api.get('/api/billetera');
+  return data;
+}
+
+export async function obtenerBilleteraUsuario(usuarioId: string): Promise<{ saldo: number; transacciones: Transaccion[] }> {
+  const { data } = await api.get('/api/billetera', { params: { usuarioId } });
+  return data;
+}
+
+export async function agregarCreditos(usuario_id: string, cantidad: number, descripcion: string): Promise<{ transaccion: Transaccion; nuevo_saldo: number }> {
+  const { data } = await api.post('/api/billetera/creditos', { usuario_id, cantidad, descripcion });
+  return data;
+}
+
+export async function agregarCreditosMasivo(edificio_id: string, cantidad: number, descripcion: string): Promise<{ total_usuarios: number; cantidad_por_usuario: number }> {
+  const { data } = await api.post('/api/billetera/creditos-masivo', { edificio_id, cantidad, descripcion });
+  return data;
+}
+
+export async function obtenerConfigEdificio(edificioId: string): Promise<ConfigEdificio> {
+  const { data } = await api.get('/api/config-edificio', { params: { edificioId } });
+  return data.config;
+}
+
+export async function actualizarConfigEdificio(config: { edificio_id: string; creditos_mensuales: number; costo_lavado: number; costo_secado: number; duracion_lavado: number; duracion_secado: number }): Promise<ConfigEdificio> {
+  const { data } = await api.put('/api/config-edificio', config);
+  return data.config;
+}
+
+export async function obtenerResumenCreditos(edificioId: string, mes: number, anio: number): Promise<{ resumen: ResumenCreditoItem[]; total_creditos_consumidos: number }> {
+  const { data } = await api.get('/api/resumen-creditos', { params: { edificioId, mes, anio } });
+  return data;
+}
+
+export async function listarUsuariosEdificio(edificioId: string): Promise<{ usuario_id: string; nombre: string; apartamento: string; email: string; saldo: number }[]> {
+  const { data } = await api.get('/api/usuarios', { params: { edificioId } });
+  return data.usuarios;
+}
+
+// --- Edificios ---
+
+export interface Edificio {
+  edificio_id: string;
+  nombre: string;
+  direccion?: string;
+}
+
+export async function listarEdificios(): Promise<Edificio[]> {
+  const { data } = await api.get('/api/edificios');
+  return data.edificios;
+}
+
+export async function crearEdificio(nombre: string, direccion?: string): Promise<Edificio> {
+  const { data } = await api.post('/api/edificios', { nombre, direccion });
+  return data.edificio;
 }

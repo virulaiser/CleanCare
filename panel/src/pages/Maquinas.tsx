@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
-import { listarMaquinas, crearMaquina, eliminarMaquina, Maquina, Usuario } from '../services/api';
+import { listarMaquinas, crearMaquina, eliminarMaquina, crearEdificio, listarEdificios, Maquina, Edificio, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
 function getUsuario(): Usuario | null {
@@ -10,7 +10,7 @@ function getUsuario(): Usuario | null {
 }
 
 function buildQRValue(m: Maquina): string {
-  return `cleancare://maquina?id=${m.maquina_id}&ip=${m.ip_local}&edificio=${m.edificio_id}`;
+  return `cleancare://maquina?id=${m.maquina_id}&edificio=${m.edificio_id}`;
 }
 
 export default function Maquinas() {
@@ -23,15 +23,24 @@ export default function Maquinas() {
   const [error, setError] = useState('');
 
   // Form state
-  const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState<'lavarropas' | 'secadora'>('lavarropas');
-  const [ipLocal, setIpLocal] = useState('');
+  const [tipo, setTipo] = useState<'lavarropas' | 'secadora' | 'ambos'>('lavarropas');
   const [creando, setCreando] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // QR modal
+  // QR modal (includes print)
   const [qrMaquina, setQrMaquina] = useState<Maquina | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
+
+  // ID modal
+  const [idMaquina, setIdMaquina] = useState<Maquina | null>(null);
+
+  // Edificio modal
+  const [showEdificioModal, setShowEdificioModal] = useState(false);
+  const [ediNombre, setEdiNombre] = useState('');
+  const [ediDireccion, setEdiDireccion] = useState('');
+  const [ediCreando, setEdiCreando] = useState(false);
+  const [ediMsg, setEdiMsg] = useState('');
+  const [edificios, setEdificios] = useState<Edificio[]>([]);
 
   useEffect(() => {
     if (!localStorage.getItem('cleancare_token')) {
@@ -41,6 +50,7 @@ export default function Maquinas() {
 
   useEffect(() => {
     fetchMaquinas();
+    listarEdificios().then(setEdificios).catch(() => {});
   }, []);
 
   async function fetchMaquinas() {
@@ -56,26 +66,27 @@ export default function Maquinas() {
     }
   }
 
+  // Generate auto-name: edificioId_N (next number)
+  function getNextName(tipoMaq: 'lavarropas' | 'secadora'): string {
+    const prefix = tipoMaq === 'secadora' ? 'SEC' : 'LAV';
+    const existing = maquinas.filter(m => m.tipo === tipoMaq);
+    return `${edificioId}_${prefix}_${existing.length}`;
+  }
+
   async function handleCrear(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
-
-    if (!nombre || !ipLocal) {
-      setFormError('Completá nombre e IP local');
-      return;
-    }
-
-    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    if (!ipRegex.test(ipLocal)) {
-      setFormError('Formato de IP inválido (ej: 192.168.1.45)');
-      return;
-    }
-
     setCreando(true);
     try {
-      await crearMaquina({ nombre, tipo, ip_local: ipLocal, edificio_id: edificioId });
-      setNombre('');
-      setIpLocal('');
+      if (tipo === 'ambos') {
+        const nameLav = getNextName('lavarropas');
+        const nameSec = getNextName('secadora');
+        await crearMaquina({ nombre: nameLav, tipo: 'lavarropas', edificio_id: edificioId });
+        await crearMaquina({ nombre: nameSec, tipo: 'secadora', edificio_id: edificioId });
+      } else {
+        const name = getNextName(tipo);
+        await crearMaquina({ nombre: name, tipo, edificio_id: edificioId });
+      }
       setTipo('lavarropas');
       await fetchMaquinas();
     } catch (err: any) {
@@ -110,7 +121,6 @@ export default function Maquinas() {
           h2 { color: #1E293B; margin-bottom: 4px; }
           .code { color: #3B82F6; font-size: 18px; font-weight: 600; margin-bottom: 4px; }
           .tipo { color: #94A3B8; font-size: 14px; margin-bottom: 24px; }
-          .ip { color: #94A3B8; font-size: 12px; margin-top: 16px; }
           svg { margin: 0 auto; }
           .footer { margin-top: 24px; color: #94A3B8; font-size: 12px; border-top: 1px solid #E5E7EB; padding-top: 16px; }
         </style>
@@ -120,7 +130,6 @@ export default function Maquinas() {
         <div class="code">${maquina.maquina_id}</div>
         <div class="tipo">${maquina.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}</div>
         <div id="qr"></div>
-        <div class="ip">IP: ${maquina.ip_local}</div>
         <div class="footer">Escaneá este código con la app CleanCare</div>
         <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
         <script>
@@ -144,12 +153,16 @@ export default function Maquinas() {
         <nav style={styles.navLinks}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtnActive}>Máquinas</button>
+          <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
           <button onClick={() => { localStorage.removeItem('cleancare_token'); localStorage.removeItem('cleancare_usuario'); navigate('/'); }} style={styles.navBtn}>Cerrar sesión</button>
         </nav>
       </header>
 
       <main style={styles.main}>
-        <h2 style={styles.pageTitle}>Gestión de Máquinas</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ ...styles.pageTitle, marginBottom: 0 }}>Gestión de Máquinas</h2>
+          <button onClick={() => setShowEdificioModal(true)} style={styles.btnOutline}>+ Agregar edificio</button>
+        </div>
 
         {/* Formulario crear */}
         <div style={styles.card}>
@@ -157,24 +170,20 @@ export default function Maquinas() {
           {formError && <div style={styles.error}>{formError}</div>}
           <form onSubmit={handleCrear} style={styles.form}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Nombre</label>
-              <input style={styles.input} placeholder="Ej: Lavarropas Piso 3" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-            </div>
-            <div style={styles.formGroup}>
               <label style={styles.label}>Tipo</label>
-              <select style={styles.input} value={tipo} onChange={(e) => setTipo(e.target.value as 'lavarropas' | 'secadora')}>
+              <select style={styles.input} value={tipo} onChange={(e) => setTipo(e.target.value as 'lavarropas' | 'secadora' | 'ambos')}>
                 <option value="lavarropas">Lavarropas</option>
                 <option value="secadora">Secadora</option>
+                <option value="ambos">Ambos (lavarropas + secadora)</option>
               </select>
-            </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>IP Local</label>
-              <input style={styles.input} placeholder="Ej: 192.168.1.45" value={ipLocal} onChange={(e) => setIpLocal(e.target.value)} />
             </div>
             <button type="submit" style={{ ...styles.btnPrimary, opacity: creando ? 0.6 : 1 }} disabled={creando}>
               {creando ? 'Creando...' : 'Crear máquina'}
             </button>
           </form>
+          <p style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8 }}>
+            El nombre se genera automáticamente: {edificioId}_{tipo === 'ambos' ? 'LAV/SEC' : (tipo === 'secadora' ? 'SEC' : 'LAV')}_N
+          </p>
         </div>
 
         {/* Lista */}
@@ -192,8 +201,6 @@ export default function Maquinas() {
                   <th style={styles.th}>Nombre</th>
                   <th style={styles.th}>Código</th>
                   <th style={styles.th}>Tipo</th>
-                  <th style={styles.th}>IP</th>
-                  <th style={{ ...styles.th, textAlign: 'center' }}>QR</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
@@ -201,18 +208,17 @@ export default function Maquinas() {
                 {maquinas.map((m) => (
                   <tr key={m._id}>
                     <td style={styles.td}>{m.nombre}</td>
-                    <td style={styles.tdCode}>{m.maquina_id}</td>
+                    <td style={styles.tdCode}>
+                      <span style={{ cursor: 'pointer' }} onClick={() => setIdMaquina(m)}>{m.maquina_id}</span>
+                    </td>
                     <td style={styles.td}>
                       <span style={m.tipo === 'secadora' ? styles.badgeSecadora : styles.badgeLavarropas}>
                         {m.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}
                       </span>
                     </td>
-                    <td style={styles.td}>{m.ip_local}</td>
-                    <td style={{ ...styles.td, textAlign: 'center' }}>
-                      <button style={styles.btnSmall} onClick={() => setQrMaquina(m)}>Ver QR</button>
-                    </td>
-                    <td style={{ ...styles.td, textAlign: 'center' }}>
-                      <button style={styles.btnPrint} onClick={() => handlePrint(m)}>Imprimir</button>
+                    <td style={{ ...styles.td, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <button style={styles.btnSmall} onClick={() => setQrMaquina(m)}>QR</button>
+                      {' '}
                       <button style={styles.btnDelete} onClick={() => handleEliminar(m.maquina_id)}>Eliminar</button>
                     </td>
                   </tr>
@@ -223,13 +229,13 @@ export default function Maquinas() {
         </div>
       </main>
 
-      {/* Modal QR */}
+      {/* Modal QR + Imprimir */}
       {qrMaquina && (
         <div style={styles.modalOverlay} onClick={() => setQrMaquina(null)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>{qrMaquina.nombre}</h3>
             <p style={styles.modalCode}>{qrMaquina.maquina_id}</p>
-            <p style={styles.modalTipo}>{qrMaquina.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'} — IP: {qrMaquina.ip_local}</p>
+            <p style={styles.modalTipo}>{qrMaquina.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}</p>
             <div ref={qrRef} style={styles.qrContainer}>
               <QRCode value={buildQRValue(qrMaquina)} size={220} level="M" />
             </div>
@@ -237,6 +243,79 @@ export default function Maquinas() {
             <div style={styles.modalActions}>
               <button style={styles.btnPrimary} onClick={() => handlePrint(qrMaquina)}>Imprimir QR</button>
               <button style={styles.btnOutline} onClick={() => setQrMaquina(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ID */}
+      {idMaquina && (
+        <div style={styles.modalOverlay} onClick={() => setIdMaquina(null)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>{idMaquina.nombre}</h3>
+            <p style={{ fontSize: 36, fontWeight: 700, color: colors.primary, fontFamily: 'monospace', margin: '16px 0' }}>{idMaquina.maquina_id}</p>
+            <p style={styles.modalTipo}>{idMaquina.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'} — {idMaquina.edificio_id}</p>
+            <div style={styles.modalActions}>
+              <button style={styles.btnOutline} onClick={() => setIdMaquina(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Agregar Edificio */}
+      {showEdificioModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowEdificioModal(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>Agregar edificio</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20, textAlign: 'left' }}>
+              <div>
+                <label style={styles.label}>Nombre *</label>
+                <input style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: Torre Norte" value={ediNombre} onChange={(e) => setEdiNombre(e.target.value)} autoFocus />
+              </div>
+              <div>
+                <label style={styles.label}>Dirección (opcional)</label>
+                <input style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: Av. Rivera 1234" value={ediDireccion} onChange={(e) => setEdiDireccion(e.target.value)} />
+              </div>
+            </div>
+            {ediMsg && <p style={{ fontSize: 13, color: ediMsg.includes('Error') ? colors.error : colors.success, marginBottom: 12 }}>{ediMsg}</p>}
+
+            {/* Lista de edificios existentes */}
+            {edificios.length > 0 && (
+              <div style={{ textAlign: 'left', marginBottom: 16 }}>
+                <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 6 }}>Edificios existentes:</p>
+                {edificios.map((ed) => (
+                  <div key={ed.edificio_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${colors.border}`, fontSize: 13 }}>
+                    <span style={{ fontWeight: 600, color: colors.textPrimary }}>{ed.nombre}</span>
+                    <span style={{ fontFamily: 'monospace', color: colors.primary, fontSize: 12 }}>{ed.edificio_id}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={styles.modalActions}>
+              <button
+                style={{ ...styles.btnPrimary, opacity: ediCreando || !ediNombre ? 0.5 : 1 }}
+                disabled={ediCreando || !ediNombre}
+                onClick={async () => {
+                  setEdiCreando(true);
+                  setEdiMsg('');
+                  try {
+                    await crearEdificio(ediNombre, ediDireccion || undefined);
+                    setEdiNombre('');
+                    setEdiDireccion('');
+                    const updated = await listarEdificios();
+                    setEdificios(updated);
+                    setShowEdificioModal(false);
+                  } catch {
+                    setEdiMsg('Error al crear edificio');
+                  } finally {
+                    setEdiCreando(false);
+                  }
+                }}
+              >
+                {ediCreando ? 'Creando...' : 'Crear edificio'}
+              </button>
+              <button style={styles.btnOutline} onClick={() => { setShowEdificioModal(false); setEdiMsg(''); }}>Cerrar</button>
             </div>
           </div>
         </div>
@@ -290,11 +369,6 @@ const styles: Record<string, React.CSSProperties> = {
   btnSmall: {
     padding: '6px 14px', borderRadius: 8, backgroundColor: colors.bgBlueLight,
     color: colors.primary, fontSize: 13, fontWeight: 600, border: 'none',
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-  btnPrint: {
-    padding: '6px 14px', borderRadius: 8, backgroundColor: '#F0FDF4',
-    color: '#16A34A', fontSize: 13, fontWeight: 600, border: 'none',
     cursor: 'pointer', fontFamily: 'inherit', marginRight: 8,
   },
   btnDelete: {
@@ -328,8 +402,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 8, fontSize: 14, marginBottom: 16,
   },
   muted: { color: colors.textSecondary, fontSize: 14 },
-
-  // Modal
   modalOverlay: {
     position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',

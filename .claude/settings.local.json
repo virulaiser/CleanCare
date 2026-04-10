@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__github__create_repository",
+      "Bash(curl -s https://backend-one-tau-21.vercel.app/api)",
+      "Bash(EXPO_PUBLIC_API_URL=https://backend-one-tau-21.vercel.app npx expo start --lan --non-interactive)",
+      "Bash(jobs -l)",
+      "Bash(fg)",
+      "Bash(curl -s http://localhost:3000/api)",
+      "Bash(python -m json.tool)",
+      "Bash(curl:*)",
+      "Bash(netstat -ano)",
+      "Bash(powershell:*)",
+      "Bash(/c/Windows/System32/netstat.exe -ano)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Login OK, usuario_id:', d['usuario'].get\\('usuario_id', 'N/A'\\)\\); print\\('apartamento:', d['usuario'].get\\('apartamento', 'N/A'\\)\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); u=d['usuario']; print\\('OK:', u.get\\('usuario_id'\\), u.get\\('telefono'\\), u.get\\('apartamento'\\)\\)\")",
+      "Bash(/c/Windows/System32/taskkill.exe //F //PID 11780)"
+    ]
+  }
+}

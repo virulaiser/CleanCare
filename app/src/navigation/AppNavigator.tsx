@@ -9,6 +9,7 @@ import MachineScreen from '../screens/MachineScreen';
 import CycleScreen from '../screens/CycleScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import BleTestScreen from '../screens/BleTestScreen';
+import WalletScreen from '../screens/WalletScreen';
 import { colors } from '../constants/colors';
 
 export type RootStackParamList = {
@@ -18,7 +19,6 @@ export type RootStackParamList = {
   Scan: undefined;
   Machine: {
     maquina_id: string;
-    ip: string;
     edificio_id: string;
   };
   Cycle: {
@@ -27,6 +27,7 @@ export type RootStackParamList = {
     tipo: 'lavarropas' | 'secadora';
   };
   History: undefined;
+  Wallet: undefined;
   BleTest: undefined;
 };
 
@@ -78,6 +79,11 @@ export default function AppNavigator() {
           name="History"
           component={HistoryScreen}
           options={{ title: 'Historial de Usos' }}
+        />
+        <Stack.Screen
+          name="Wallet"
+          component={WalletScreen}
+          options={{ title: 'Mi Billetera' }}
         />
         <Stack.Screen
           name="BleTest"

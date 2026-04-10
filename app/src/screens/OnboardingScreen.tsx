@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../constants/colors';
@@ -29,7 +29,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem('cleancare_onboarded').then((val) => {
+    SecureStore.getItemAsync('cleancare_onboarded').then((val) => {
       if (val === 'true') {
         navigation.replace('Login');
       } else {
@@ -47,7 +47,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   }
 
   const handleStart = async () => {
-    await AsyncStorage.setItem('cleancare_onboarded', 'true');
+    await SecureStore.setItemAsync('cleancare_onboarded', 'true');
     navigation.replace('Login');
   };
 

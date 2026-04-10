@@ -36,8 +36,15 @@
       "expo-notifications",
       [
         "react-native-ble-plx",
-        { "isBackgroundEnabled": true, "modes": ["peripheral", "central"] }
-      ]
+        {
+          "isBackgroundEnabled": true,
+          "modes": [
+            "peripheral",
+            "central"
+          ]
+        }
+      ],
+      "expo-secure-store"
     ]
   }
 }

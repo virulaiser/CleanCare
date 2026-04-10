@@ -37,6 +37,7 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 | Auth | JWT + bcryptjs | jsonwebtoken 9.0.3 |
 | Deploy backend/panel | Vercel (serverless) | — |
 | Hardware | ESP32 (BLE) + relay | PlatformIO / Arduino |
+| Almacenamiento seguro | expo-secure-store | Keychain (iOS) / EncryptedSharedPreferences (Android) |
 | BLE | react-native-ble-plx | Expo config plugin |
 | Notificaciones | expo-notifications | Background alerts |
 | Audio | expo-av | Sonido de finalización |
@@ -56,13 +57,14 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 | Admin login | https://panel-three-blush.vercel.app/login |
 | Admin dashboard | https://panel-three-blush.vercel.app/dashboard |
 | Admin máquinas | https://panel-three-blush.vercel.app/maquinas |
+| Admin créditos | https://panel-three-blush.vercel.app/creditos |
 | Repositorio | https://github.com/virulaiser/CleanCare |
 
 ### Credenciales admin
 - **Email**: admin@cleancare.uy
 - **Password**: admin123
 - **Rol**: admin
-- **Edificio**: edificio-central
+- **Edificio**: EDI-NORTE (Torre Norte)
 
 ---
 
@@ -92,8 +94,9 @@ cleancare/
 │       │   ├── OnboardingScreen.tsx # Intro del sistema (se muestra 1 vez)
 │       │   ├── LoginScreen.tsx      # Login con JWT + auto-redirect
 │       │   ├── RegistroScreen.tsx   # Registro (nombre, email, password, tel, apto, edificio)
-│       │   ├── ScanScreen.tsx       # Cámara QR + modal lavar/secar
+│       │   ├── ScanScreen.tsx       # Cámara QR + modal lavar/secar + badge saldo
 │       │   ├── CycleScreen.tsx      # Animación máquina + timer + notif background + reportar avería
+│       │   ├── WalletScreen.tsx     # Billetera: saldo + historial de transacciones
 │       │   ├── MachineScreen.tsx    # Estado ESP32 WiFi (legacy, para cuando haya ESP32 WiFi)
 │       │   ├── HistoryScreen.tsx    # Historial personal con badges estado
 │       │   └── BleTestScreen.tsx    # Test conexión BLE con ESP32
@@ -104,15 +107,24 @@ cleancare/
 ├── backend/                        # Node.js + Express → Vercel serverless
 │   ├── api/
 │   │   ├── index.js                # Router Express (dev local + Vercel export)
-│   │   ├── auth.js                 # POST /api/auth?action=login|registro
-│   │   ├── uso.js                  # POST /api/uso (inicio) + PATCH (fin/avería)
+│   │   ├── auth.js                 # POST /api/auth?action=login|registro (retorna saldo)
+│   │   ├── uso.js                  # POST /api/uso (inicio, verifica saldo) + PATCH (fin/avería, devuelve crédito)
 │   │   ├── usos.js                 # GET /api/usos (filtro ?mis=true)
 │   │   ├── resumen.js              # GET /api/resumen (solo admin)
-│   │   └── maquinas.js             # GET/POST/DELETE /api/maquinas
+│   │   ├── maquinas.js             # GET/POST/DELETE /api/maquinas
+│   │   ├── billetera.js            # GET /api/billetera + POST creditos/creditos-masivo
+│   │   ├── config-edificio.js      # GET/PUT /api/config-edificio (config créditos)
+│   │   ├── resumen-creditos.js     # GET /api/resumen-creditos (consumo mensual)
+│   │   ├── usuarios.js             # GET /api/usuarios (lista con saldo, admin)
+│   │   ├── edificios.js            # GET/POST/DELETE /api/edificios
+│   │   └── cron-asignacion.js      # GET /api/cron/asignacion-mensual (Vercel Cron)
 │   ├── models/
 │   │   ├── Uso.js                  # Schema: estado, fecha_inicio, fecha_fin, completado
 │   │   ├── Maquina.js              # Schema: maquina_id (auto-gen), nombre, tipo, ip, activa
-│   │   └── Usuario.js              # Schema: usuario_id (auto-gen), email, tel, apto, edificio
+│   │   ├── Usuario.js              # Schema: usuario_id (auto-gen), email, tel, apto, edificio
+│   │   ├── Transaccion.js          # Schema: transaccion_id, usuario_id, tipo, cantidad, fecha
+│   │   ├── ConfigEdificio.js       # Schema: edificio_id, creditos_mensuales, costos
+│   │   └── Edificio.js             # Schema: edificio_id (auto), nombre, direccion, activo
 │   ├── lib/
 │   │   ├── mongodb.js              # Conexión singleton Mongoose
 │   │   └── auth.js                 # generarToken, verificarToken, soloAdmin
@@ -125,7 +137,7 @@ cleancare/
 │   ├── vite.config.ts              # Proxy /api → localhost:3000 en dev
 │   ├── tsconfig.json
 │   └── src/
-│       ├── main.tsx                # Router: / → /usuarios → /registro → /mi-cuenta → /login → /dashboard → /maquinas
+│       ├── main.tsx                # Router: / → /usuarios → /registro → /mi-cuenta → /login → /dashboard → /maquinas → /creditos
 │       ├── styles/global.css       # Reset + responsive media queries + hamburger menu
 │       ├── constants/colors.ts
 │       ├── services/api.ts         # Axios + JWT + login/registro/listarMisUsos
@@ -136,7 +148,8 @@ cleancare/
 │           ├── MiCuenta.tsx        # Resumen mensual de uso del residente
 │           ├── Login.tsx           # Login admin con JWT
 │           ├── Dashboard.tsx       # KPIs + resumen facturación + exportar CSV
-│           └── Maquinas.tsx        # CRUD máquinas + generación QR + impresión
+│           ├── Maquinas.tsx        # CRUD máquinas + generación QR + impresión
+│           └── Creditos.tsx        # Gestión créditos: config edificio, usuarios+saldos, resumen consumo
 │
 └── firmware/                       # ESP32
     ├── cleancare_esp32/            # Firmware WiFi HTTP (legacy)
@@ -185,14 +198,24 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 }
 ```
 
+#### `edificios`
+```json
+{
+  "edificio_id": "EDI-NORTE",
+  "nombre": "Torre Norte",
+  "direccion": "Av. Rivera 1234",
+  "activo": true,
+  "creado": "2026-04-10T..."
+}
+```
+
 #### `maquinas`
 ```json
 {
-  "maquina_id": "LAV-7DED11",
-  "edificio_id": "edificio-central",
+  "maquina_id": "LAV-000001",
+  "edificio_id": "EDI-NORTE",
   "tipo": "lavarropas",
-  "ip_local": "192.168.1.45",
-  "nombre": "Lavarropas Piso 3",
+  "nombre": "Lavarropas Piso 1",
   "activa": true
 }
 ```
@@ -213,6 +236,33 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 }
 ```
 
+#### `transacciones`
+```json
+{
+  "transaccion_id": "TXN-A1B2C3",
+  "usuario_id": "USR-DD3FAD",
+  "edificio_id": "edificio-central",
+  "tipo": "uso_maquina",
+  "cantidad": -1,
+  "descripcion": "Uso LAV-7DED11 (lavarropas)",
+  "referencia_id": "665abc...",
+  "creado_por": "sistema",
+  "fecha": "2026-04-10T12:00:00.000Z"
+}
+```
+
+#### `config_edificios`
+```json
+{
+  "edificio_id": "edificio-central",
+  "creditos_mensuales": 10,
+  "costo_lavado": 1,
+  "costo_secado": 1,
+  "activo": true,
+  "actualizado": "2026-04-10T12:00:00.000Z"
+}
+```
+
 ---
 
 ## API Endpoints
@@ -221,16 +271,18 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/api` | Health check |
-| `POST` | `/api/auth?action=login` | Login → retorna JWT |
-| `POST` | `/api/auth?action=registro` | Registro → retorna JWT |
+| `POST` | `/api/auth?action=login` | Login → retorna JWT + saldo |
+| `POST` | `/api/auth?action=registro` | Registro → retorna JWT + saldo |
+| `GET` | `/api/edificios` | Listar edificios activos (para dropdowns) |
 
 ### Protegidos (requieren Bearer token)
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/uso` | Iniciar ciclo (estado: activo, fecha_inicio) |
-| `PATCH` | `/api/uso?id=X` | Actualizar ciclo (completado/cancelado/averia, fecha_fin) |
+| `POST` | `/api/uso` | Iniciar ciclo (verifica saldo, descuenta crédito) |
+| `PATCH` | `/api/uso?id=X` | Actualizar ciclo (devuelve crédito en cancelación/avería) |
 | `GET` | `/api/usos` | Listar usos (todos, o ?mis=true para filtrar por usuario) |
 | `GET` | `/api/maquinas?edificioId=X` | Listar máquinas activas |
+| `GET` | `/api/billetera` | Saldo + últimas transacciones del usuario |
 
 ### Solo admin
 | Método | Ruta | Descripción |
@@ -238,6 +290,20 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 | `GET` | `/api/resumen?edificioId&mes&anio` | Resumen facturación mensual |
 | `POST` | `/api/maquinas` | Crear máquina (genera código LAV/SEC-XXXXXX) |
 | `DELETE` | `/api/maquinas?maquinaId=X` | Soft-delete máquina |
+| `GET` | `/api/billetera?usuarioId=X` | Saldo de un usuario específico |
+| `POST` | `/api/billetera/creditos` | Agregar créditos a un usuario |
+| `POST` | `/api/billetera/creditos-masivo` | Agregar créditos a todos los del edificio |
+| `GET` | `/api/config-edificio?edificioId=X` | Config créditos del edificio |
+| `PUT` | `/api/config-edificio` | Actualizar config créditos |
+| `GET` | `/api/resumen-creditos?edificioId&mes&anio` | Resumen consumo créditos mensual |
+| `GET` | `/api/usuarios?edificioId=X` | Listar usuarios con saldo |
+| `POST` | `/api/edificios` | Crear edificio |
+| `DELETE` | `/api/edificios?edificioId=X` | Soft-delete edificio |
+
+### Cron (Vercel)
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/cron/asignacion-mensual` | Asigna créditos mensuales (1ro de cada mes, 3am UTC) |
 
 ---
 

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { registro } from '../services/api';
+import { registro, listarEdificios, Edificio } from '../services/api';
 import { colors } from '../constants/colors';
 
 export default function Registro() {
@@ -15,6 +15,11 @@ export default function Registro() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [edificios, setEdificios] = useState<Edificio[]>([]);
+
+  useEffect(() => {
+    listarEdificios().then(setEdificios).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,8 +111,13 @@ export default function Registro() {
               <input style={styles.input} value={apartamento} onChange={(e) => setApartamento(e.target.value)} placeholder="Ej: 3B" />
             </div>
             <div style={styles.field}>
-              <label style={styles.label}>ID del edificio *</label>
-              <input style={styles.input} value={edificio} onChange={(e) => setEdificio(e.target.value)} placeholder="Ej: edificio-central" />
+              <label style={styles.label}>Edificio *</label>
+              <select style={styles.input} value={edificio} onChange={(e) => setEdificio(e.target.value)}>
+                <option value="">Seleccioná tu edificio</option>
+                {edificios.map((e) => (
+                  <option key={e.edificio_id} value={e.edificio_id}>{e.nombre}</option>
+                ))}
+              </select>
             </div>
           </div>
 

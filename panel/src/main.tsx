@@ -8,6 +8,7 @@ import Registro from './pages/Registro';
 import MiCuenta from './pages/MiCuenta';
 import Dashboard from './pages/Dashboard';
 import Maquinas from './pages/Maquinas';
+import Creditos from './pages/Creditos';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/mi-cuenta" element={<MiCuenta />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/maquinas" element={<Maquinas />} />
+        <Route path="/creditos" element={<Creditos />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

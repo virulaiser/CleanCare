@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listarMisUsos, Uso, Usuario } from '../services/api';
+import { listarMisUsos, obtenerBilletera, Uso, Usuario, Transaccion } from '../services/api';
 import { colors } from '../constants/colors';
 
 function getUsuario(): Usuario | null {
@@ -27,6 +27,7 @@ export default function MiCuenta() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [anio, setAnio] = useState(now.getFullYear());
   const [usos, setUsos] = useState<Uso[]>([]);
+  const [saldo, setSaldo] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -44,8 +45,12 @@ export default function MiCuenta() {
     setLoading(true);
     setError('');
     try {
-      const data = await listarMisUsos();
+      const [data, billetera] = await Promise.all([
+        listarMisUsos(),
+        obtenerBilletera(),
+      ]);
       setUsos(data);
+      setSaldo(billetera.saldo);
     } catch {
       setError('Error al cargar tus usos.');
     } finally {
@@ -95,6 +100,14 @@ export default function MiCuenta() {
         </div>
 
         {error && <div style={styles.error}>{error}</div>}
+
+        {/* Saldo */}
+        <div style={{ ...styles.card, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '20px 24px' }}>
+          <span style={{ fontSize: 15, color: colors.textSecondary }}>Tu saldo:</span>
+          <span style={{ fontSize: 32, fontWeight: 700, color: saldo !== null && saldo <= 0 ? '#EF4444' : colors.primary }}>
+            {loading ? '...' : saldo ?? 0} fichas
+          </span>
+        </div>
 
         {/* KPIs */}
         <div style={styles.kpiRow}>

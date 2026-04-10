@@ -1,5 +1,5 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -10,7 +10,7 @@ const api = axios.create({
 
 // Inyectar token en cada request
 api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('cleancare_token');
+  const token = await SecureStore.getItemAsync('cleancare_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -48,15 +48,14 @@ export interface Maquina {
   maquina_id: string;
   edificio_id: string;
   tipo: string;
-  ip_local: string;
   nombre: string;
   activa: boolean;
 }
 
 export async function loginUsuario(email: string, password: string): Promise<{ token: string; usuario: Usuario }> {
   const { data } = await api.post('/api/auth?action=login', { email, password });
-  await AsyncStorage.setItem('cleancare_token', data.token);
-  await AsyncStorage.setItem('cleancare_usuario', JSON.stringify(data.usuario));
+  await SecureStore.setItemAsync('cleancare_token', data.token);
+  await SecureStore.setItemAsync('cleancare_usuario', JSON.stringify(data.usuario));
   return data;
 }
 
@@ -70,22 +69,23 @@ export async function registrarUsuario(campos: {
   apartamento?: string;
 }): Promise<{ token: string; usuario: Usuario }> {
   const { data } = await api.post('/api/auth?action=registro', campos);
-  await AsyncStorage.setItem('cleancare_token', data.token);
-  await AsyncStorage.setItem('cleancare_usuario', JSON.stringify(data.usuario));
+  await SecureStore.setItemAsync('cleancare_token', data.token);
+  await SecureStore.setItemAsync('cleancare_usuario', JSON.stringify(data.usuario));
   return data;
 }
 
 export async function getUsuarioGuardado(): Promise<Usuario | null> {
-  const raw = await AsyncStorage.getItem('cleancare_usuario');
+  const raw = await SecureStore.getItemAsync('cleancare_usuario');
   return raw ? JSON.parse(raw) : null;
 }
 
 export async function getToken(): Promise<string | null> {
-  return AsyncStorage.getItem('cleancare_token');
+  return SecureStore.getItemAsync('cleancare_token');
 }
 
 export async function logout(): Promise<void> {
-  await AsyncStorage.multiRemove(['cleancare_token', 'cleancare_usuario']);
+  await SecureStore.deleteItemAsync('cleancare_token');
+  await SecureStore.deleteItemAsync('cleancare_usuario');
 }
 
 export async function iniciarUso(uso: {
@@ -127,4 +127,34 @@ export async function listarMaquinas(edificioId: string): Promise<Maquina[]> {
     params: { edificioId },
   });
   return data.maquinas;
+}
+
+// --- Billetera ---
+
+export interface Transaccion {
+  _id: string;
+  transaccion_id: string;
+  usuario_id: string;
+  tipo: 'asignacion_mensual' | 'ajuste_admin' | 'uso_maquina' | 'devolucion';
+  cantidad: number;
+  descripcion: string;
+  fecha: string;
+}
+
+export async function obtenerBilletera(): Promise<{ saldo: number; transacciones: Transaccion[] }> {
+  const { data } = await api.get('/api/billetera');
+  return data;
+}
+
+// --- Edificios ---
+
+export interface Edificio {
+  edificio_id: string;
+  nombre: string;
+  direccion?: string;
+}
+
+export async function listarEdificios(): Promise<Edificio[]> {
+  const { data } = await api.get('/api/edificios');
+  return data.edificios;
 }

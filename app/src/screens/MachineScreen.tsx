@@ -12,7 +12,8 @@ const DURACIONES = [30, 45, 60];
 const POLL_INTERVAL = 30000; // 30s
 
 export default function MachineScreen({ route, navigation }: Props) {
-  const { maquina_id, ip, edificio_id } = route.params;
+  const { maquina_id, edificio_id } = route.params;
+  const ip = '0.0.0.0'; // Legacy — WiFi no longer used, kept for backward compatibility
 
   const [estado, setEstado] = useState<EstadoMaquina | null>(null);
   const [loading, setLoading] = useState(true);

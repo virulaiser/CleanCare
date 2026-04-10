@@ -34,15 +34,10 @@ async function listar(req, res) {
 }
 
 async function crear(req, res) {
-  const { nombre, tipo, ip_local, edificio_id } = req.body;
+  const { nombre, tipo, edificio_id } = req.body;
 
-  if (!nombre || !tipo || !ip_local || !edificio_id) {
-    return res.status(400).json({ ok: false, error: 'Faltan campos: nombre, tipo, ip_local, edificio_id' });
-  }
-
-  const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (!ipRegex.test(ip_local)) {
-    return res.status(400).json({ ok: false, error: 'Formato de IP inválido (ej: 192.168.1.45)' });
+  if (!nombre || !tipo || !edificio_id) {
+    return res.status(400).json({ ok: false, error: 'Faltan campos: nombre, tipo, edificio_id' });
   }
 
   if (!['lavarropas', 'secadora'].includes(tipo)) {
@@ -58,7 +53,6 @@ async function crear(req, res) {
     maquina_id,
     edificio_id,
     tipo,
-    ip_local,
     nombre,
     activa: true,
   });

@@ -1,10 +1,11 @@
 # TODO — CleanCare
 
-Última actualización: 2026-04-09
+Última actualización: 2026-04-10
 
 ## En progreso
 - [ ] **Integración BLE real** — conectar firmware BLE con el flujo principal de la app (reemplazar ciclo simulado)
 - [ ] **Development build** — generar APK con `npx expo run:android` para probar BLE
+- [ ] **Deploy completo** — hacer deploy del backend y panel con billetera + edificios + sin IP
 
 ## Pendiente (producción)
 - [ ] **Recuperar contraseña** — flujo de reset password (email o código)
@@ -14,6 +15,13 @@
 - [ ] **CI/CD** — GitHub Actions para auto-deploy en push
 - [ ] **Estado en tiempo real en panel** — ver qué máquinas están en uso ahora
 - [ ] **Botón "Bajar App"** — vincular con Play Store o APK cuando esté listo
+
+## Completado (2026-04-10)
+- [x] **UUID máquinas + eliminar IP** — ip_local eliminado del modelo, API, panel y QR. Máquinas se identifican solo por maquina_id auto-generado
+- [x] **Colección Edificios** — modelo Edificio con nombre legible, endpoint /api/edificios, dropdown en registro (panel y app)
+- [x] **Cifrado en celular** — AsyncStorage reemplazado por expo-secure-store (Keychain/EncryptedSharedPreferences)
+- [x] **Seed script + datos ejemplo** — seed.js limpia BD, crea 2 edificios (Torre Norte/Sur), 4 máquinas, admin, configs créditos
+- [x] **Sistema de billetera/créditos** — modelo Transaccion + ConfigEdificio, endpoints billetera/config/resumen, cron mensual, página admin Créditos, saldo en MiCuenta, WalletScreen en app, verificación de saldo antes de ciclo
 
 ## Completado (2026-04-09)
 - [x] **App Expo SDK 54** — alineado con Expo Go disponible en Play Store

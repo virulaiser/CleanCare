@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Modal, FlatList } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { registrarUsuario } from '../services/api.service';
+import { registrarUsuario, listarEdificios, Edificio } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Registro'>;
@@ -14,8 +14,15 @@ export default function RegistroScreen({ navigation }: Props) {
   const [telefono, setTelefono] = useState('');
   const [apartamento, setApartamento] = useState('');
   const [edificio, setEdificio] = useState('');
+  const [edificioNombre, setEdificioNombre] = useState('');
   const [unidad, setUnidad] = useState('');
   const [loading, setLoading] = useState(false);
+  const [edificios, setEdificios] = useState<Edificio[]>([]);
+  const [showEdificios, setShowEdificios] = useState(false);
+
+  useEffect(() => {
+    listarEdificios().then(setEdificios).catch(() => {});
+  }, []);
 
   const handleRegistro = async () => {
     if (!nombre || !email || !password || !edificio) {
@@ -61,8 +68,41 @@ export default function RegistroScreen({ navigation }: Props) {
       <TextInput style={styles.input} placeholder="Contraseña (mínimo 6 caracteres)" placeholderTextColor={colors.textSecondary} value={password} onChangeText={setPassword} secureTextEntry />
       <TextInput style={styles.input} placeholder="Teléfono (ej: 099123456)" placeholderTextColor={colors.textSecondary} value={telefono} onChangeText={setTelefono} keyboardType="phone-pad" />
       <TextInput style={styles.input} placeholder="Apartamento (ej: 3B)" placeholderTextColor={colors.textSecondary} value={apartamento} onChangeText={setApartamento} />
-      <TextInput style={styles.input} placeholder="ID del edificio (ej: edificio-central)" placeholderTextColor={colors.textSecondary} value={edificio} onChangeText={setEdificio} />
+      <TouchableOpacity style={styles.input} onPress={() => setShowEdificios(true)}>
+        <Text style={{ fontSize: 16, color: edificio ? colors.textPrimary : colors.textSecondary }}>
+          {edificioNombre || 'Seleccioná tu edificio'}
+        </Text>
+      </TouchableOpacity>
       <TextInput style={styles.input} placeholder="Unidad (ej: apto-302) — opcional" placeholderTextColor={colors.textSecondary} value={unidad} onChangeText={setUnidad} />
+
+      <Modal visible={showEdificios} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Elegí tu edificio</Text>
+            <FlatList
+              data={edificios}
+              keyExtractor={(item) => item.edificio_id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setEdificio(item.edificio_id);
+                    setEdificioNombre(item.nombre);
+                    setShowEdificios(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{item.nombre}</Text>
+                  {item.direccion ? <Text style={styles.modalItemSub}>{item.direccion}</Text> : null}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={<Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>No hay edificios registrados</Text>}
+            />
+            <TouchableOpacity onPress={() => setShowEdificios(false)} style={styles.modalClose}>
+              <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <TouchableOpacity style={[styles.button, loading && { opacity: 0.6 }]} onPress={handleRegistro} disabled={loading}>
         {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Registrarme</Text>}
@@ -116,5 +156,45 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 14,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    maxHeight: '60%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  modalItemSub: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  modalClose: {
+    paddingVertical: 12,
+    alignItems: 'center',
   },
 });

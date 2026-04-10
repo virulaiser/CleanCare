@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { obtenerBilletera } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
@@ -26,6 +28,13 @@ export default function ScanScreen({ navigation }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [parsedQR, setParsedQR] = useState<{ maquina_id: string; edificio_id: string } | null>(null);
+  const [saldo, setSaldo] = useState<number | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      obtenerBilletera().then(data => setSaldo(data.saldo)).catch(() => {});
+    }, [])
+  );
 
   if (!permission) {
     return <View style={styles.container}><Text>Cargando...</Text></View>;
@@ -64,6 +73,17 @@ export default function ScanScreen({ navigation }: Props) {
 
   const handleConfirmCycle = () => {
     if (!parsedQR) return;
+
+    // Verificar saldo antes de iniciar
+    if (saldo !== null && saldo <= 0) {
+      Alert.alert(
+        'Sin fichas',
+        'No tenés fichas suficientes para iniciar un ciclo. Contactá al administrador del edificio.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     const tipo = getTipoFromQR();
     setParsedQR(null);
     setScanned(false);
@@ -87,15 +107,29 @@ export default function ScanScreen({ navigation }: Props) {
         onBarcodeScanned={handleBarCodeScanned}
       />
       <View style={styles.overlay}>
+        {/* Badge de saldo */}
+        {saldo !== null && (
+          <TouchableOpacity style={styles.saldoBadge} onPress={() => navigation.navigate('Wallet')}>
+            <Text style={[styles.saldoText, saldo <= 0 && { color: '#EF4444' }]}>
+              {saldo} {saldo === 1 ? 'ficha' : 'fichas'}
+            </Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.scanFrame} />
         <Text style={styles.hint}>Apuntá la cámara al QR de la máquina</Text>
       </View>
       <View style={styles.bottomBar}>
         <TouchableOpacity
+          style={styles.walletButton}
+          onPress={() => navigation.navigate('Wallet')}
+        >
+          <Text style={styles.walletButtonText}>Billetera</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.historyButton}
           onPress={() => navigation.navigate('History')}
         >
-          <Text style={styles.historyButtonText}>Ver historial</Text>
+          <Text style={styles.historyButtonText}>Historial</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.bleButton}
@@ -223,6 +257,30 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   bleButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  saldoBadge: {
+    position: 'absolute',
+    top: 20,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  saldoText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  walletButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 999,
+  },
+  walletButtonText: {
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
