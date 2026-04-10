@@ -47,15 +47,21 @@ async function seed() {
   console.log(`  OK — ${edNorte.edificio_id}: ${edNorte.nombre} (Admin: ${edNorte.admin_nombre})`);
   console.log(`  OK — ${edSur.edificio_id}: ${edSur.nombre} (Admin: ${edSur.admin_nombre})`);
 
-  // 3. Crear máquinas (1 lavadora + 1 secadora por edificio, maquina_id = ObjectId hex)
-  console.log('Creando máquinas...');
+  // 3. Crear 10 máquinas (5 por edificio: 3 lavarropas + 2 secadoras)
+  console.log('Creando 10 máquinas...');
   const maquinas = await Maquina.insertMany([
     { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-NORTE', tipo: 'lavarropas', nombre: 'EDI-NORTE_LAV_0', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-NORTE', tipo: 'lavarropas', nombre: 'EDI-NORTE_LAV_1', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-NORTE', tipo: 'lavarropas', nombre: 'EDI-NORTE_LAV_2', activa: true },
     { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-NORTE', tipo: 'secadora', nombre: 'EDI-NORTE_SEC_0', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-NORTE', tipo: 'secadora', nombre: 'EDI-NORTE_SEC_1', activa: true },
     { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-SUR', tipo: 'lavarropas', nombre: 'EDI-SUR_LAV_0', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-SUR', tipo: 'lavarropas', nombre: 'EDI-SUR_LAV_1', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-SUR', tipo: 'lavarropas', nombre: 'EDI-SUR_LAV_2', activa: true },
     { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-SUR', tipo: 'secadora', nombre: 'EDI-SUR_SEC_0', activa: true },
+    { maquina_id: new mongoose.Types.ObjectId().toHexString(), edificio_id: 'EDI-SUR', tipo: 'secadora', nombre: 'EDI-SUR_SEC_1', activa: true },
   ]);
-  maquinas.forEach(m => console.log(`  OK — ${m.maquina_id}: ${m.nombre} (${m.edificio_id})`));
+  maquinas.forEach(m => console.log(`  OK — ${m.nombre} (${m.edificio_id})`));
 
   // 4. Crear admin
   console.log('Creando usuario admin...');
@@ -114,22 +120,26 @@ async function seed() {
   ]);
   console.log('  OK — configs para EDI-NORTE y EDI-SUR');
 
-  // 7. Crear 20 usos random
-  console.log('Creando 20 usos random...');
+  // 7. Crear usos random distribuidos en 90 días (3 meses)
+  const TOTAL_USOS = 60;
+  const DIAS_RANGO = 90;
+  console.log(`Creando ${TOTAL_USOS} usos random (últimos ${DIAS_RANGO} días)...`);
   const allUsers = await Usuario.find({ rol: 'residente' }).lean();
   const allMachines = await Maquina.find({ activa: true }).lean();
   const estados = ['completado', 'completado', 'completado', 'completado', 'cancelado', 'averia'];
   const usosData = [];
 
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < TOTAL_USOS; i++) {
     const user = allUsers[Math.floor(Math.random() * allUsers.length)];
-    // Pick a machine from the user's building
     const buildingMachines = allMachines.filter(m => m.edificio_id === user.edificio_id);
     const machine = buildingMachines[Math.floor(Math.random() * buildingMachines.length)];
     const duracion = machine.tipo === 'secadora' ? 30 : 45;
     const estado = estados[Math.floor(Math.random() * estados.length)];
-    const daysAgo = Math.floor(Math.random() * 30);
-    const fecha_inicio = new Date(Date.now() - daysAgo * 86400000 - Math.floor(Math.random() * 43200000));
+    // Random date in the last 90 days
+    const daysAgo = Math.floor(Math.random() * DIAS_RANGO);
+    const hoursOffset = Math.floor(Math.random() * 14) + 7; // entre 7am y 9pm
+    const fecha_inicio = new Date(Date.now() - daysAgo * 86400000);
+    fecha_inicio.setHours(hoursOffset, Math.floor(Math.random() * 60), 0, 0);
     const fecha_fin = new Date(fecha_inicio.getTime() + duracion * 60000);
 
     usosData.push({
@@ -145,25 +155,23 @@ async function seed() {
       fecha: fecha_inicio,
     });
 
-    // Deduct credit for the use
     await Transaccion.create({
       usuario_id: user.usuario_id,
       edificio_id: user.edificio_id,
       tipo: 'uso_maquina',
       cantidad: -1,
-      descripcion: `Uso ${machine.maquina_id} (${machine.tipo})`,
+      descripcion: `Uso ${machine.nombre} (${machine.tipo})`,
       creado_por: 'sistema',
       fecha: fecha_inicio,
     });
 
-    // Refund if cancelled or averia
     if (estado === 'cancelado' || estado === 'averia') {
       await Transaccion.create({
         usuario_id: user.usuario_id,
         edificio_id: user.edificio_id,
         tipo: 'devolucion',
         cantidad: 1,
-        descripcion: `Devolución por ${estado}: ${machine.maquina_id}`,
+        descripcion: `Devolución por ${estado}: ${machine.nombre}`,
         creado_por: 'sistema',
         fecha: fecha_fin,
       });
@@ -171,13 +179,14 @@ async function seed() {
   }
 
   await Uso.insertMany(usosData);
-  console.log(`  OK — 20 usos creados`);
+  console.log(`  OK — ${TOTAL_USOS} usos creados (rango: ${DIAS_RANGO} días)`);
 
   console.log('\n=== Seed completado ===');
   console.log('  2 edificios: Torre Norte, Torre Sur');
-  console.log('  4 máquinas: LAV-000001, SEC-000001, LAV-000002, SEC-000002');
+  console.log('  10 máquinas (5 por edificio: 3 lavarropas + 2 secadoras)');
   console.log('  1 admin: admin@cleancare.uy / admin123');
   console.log('  10 residentes: 123456 (5 por edificio, 10 créditos c/u)');
+  console.log(`  ${TOTAL_USOS} usos random (últimos 3 meses)`);
   console.log('  2 configs de créditos (10/mes, costo 1, lavado 45min, secado 30min)');
 
   process.exit(0);
