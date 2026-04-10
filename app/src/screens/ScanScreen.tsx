@@ -7,16 +7,16 @@ import { colors } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 
-// QR format: cleancare://maquina?id=esp32-lav-3B&ip=192.168.1.45&edificio=edificio-central
-function parseQR(data: string): { maquina_id: string; ip: string; edificio_id: string } | null {
+// QR format: cleancare://maquina?id=LAV-7DED11&edificio=edificio-central
+// (ip es opcional, legacy WiFi)
+function parseQR(data: string): { maquina_id: string; edificio_id: string } | null {
   try {
     const url = new URL(data);
     if (url.protocol !== 'cleancare:') return null;
     const maquina_id = url.searchParams.get('id');
-    const ip = url.searchParams.get('ip');
     const edificio_id = url.searchParams.get('edificio');
-    if (!maquina_id || !ip || !edificio_id) return null;
-    return { maquina_id, ip, edificio_id };
+    if (!maquina_id || !edificio_id) return null;
+    return { maquina_id, edificio_id };
   } catch {
     return null;
   }
@@ -25,7 +25,7 @@ function parseQR(data: string): { maquina_id: string; ip: string; edificio_id: s
 export default function ScanScreen({ navigation }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-  const [parsedQR, setParsedQR] = useState<{ maquina_id: string; ip: string; edificio_id: string } | null>(null);
+  const [parsedQR, setParsedQR] = useState<{ maquina_id: string; edificio_id: string } | null>(null);
 
   if (!permission) {
     return <View style={styles.container}><Text>Cargando...</Text></View>;

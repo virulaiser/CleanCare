@@ -14,6 +14,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
+
 // UUIDs del servicio y caracteristicas
 #define SERVICE_UUID        "12345678-1234-1234-1234-123456789abc"
 #define CONTROL_CHAR_UUID   "12345678-1234-1234-1234-123456789abd"  // Write
@@ -43,6 +44,9 @@ class ServerCallbacks : public BLEServerCallbacks {
     pServer->startAdvertising();
   }
 };
+
+void sendStatus();
+void turnOff();
 
 // Callback de escritura en la caracteristica de control
 class ControlCallbacks : public BLECharacteristicCallbacks {
