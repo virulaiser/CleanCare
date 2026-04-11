@@ -1,5 +1,6 @@
 const connectDB = require('../lib/mongodb');
 const Usuario = require('../models/Usuario');
+const Transaccion = require('../models/Transaccion');
 const bcrypt = require('bcryptjs');
 const { obtenerSaldo } = require('./billetera');
 
@@ -18,14 +19,29 @@ module.exports = async (req, res) => {
         .select('usuario_id nombre email apartamento telefono edificio_id unidad creado')
         .lean();
 
-      const conSaldo = await Promise.all(
-        usuarios.map(async (u) => ({
-          ...u,
-          saldo: await obtenerSaldo(u.usuario_id)
-        }))
-      );
+      // Obtener todas las transacciones de estos usuarios de una vez
+      const usuarioIds = usuarios.map(u => u.usuario_id);
+      const transacciones = await Transaccion.find({ usuario_id: { $in: usuarioIds } }).lean();
 
-      return res.json({ ok: true, usuarios: conSaldo });
+      // Agrupar por usuario
+      const txByUser = {};
+      transacciones.forEach(tx => {
+        if (!txByUser[tx.usuario_id]) txByUser[tx.usuario_id] = [];
+        txByUser[tx.usuario_id].push(tx);
+      });
+
+      const conDatos = usuarios.map(u => {
+        const txs = txByUser[u.usuario_id] || [];
+        let saldo = 0, fichas_usadas = 0, fichas_extras = 0;
+        txs.forEach(tx => {
+          saldo += tx.cantidad;
+          if (tx.tipo === 'uso_maquina') fichas_usadas += Math.abs(tx.cantidad);
+          if (tx.tipo === 'ajuste_admin') fichas_extras += tx.cantidad;
+        });
+        return { ...u, saldo, fichas_usadas, fichas_extras };
+      });
+
+      return res.json({ ok: true, usuarios: conDatos });
     }
 
     // POST — crear usuario manualmente (admin)

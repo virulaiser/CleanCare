@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   listarUsuariosEdificio, listarEdificios, crearUsuarioAdmin,
-  editarUsuarioAdmin, eliminarUsuarioAdmin, Edificio, Usuario,
+  editarUsuarioAdmin, eliminarUsuarioAdmin, Edificio,
 } from '../services/api';
 import { colors } from '../constants/colors';
 
@@ -15,11 +15,8 @@ interface UsuarioRow {
   edificio_id: string;
   unidad?: string;
   saldo: number;
-}
-
-function getUsuario(): { edificio_id: string } | null {
-  const raw = localStorage.getItem('cleancare_usuario');
-  return raw ? JSON.parse(raw) : null;
+  fichas_usadas: number;
+  fichas_extras: number;
 }
 
 export default function AdminUsuarios() {
@@ -27,8 +24,14 @@ export default function AdminUsuarios() {
   const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
   const [edificios, setEdificios] = useState<Edificio[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busqueda, setBusqueda] = useState('');
+
+  // Filtros
+  const [filtroNombre, setFiltroNombre] = useState('');
+  const [filtroEmail, setFiltroEmail] = useState('');
+  const [filtroApto, setFiltroApto] = useState('');
   const [filtroEdificio, setFiltroEdificio] = useState('');
+  const [filtroFichas, setFiltroFichas] = useState<'' | 'con' | 'sin'>('');
+  const [ordenar, setOrdenar] = useState<'nombre' | 'fichas_usadas' | 'fichas_extras' | 'saldo'>('nombre');
 
   // Modal crear
   const [showCrear, setShowCrear] = useState(false);
@@ -66,9 +69,7 @@ export default function AdminUsuarios() {
       ]);
       setUsuarios(usrs as UsuarioRow[]);
       setEdificios(edfs);
-      if (edfs.length > 0 && !formEdificio) {
-        setFormEdificio(edfs[0].edificio_id);
-      }
+      if (edfs.length > 0 && !formEdificio) setFormEdificio(edfs[0].edificio_id);
     } catch {}
     setLoading(false);
   }
@@ -79,7 +80,7 @@ export default function AdminUsuarios() {
     navigate('/');
   };
 
-  // Crear usuario
+  // Crear
   const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNombre || !formEmail || !formPassword || !formEdificio) {
@@ -89,13 +90,9 @@ export default function AdminUsuarios() {
     setCreando(true);
     try {
       await crearUsuarioAdmin({
-        nombre: formNombre,
-        email: formEmail,
-        password: formPassword,
-        telefono: formTelefono || undefined,
-        apartamento: formApto || undefined,
-        edificio_id: formEdificio,
-        unidad: formUnidad || undefined,
+        nombre: formNombre, email: formEmail, password: formPassword,
+        telefono: formTelefono || undefined, apartamento: formApto || undefined,
+        edificio_id: formEdificio, unidad: formUnidad || undefined,
       });
       setShowCrear(false);
       setFormNombre(''); setFormEmail(''); setFormPassword('');
@@ -107,32 +104,23 @@ export default function AdminUsuarios() {
     setCreando(false);
   };
 
-  // Abrir modal editar
+  // Editar
   const openEdit = (u: UsuarioRow) => {
     setEditUser(u);
-    setEditNombre(u.nombre);
-    setEditEmail(u.email);
-    setEditPassword('');
-    setEditTelefono(u.telefono || '');
-    setEditApto(u.apartamento || '');
-    setEditEdificio(u.edificio_id);
-    setEditUnidad(u.unidad || '');
+    setEditNombre(u.nombre); setEditEmail(u.email); setEditPassword('');
+    setEditTelefono(u.telefono || ''); setEditApto(u.apartamento || '');
+    setEditEdificio(u.edificio_id); setEditUnidad(u.unidad || '');
   };
 
-  // Guardar edición
   const handleEditar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
     setEditando(true);
     try {
       await editarUsuarioAdmin(editUser.usuario_id, {
-        nombre: editNombre || undefined,
-        email: editEmail || undefined,
-        password: editPassword || undefined,
-        telefono: editTelefono,
-        apartamento: editApto,
-        edificio_id: editEdificio || undefined,
-        unidad: editUnidad,
+        nombre: editNombre || undefined, email: editEmail || undefined,
+        password: editPassword || undefined, telefono: editTelefono,
+        apartamento: editApto, edificio_id: editEdificio || undefined, unidad: editUnidad,
       });
       setEditUser(null);
       await fetchData();
@@ -142,27 +130,49 @@ export default function AdminUsuarios() {
     setEditando(false);
   };
 
-  // Eliminar usuario
+  // Eliminar
   const handleEliminar = async (u: UsuarioRow) => {
     if (!confirm(`¿Desactivar a ${u.nombre} (${u.email})?`)) return;
     try {
       await eliminarUsuarioAdmin(u.usuario_id);
       await fetchData();
-    } catch {
-      alert('Error al eliminar usuario');
-    }
+    } catch { alert('Error al eliminar usuario'); }
   };
 
-  // Filtrar
+  // Filtrar y ordenar
+  const edificioNombre = (id: string) => edificios.find(e => e.edificio_id === id)?.nombre || id;
+
   const filtrados = usuarios.filter((u) => {
-    const q = busqueda.toLowerCase();
-    const matchBusq = !q || u.nombre.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-      || (u.apartamento || '').toLowerCase().includes(q);
-    const matchEdif = !filtroEdificio || u.edificio_id === filtroEdificio;
-    return matchBusq && matchEdif;
+    if (filtroNombre && !u.nombre.toLowerCase().includes(filtroNombre.toLowerCase())) return false;
+    if (filtroEmail && !u.email.toLowerCase().includes(filtroEmail.toLowerCase())) return false;
+    if (filtroApto && !(u.apartamento || '').toLowerCase().includes(filtroApto.toLowerCase())) return false;
+    if (filtroEdificio && u.edificio_id !== filtroEdificio) return false;
+    if (filtroFichas === 'con' && u.saldo <= 0) return false;
+    if (filtroFichas === 'sin' && u.saldo > 0) return false;
+    return true;
+  }).sort((a, b) => {
+    if (ordenar === 'nombre') return a.nombre.localeCompare(b.nombre);
+    if (ordenar === 'fichas_usadas') return b.fichas_usadas - a.fichas_usadas;
+    if (ordenar === 'fichas_extras') return b.fichas_extras - a.fichas_extras;
+    if (ordenar === 'saldo') return b.saldo - a.saldo;
+    return 0;
   });
 
-  const edificioNombre = (id: string) => edificios.find(e => e.edificio_id === id)?.nombre || id;
+  // Avatar
+  const Avatar = ({ nombre }: { nombre: string }) => {
+    const initial = nombre ? nombre.charAt(0).toUpperCase() : '?';
+    const hue = nombre ? (nombre.charCodeAt(0) * 37) % 360 : 200;
+    return (
+      <div style={{
+        width: 36, height: 36, borderRadius: 18, display: 'flex',
+        alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        backgroundColor: `hsl(${hue}, 60%, 90%)`, color: `hsl(${hue}, 60%, 35%)`,
+        fontSize: 15, fontWeight: 700,
+      }}>
+        {initial}
+      </div>
+    );
+  };
 
   return (
     <div style={styles.page}>
@@ -183,37 +193,67 @@ export default function AdminUsuarios() {
           <div>
             <h2 style={styles.pageTitle}>Gestión de Usuarios</h2>
             <p style={{ fontSize: 14, color: colors.textSecondary, margin: 0 }}>
-              Crear, editar y desactivar usuarios residentes
+              {filtrados.length} usuario{filtrados.length !== 1 ? 's' : ''} encontrado{filtrados.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <button onClick={() => setShowCrear(true)} style={styles.btnPrimary}>
-            + Nuevo usuario
-          </button>
+          <button onClick={() => setShowCrear(true)} style={styles.btnPrimary}>+ Nuevo usuario</button>
         </div>
 
         {/* Filtros */}
         <div style={styles.card}>
+          <h3 style={styles.cardTitle}>Filtros</h3>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <input
-              style={{ ...styles.input, flex: '1 1 200px' }}
-              placeholder="Buscar por nombre, email o apto..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
+            <div style={styles.filterCol}>
+              <label style={styles.label}>Nombre</label>
+              <input style={styles.input} placeholder="Buscar nombre..." value={filtroNombre} onChange={(e) => setFiltroNombre(e.target.value)} />
+            </div>
+            <div style={styles.filterCol}>
+              <label style={styles.label}>Email</label>
+              <input style={styles.input} placeholder="Buscar email..." value={filtroEmail} onChange={(e) => setFiltroEmail(e.target.value)} />
+            </div>
+            <div style={styles.filterCol}>
+              <label style={styles.label}>Apartamento</label>
+              <input style={styles.input} placeholder="Ej: 3B" value={filtroApto} onChange={(e) => setFiltroApto(e.target.value)} />
+            </div>
             {edificios.length > 1 && (
-              <select style={styles.input} value={filtroEdificio} onChange={(e) => setFiltroEdificio(e.target.value)}>
-                <option value="">Todos los edificios</option>
-                {edificios.map(e => (
-                  <option key={e.edificio_id} value={e.edificio_id}>{e.nombre}</option>
-                ))}
-              </select>
+              <div style={styles.filterCol}>
+                <label style={styles.label}>Edificio</label>
+                <select style={styles.input} value={filtroEdificio} onChange={(e) => setFiltroEdificio(e.target.value)}>
+                  <option value="">Todos</option>
+                  {edificios.map(e => <option key={e.edificio_id} value={e.edificio_id}>{e.nombre}</option>)}
+                </select>
+              </div>
             )}
+            <div style={styles.filterCol}>
+              <label style={styles.label}>Fichas</label>
+              <select style={styles.input} value={filtroFichas} onChange={(e) => setFiltroFichas(e.target.value as any)}>
+                <option value="">Todos</option>
+                <option value="con">Con fichas</option>
+                <option value="sin">Sin fichas</option>
+              </select>
+            </div>
+            <div style={styles.filterCol}>
+              <label style={styles.label}>Ordenar por</label>
+              <select style={styles.input} value={ordenar} onChange={(e) => setOrdenar(e.target.value as any)}>
+                <option value="nombre">Nombre</option>
+                <option value="saldo">Saldo</option>
+                <option value="fichas_usadas">Fichas usadas</option>
+                <option value="fichas_extras">Fichas extras</option>
+              </select>
+            </div>
           </div>
+          {(filtroNombre || filtroEmail || filtroApto || filtroEdificio || filtroFichas) && (
+            <button
+              onClick={() => { setFiltroNombre(''); setFiltroEmail(''); setFiltroApto(''); setFiltroEdificio(''); setFiltroFichas(''); }}
+              style={{ marginTop: 12, padding: '6px 16px', borderRadius: 999, border: 'none', backgroundColor: colors.bgCard, color: colors.textSecondary, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Limpiar filtros
+            </button>
+          )}
         </div>
 
         {/* Tabla */}
         <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Usuarios activos ({filtrados.length})</h3>
           {loading ? (
             <p style={styles.muted}>Cargando...</p>
           ) : filtrados.length === 0 ? (
@@ -223,25 +263,43 @@ export default function AdminUsuarios() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>Nombre</th>
+                    <th style={styles.th}>Usuario</th>
                     <th style={styles.th}>Email</th>
                     <th style={styles.th}>Apto</th>
-                    <th style={styles.th}>Teléfono</th>
                     <th style={styles.th}>Edificio</th>
-                    <th style={styles.th}>Fichas</th>
+                    <th style={styles.th}>Saldo</th>
+                    <th style={styles.th}>Usadas</th>
+                    <th style={styles.th}>Extras</th>
                     <th style={styles.th}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtrados.map((u) => (
-                    <tr key={u.usuario_id}>
-                      <td style={styles.td}><strong>{u.nombre}</strong></td>
-                      <td style={styles.td}>{u.email}</td>
+                    <tr key={u.usuario_id} style={{ transition: 'background 0.15s' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = colors.bgPage)} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}>
+                      <td style={styles.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar nombre={u.nombre} />
+                          <div>
+                            <div style={{ fontWeight: 600, color: colors.textPrimary }}>{u.nombre}</div>
+                            {u.telefono && <div style={{ fontSize: 12, color: colors.textSecondary }}>{u.telefono}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={styles.td}><span style={{ fontSize: 13 }}>{u.email}</span></td>
                       <td style={styles.td}>{u.apartamento || '—'}</td>
-                      <td style={styles.td}>{u.telefono || '—'}</td>
-                      <td style={styles.td}>{edificioNombre(u.edificio_id)}</td>
-                      <td style={{ ...styles.td, fontWeight: 600, color: u.saldo <= 0 ? colors.error : colors.success }}>
+                      <td style={styles.td}>
+                        <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, backgroundColor: colors.bgBlueLight, color: colors.primary, fontWeight: 500 }}>
+                          {edificioNombre(u.edificio_id)}
+                        </span>
+                      </td>
+                      <td style={{ ...styles.td, fontWeight: 700, color: u.saldo <= 0 ? colors.error : colors.success }}>
                         {u.saldo}
+                      </td>
+                      <td style={{ ...styles.td, color: colors.textSecondary }}>
+                        {u.fichas_usadas || 0}
+                      </td>
+                      <td style={{ ...styles.td, color: u.fichas_extras > 0 ? '#D97706' : colors.textSecondary }}>
+                        {u.fichas_extras > 0 ? `+${u.fichas_extras}` : '0'}
                       </td>
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -289,9 +347,7 @@ export default function AdminUsuarios() {
               <div style={styles.formRow}>
                 <label style={styles.label}>Edificio *</label>
                 <select style={styles.input} value={formEdificio} onChange={(e) => setFormEdificio(e.target.value)}>
-                  {edificios.map(e => (
-                    <option key={e.edificio_id} value={e.edificio_id}>{e.nombre}</option>
-                  ))}
+                  {edificios.map(e => <option key={e.edificio_id} value={e.edificio_id}>{e.nombre}</option>)}
                 </select>
               </div>
               <div style={styles.formRow}>
@@ -313,10 +369,13 @@ export default function AdminUsuarios() {
       {editUser && (
         <div style={styles.overlay} onClick={() => setEditUser(null)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>Editar usuario</h3>
-            <p style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 16 }}>
-              ID: {editUser.usuario_id}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <Avatar nombre={editUser.nombre} />
+              <div>
+                <h3 style={{ ...styles.modalTitle, marginBottom: 0 }}>Editar usuario</h3>
+                <span style={{ fontSize: 12, color: colors.textSecondary }}>{editUser.usuario_id}</span>
+              </div>
+            </div>
             <form onSubmit={handleEditar} style={styles.form}>
               <div style={styles.formRow}>
                 <label style={styles.label}>Nombre</label>
@@ -327,7 +386,7 @@ export default function AdminUsuarios() {
                 <input style={styles.input} value={editEmail} onChange={(e) => setEditEmail(e.target.value)} type="email" />
               </div>
               <div style={styles.formRow}>
-                <label style={styles.label}>Nueva contraseña (dejar vacío para no cambiar)</label>
+                <label style={styles.label}>Nueva contraseña (vacío = no cambiar)</label>
                 <input style={styles.input} value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="••••••" type="password" />
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -343,14 +402,27 @@ export default function AdminUsuarios() {
               <div style={styles.formRow}>
                 <label style={styles.label}>Edificio</label>
                 <select style={styles.input} value={editEdificio} onChange={(e) => setEditEdificio(e.target.value)}>
-                  {edificios.map(e => (
-                    <option key={e.edificio_id} value={e.edificio_id}>{e.nombre}</option>
-                  ))}
+                  {edificios.map(e => <option key={e.edificio_id} value={e.edificio_id}>{e.nombre}</option>)}
                 </select>
               </div>
               <div style={styles.formRow}>
                 <label style={styles.label}>Unidad</label>
                 <input style={styles.input} value={editUnidad} onChange={(e) => setEditUnidad(e.target.value)} />
+              </div>
+              {/* Resumen fichas */}
+              <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                <div style={styles.statBox}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: editUser.saldo <= 0 ? colors.error : colors.success }}>{editUser.saldo}</span>
+                  <span style={{ fontSize: 11, color: colors.textSecondary }}>Saldo</span>
+                </div>
+                <div style={styles.statBox}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{editUser.fichas_usadas}</span>
+                  <span style={{ fontSize: 11, color: colors.textSecondary }}>Usadas</span>
+                </div>
+                <div style={styles.statBox}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: '#D97706' }}>{editUser.fichas_extras}</span>
+                  <span style={{ fontSize: 11, color: colors.textSecondary }}>Extras</span>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
                 <button type="button" onClick={() => setEditUser(null)} style={styles.btnCancel}>Cancelar</button>
@@ -379,31 +451,32 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: colors.white, color: colors.textPrimary, fontSize: 14,
     cursor: 'pointer', fontFamily: 'inherit',
   },
-  main: { maxWidth: 1100, margin: '0 auto', padding: '32px 24px' },
+  main: { maxWidth: 1200, margin: '0 auto', padding: '32px 24px' },
   pageTitle: { fontSize: 22, fontWeight: 700, color: colors.textPrimary, margin: 0 },
   card: {
     backgroundColor: colors.white, borderRadius: 12, padding: 24,
     border: `1px solid ${colors.border}`, marginBottom: 24,
   },
-  cardTitle: { fontSize: 16, fontWeight: 600, color: colors.textPrimary, marginBottom: 16 },
+  cardTitle: { fontSize: 14, fontWeight: 600, color: colors.textSecondary, marginBottom: 12, textTransform: 'uppercase' as const, letterSpacing: 0.5 },
+  filterCol: { display: 'flex', flexDirection: 'column' as const, gap: 4, flex: '1 1 140px', minWidth: 120 },
   input: {
-    padding: '10px 14px', borderRadius: 8, border: `1px solid ${colors.border}`,
+    padding: '9px 12px', borderRadius: 8, border: `1px solid ${colors.border}`,
     fontSize: 14, fontFamily: 'inherit', backgroundColor: colors.white, width: '100%',
     boxSizing: 'border-box' as const,
   },
-  label: { fontSize: 13, fontWeight: 500, color: colors.textSecondary, marginBottom: 4 },
+  label: { fontSize: 12, fontWeight: 500, color: colors.textSecondary },
   btnPrimary: {
     padding: '10px 24px', borderRadius: 999, backgroundColor: colors.primary,
     color: colors.white, fontSize: 14, fontWeight: 600, border: 'none',
     cursor: 'pointer', fontFamily: 'inherit',
   },
   btnEdit: {
-    padding: '6px 14px', borderRadius: 8, backgroundColor: '#DBEAFE',
+    padding: '5px 12px', borderRadius: 6, backgroundColor: '#DBEAFE',
     color: colors.primary, fontSize: 12, fontWeight: 600, border: 'none',
     cursor: 'pointer', fontFamily: 'inherit',
   },
   btnDelete: {
-    padding: '6px 14px', borderRadius: 8, backgroundColor: '#FEF2F2',
+    padding: '5px 12px', borderRadius: 6, backgroundColor: '#FEF2F2',
     color: colors.error, fontSize: 12, fontWeight: 600, border: 'none',
     cursor: 'pointer', fontFamily: 'inherit',
   },
@@ -414,16 +487,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 14 },
   th: {
-    textAlign: 'left' as const, padding: '10px 12px', fontSize: 12, fontWeight: 600,
+    textAlign: 'left' as const, padding: '10px 12px', fontSize: 11, fontWeight: 600,
     color: colors.textSecondary, borderBottom: `2px solid ${colors.border}`,
     textTransform: 'uppercase' as const, letterSpacing: 0.5,
   },
-  td: {
-    padding: '12px', borderBottom: `1px solid ${colors.border}`,
-    color: colors.textPrimary,
-  },
+  td: { padding: '10px 12px', borderBottom: `1px solid ${colors.border}`, color: colors.textPrimary },
   muted: { color: colors.textSecondary, fontSize: 14 },
-  // Modal
+  statBox: {
+    flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
+    padding: 12, borderRadius: 8, backgroundColor: colors.bgPage,
+  },
   overlay: {
     position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
