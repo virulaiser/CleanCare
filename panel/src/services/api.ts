@@ -201,7 +201,7 @@ export async function listarUsuariosEdificio(edificioId?: string): Promise<{ usu
 
 export async function crearUsuarioAdmin(campos: {
   nombre: string; email: string; password: string;
-  telefono?: string; apartamento?: string; edificio_id: string; unidad?: string;
+  telefono?: string; apartamento?: string; edificio_id: string; unidad?: string; foto?: string;
 }): Promise<{ usuario_id: string; nombre: string; email: string }> {
   const { data } = await api.post('/api/usuarios', campos);
   return data.usuario;
@@ -209,7 +209,7 @@ export async function crearUsuarioAdmin(campos: {
 
 export async function editarUsuarioAdmin(usuarioId: string, campos: {
   nombre?: string; email?: string; password?: string;
-  telefono?: string; apartamento?: string; edificio_id?: string; unidad?: string;
+  telefono?: string; apartamento?: string; edificio_id?: string; unidad?: string; foto?: string;
 }): Promise<{ usuario_id: string; nombre: string; email: string }> {
   const { data } = await api.patch('/api/usuarios', campos, { params: { usuarioId } });
   return data.usuario;

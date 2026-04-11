@@ -16,7 +16,7 @@ module.exports = async (req, res) => {
       if (edificioId) filter.edificio_id = edificioId;
 
       const usuarios = await Usuario.find(filter)
-        .select('usuario_id nombre email apartamento telefono edificio_id unidad creado')
+        .select('usuario_id nombre email apartamento telefono edificio_id unidad foto creado')
         .lean();
 
       // Obtener todas las transacciones de estos usuarios de una vez
@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
 
     // POST — crear usuario manualmente (admin)
     if (req.method === 'POST') {
-      const { nombre, email, password, telefono, apartamento, edificio_id, unidad } = req.body;
+      const { nombre, email, password, telefono, apartamento, edificio_id, unidad, foto } = req.body;
 
       if (!nombre || !email || !password || !edificio_id) {
         return res.status(400).json({ ok: false, error: 'Faltan campos obligatorios (nombre, email, password, edificio_id)' });
@@ -74,6 +74,7 @@ module.exports = async (req, res) => {
         apartamento: apartamento || undefined,
         edificio_id,
         unidad: unidad || undefined,
+        foto: foto || undefined,
         rol: 'residente',
       });
 
@@ -100,7 +101,7 @@ module.exports = async (req, res) => {
         return res.status(400).json({ ok: false, error: 'Falta usuarioId' });
       }
 
-      const { nombre, email, telefono, apartamento, edificio_id, unidad, password } = req.body;
+      const { nombre, email, telefono, apartamento, edificio_id, unidad, password, foto } = req.body;
       const usuario = await Usuario.findOne({ usuario_id: usuarioId, activo: true });
       if (!usuario) {
         return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
@@ -111,6 +112,7 @@ module.exports = async (req, res) => {
       if (apartamento !== undefined) usuario.apartamento = apartamento;
       if (edificio_id) usuario.edificio_id = edificio_id;
       if (unidad !== undefined) usuario.unidad = unidad;
+      if (foto !== undefined) usuario.foto = foto;
 
       if (email && email.trim().toLowerCase() !== usuario.email) {
         const existe = await Usuario.findOne({ email: email.trim().toLowerCase() });

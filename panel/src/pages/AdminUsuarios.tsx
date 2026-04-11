@@ -14,9 +14,35 @@ interface UsuarioRow {
   telefono?: string;
   edificio_id: string;
   unidad?: string;
+  foto?: string;
   saldo: number;
   fichas_usadas: number;
   fichas_extras: number;
+}
+
+// Comprimir imagen a max 200x200 y convertir a base64
+function compressImage(file: File, maxSize = 200): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+        else { w = Math.round(w * maxSize / h); h = maxSize; }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function AdminUsuarios() {
@@ -42,6 +68,7 @@ export default function AdminUsuarios() {
   const [formApto, setFormApto] = useState('');
   const [formEdificio, setFormEdificio] = useState('');
   const [formUnidad, setFormUnidad] = useState('');
+  const [formFoto, setFormFoto] = useState('');
   const [creando, setCreando] = useState(false);
 
   // Modal editar
@@ -53,6 +80,7 @@ export default function AdminUsuarios() {
   const [editApto, setEditApto] = useState('');
   const [editEdificio, setEditEdificio] = useState('');
   const [editUnidad, setEditUnidad] = useState('');
+  const [editFoto, setEditFoto] = useState('');
   const [editando, setEditando] = useState(false);
 
   useEffect(() => {
@@ -93,10 +121,11 @@ export default function AdminUsuarios() {
         nombre: formNombre, email: formEmail, password: formPassword,
         telefono: formTelefono || undefined, apartamento: formApto || undefined,
         edificio_id: formEdificio, unidad: formUnidad || undefined,
+        foto: formFoto || undefined,
       });
       setShowCrear(false);
       setFormNombre(''); setFormEmail(''); setFormPassword('');
-      setFormTelefono(''); setFormApto(''); setFormUnidad('');
+      setFormTelefono(''); setFormApto(''); setFormUnidad(''); setFormFoto('');
       await fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Error al crear usuario');
@@ -110,6 +139,7 @@ export default function AdminUsuarios() {
     setEditNombre(u.nombre); setEditEmail(u.email); setEditPassword('');
     setEditTelefono(u.telefono || ''); setEditApto(u.apartamento || '');
     setEditEdificio(u.edificio_id); setEditUnidad(u.unidad || '');
+    setEditFoto(u.foto || '');
   };
 
   const handleEditar = async (e: React.FormEvent) => {
@@ -121,6 +151,7 @@ export default function AdminUsuarios() {
         nombre: editNombre || undefined, email: editEmail || undefined,
         password: editPassword || undefined, telefono: editTelefono,
         apartamento: editApto, edificio_id: editEdificio || undefined, unidad: editUnidad,
+        foto: editFoto || undefined,
       });
       setEditUser(null);
       await fetchData();
@@ -158,18 +189,59 @@ export default function AdminUsuarios() {
     return 0;
   });
 
-  // Avatar
-  const Avatar = ({ nombre }: { nombre: string }) => {
+  // Avatar — muestra foto o inicial
+  const Avatar = ({ nombre, foto, size = 36 }: { nombre: string; foto?: string; size?: number }) => {
+    if (foto) {
+      return <img src={foto} alt={nombre} style={{ width: size, height: size, borderRadius: size / 2, objectFit: 'cover', flexShrink: 0 }} />;
+    }
     const initial = nombre ? nombre.charAt(0).toUpperCase() : '?';
     const hue = nombre ? (nombre.charCodeAt(0) * 37) % 360 : 200;
     return (
       <div style={{
-        width: 36, height: 36, borderRadius: 18, display: 'flex',
+        width: size, height: size, borderRadius: size / 2, display: 'flex',
         alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         backgroundColor: `hsl(${hue}, 60%, 90%)`, color: `hsl(${hue}, 60%, 35%)`,
-        fontSize: 15, fontWeight: 700,
+        fontSize: size * 0.42, fontWeight: 700,
       }}>
         {initial}
+      </div>
+    );
+  };
+
+  // Componente upload foto
+  const PhotoUpload = ({ foto, onFoto, nombre }: { foto: string; onFoto: (f: string) => void; nombre: string }) => {
+    const fileRef = React.useRef<HTMLInputElement>(null);
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { alert('Solo se permiten imágenes'); return; }
+      try {
+        const b64 = await compressImage(file);
+        onFoto(b64);
+      } catch { alert('Error al procesar la imagen'); }
+    };
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+        <div onClick={() => fileRef.current?.click()} style={{ cursor: 'pointer', position: 'relative' }}>
+          <Avatar nombre={nombre} foto={foto} size={64} />
+          <div style={{
+            position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: 11,
+            backgroundColor: colors.primary, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '2px solid white', fontSize: 11, color: 'white',
+          }}>+</div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <button type="button" onClick={() => fileRef.current?.click()}
+            style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${colors.border}`, backgroundColor: colors.white, color: colors.textPrimary, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {foto ? 'Cambiar foto' : 'Subir foto'}
+          </button>
+          {foto && <button type="button" onClick={() => onFoto('')}
+            style={{ marginLeft: 8, padding: '6px 14px', borderRadius: 8, border: 'none', backgroundColor: '#FEF2F2', color: colors.error, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Quitar
+          </button>}
+          <p style={{ fontSize: 11, color: colors.textSecondary, margin: '4px 0 0' }}>JPG o PNG, se redimensiona a 200x200</p>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
       </div>
     );
   };
@@ -278,7 +350,7 @@ export default function AdminUsuarios() {
                     <tr key={u.usuario_id} style={{ transition: 'background 0.15s' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = colors.bgPage)} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}>
                       <td style={styles.td}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Avatar nombre={u.nombre} />
+                          <Avatar nombre={u.nombre} foto={u.foto} />
                           <div>
                             <div style={{ fontWeight: 600, color: colors.textPrimary }}>{u.nombre}</div>
                             {u.telefono && <div style={{ fontSize: 12, color: colors.textSecondary }}>{u.telefono}</div>}
@@ -322,6 +394,7 @@ export default function AdminUsuarios() {
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>Nuevo usuario</h3>
             <form onSubmit={handleCrear} style={styles.form}>
+              <PhotoUpload foto={formFoto} onFoto={setFormFoto} nombre={formNombre || 'N'} />
               <div style={styles.formRow}>
                 <label style={styles.label}>Nombre *</label>
                 <input style={styles.input} value={formNombre} onChange={(e) => setFormNombre(e.target.value)} placeholder="Nombre completo" />
@@ -377,6 +450,7 @@ export default function AdminUsuarios() {
               </div>
             </div>
             <form onSubmit={handleEditar} style={styles.form}>
+              <PhotoUpload foto={editFoto} onFoto={setEditFoto} nombre={editNombre || 'E'} />
               <div style={styles.formRow}>
                 <label style={styles.label}>Nombre</label>
                 <input style={styles.input} value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />

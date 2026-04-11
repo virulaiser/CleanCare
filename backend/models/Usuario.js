@@ -12,6 +12,7 @@ const usuarioSchema = new mongoose.Schema({
   rol:         { type: String, enum: ['admin', 'residente'], default: 'residente' },
   edificio_id: { type: String, required: true },
   unidad:      { type: String },
+  foto:        { type: String },
   activo:      { type: Boolean, default: true },
   creado:      { type: Date, default: Date.now }
 });
