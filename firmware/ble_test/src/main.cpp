@@ -1,7 +1,15 @@
 /*
-  CleanCare — BLE Firmware con diagnóstico
+  CleanCare — BLE Firmware v3.0
 
-  Subir con PlatformIO:
+  Features:
+  - BLE server "CleanCare-ESP32"
+  - LED/relay control via BLE commands
+  - Auto-reset cada 24h (si no hay ciclo activo)
+  - Registro de usos en NVS (memoria no volátil)
+  - Recibe fecha/hora de la app
+  - Extracción de logs con clave
+
+  Subir:
     cd firmware/ble_test
     pio run --target upload
     pio device monitor
@@ -12,6 +20,7 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <Preferences.h>
 
 // UUIDs — DEBEN coincidir con la app
 #define SERVICE_UUID        "12345678-1234-1234-1234-123456789abc"
@@ -19,9 +28,14 @@
 #define STATUS_CHAR_UUID    "12345678-1234-1234-1234-123456789abe"
 
 #define LED_PIN 2
+#define RESET_INTERVAL_MS   86400000UL  // 24 horas en ms
+#define MAX_LOGS            200         // Máximo de registros en NVS
+#define LOG_ACCESS_KEY      "cleancare2026"
 
+Preferences preferences;
 BLECharacteristic *statusCharacteristic;
 BLEServer *bleServer;
+
 bool deviceConnected = false;
 bool ledOn = false;
 unsigned long ledOffTime = 0;
@@ -29,8 +43,105 @@ unsigned long durationMs = 0;
 unsigned long startTime = 0;
 int connectionCount = 0;
 
+// Fecha/hora recibida de la app
+String currentDateTime = "";
+unsigned long dateTimeReceivedAt = 0;  // millis() cuando se recibió
+
 // ==========================================
-// CALLBACKS
+// NVS — REGISTRO DE USOS
+// ==========================================
+
+int getLogCount() {
+  preferences.begin("logs", true);
+  int count = preferences.getInt("count", 0);
+  preferences.end();
+  return count;
+}
+
+void saveLog(String dateTime, String userId, int durationSec, String tipo) {
+  preferences.begin("logs", false);
+  int count = preferences.getInt("count", 0);
+
+  // Si llegamos al máximo, rotar (borrar el más viejo)
+  if (count >= MAX_LOGS) {
+    // Mover todo un lugar hacia atrás
+    for (int i = 0; i < MAX_LOGS - 1; i++) {
+      String next = preferences.getString(("l" + String(i + 1)).c_str(), "");
+      preferences.putString(("l" + String(i)).c_str(), next);
+    }
+    count = MAX_LOGS - 1;
+  }
+
+  // Formato: "FECHA|USUARIO|DURACION|TIPO"
+  String entry = dateTime + "|" + userId + "|" + String(durationSec) + "|" + tipo;
+  preferences.putString(("l" + String(count)).c_str(), entry);
+  preferences.putInt("count", count + 1);
+  preferences.end();
+
+  Serial.print("[NVS] Log guardado #");
+  Serial.print(count);
+  Serial.print(": ");
+  Serial.println(entry);
+}
+
+void sendAllLogs() {
+  if (!deviceConnected || !statusCharacteristic) return;
+
+  preferences.begin("logs", true);
+  int count = preferences.getInt("count", 0);
+
+  // Enviar header
+  String header = "LOGS:" + String(count);
+  statusCharacteristic->setValue(header.c_str());
+  statusCharacteristic->notify();
+  delay(100);
+
+  Serial.print("[NVS] Enviando ");
+  Serial.print(count);
+  Serial.println(" logs por BLE...");
+
+  // Enviar cada log
+  for (int i = 0; i < count; i++) {
+    String entry = preferences.getString(("l" + String(i)).c_str(), "");
+    if (entry.length() > 0) {
+      String line = "LOG:" + String(i) + ":" + entry;
+      statusCharacteristic->setValue(line.c_str());
+      statusCharacteristic->notify();
+      delay(50);  // Dar tiempo al BLE
+    }
+  }
+
+  // Enviar fin
+  statusCharacteristic->setValue("LOGS_END");
+  statusCharacteristic->notify();
+  preferences.end();
+
+  Serial.println("[NVS] Logs enviados completos");
+}
+
+void clearAllLogs() {
+  preferences.begin("logs", false);
+  int count = preferences.getInt("count", 0);
+  for (int i = 0; i < count; i++) {
+    preferences.remove(("l" + String(i)).c_str());
+  }
+  preferences.putInt("count", 0);
+  preferences.end();
+  Serial.println("[NVS] Todos los logs borrados");
+}
+
+// Calcular fecha/hora actual aproximada
+String getCurrentDateTime() {
+  if (currentDateTime.length() == 0) return "sin-fecha";
+  if (dateTimeReceivedAt == 0) return currentDateTime;
+
+  // No ajustamos por millis — devolvemos la última fecha recibida
+  // (la app envía la hora en cada conexión, suficiente precisión)
+  return currentDateTime;
+}
+
+// ==========================================
+// BLE CALLBACKS
 // ==========================================
 
 class ServerCallbacks : public BLEServerCallbacks {
@@ -48,11 +159,11 @@ class ServerCallbacks : public BLEServerCallbacks {
     deviceConnected = false;
     Serial.println("=========================================");
     Serial.println("[!!] CLIENTE DESCONECTADO");
-    Serial.println("[INFO] Reiniciando advertising en 500ms...");
+    Serial.println("[INFO] Reiniciando advertising...");
     Serial.println("=========================================");
     delay(500);
     pServer->startAdvertising();
-    Serial.println("[OK] Advertising reiniciado — esperando nueva conexion");
+    Serial.println("[OK] Advertising reiniciado");
   }
 };
 
@@ -63,17 +174,35 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pChar) {
     String value = pChar->getValue().c_str();
     Serial.println("-----------------------------------------");
-    Serial.print("[CMD] Comando recibido: \"");
+    Serial.print("[CMD] Recibido: \"");
     Serial.print(value);
     Serial.println("\"");
 
+    // --- ON:segundos o ON:segundos:userId:tipo ---
     if (value.startsWith("ON")) {
-      int sepIndex = value.indexOf(':');
+      // Parsear: ON:60 o ON:60:USR-ABC123:lavarropas
+      int sep1 = value.indexOf(':');
+      int sep2 = value.indexOf(':', sep1 + 1);
+      int sep3 = (sep2 > 0) ? value.indexOf(':', sep2 + 1) : -1;
+
       int durationSec = 60;
-      if (sepIndex > 0) {
-        durationSec = value.substring(sepIndex + 1).toInt();
-        if (durationSec <= 0) durationSec = 60;
+      String userId = "desconocido";
+      String tipo = "desconocido";
+
+      if (sep1 > 0) {
+        if (sep2 > 0) {
+          durationSec = value.substring(sep1 + 1, sep2).toInt();
+          if (sep3 > 0) {
+            userId = value.substring(sep2 + 1, sep3);
+            tipo = value.substring(sep3 + 1);
+          } else {
+            userId = value.substring(sep2 + 1);
+          }
+        } else {
+          durationSec = value.substring(sep1 + 1).toInt();
+        }
       }
+      if (durationSec <= 0) durationSec = 60;
 
       ledOn = true;
       durationMs = (unsigned long)durationSec * 1000;
@@ -81,20 +210,65 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
       ledOffTime = startTime + durationMs;
       digitalWrite(LED_PIN, HIGH);
 
-      Serial.print("[OK] LED ENCENDIDO por ");
+      Serial.print("[OK] LED ON por ");
       Serial.print(durationSec);
-      Serial.print(" segundos (");
+      Serial.print("s (");
       Serial.print(durationSec / 60);
-      Serial.println(" minutos)");
+      Serial.println(" min)");
+
+      // Guardar registro en NVS
+      saveLog(getCurrentDateTime(), userId, durationSec, tipo);
+
       sendStatus();
 
+    // --- OFF ---
     } else if (value == "OFF") {
-      Serial.println("[CMD] Apagando LED...");
+      Serial.println("[CMD] Apagando...");
       turnOff();
 
+    // --- STATUS ---
     } else if (value == "STATUS") {
-      Serial.println("[CMD] Enviando estado...");
       sendStatus();
+
+    // --- TIME:2026-04-11T15:30:00 ---
+    } else if (value.startsWith("TIME:")) {
+      currentDateTime = value.substring(5);
+      dateTimeReceivedAt = millis();
+      Serial.print("[OK] Fecha/hora sincronizada: ");
+      Serial.println(currentDateTime);
+
+    // --- LOGS:cleancare2026 (con clave) ---
+    } else if (value.startsWith("LOGS:")) {
+      String key = value.substring(5);
+      if (key == LOG_ACCESS_KEY) {
+        Serial.println("[OK] Clave correcta — enviando logs...");
+        sendAllLogs();
+      } else {
+        Serial.println("[!!] Clave incorrecta para acceder a logs");
+        statusCharacteristic->setValue("LOGS_ERROR:clave_incorrecta");
+        statusCharacteristic->notify();
+      }
+
+    // --- CLEAR_LOGS:cleancare2026 ---
+    } else if (value.startsWith("CLEAR_LOGS:")) {
+      String key = value.substring(11);
+      if (key == LOG_ACCESS_KEY) {
+        clearAllLogs();
+        statusCharacteristic->setValue("LOGS_CLEARED");
+        statusCharacteristic->notify();
+      } else {
+        Serial.println("[!!] Clave incorrecta");
+      }
+
+    // --- INFO ---
+    } else if (value == "INFO") {
+      int logCount = getLogCount();
+      unsigned long uptimeSec = millis() / 1000;
+      String info = "INFO:" + String(connectionCount) + ":" + String(logCount) + ":" + String(uptimeSec) + ":" + currentDateTime;
+      statusCharacteristic->setValue(info.c_str());
+      statusCharacteristic->notify();
+      Serial.print("[TX] ");
+      Serial.println(info);
 
     } else {
       Serial.print("[??] Comando desconocido: ");
@@ -109,15 +283,11 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
 // ==========================================
 
 void sendStatus() {
-  if (!deviceConnected || !statusCharacteristic) {
-    Serial.println("[WARN] No se puede enviar status — sin cliente conectado");
-    return;
-  }
+  if (!deviceConnected || !statusCharacteristic) return;
 
   String status;
   if (ledOn) {
-    unsigned long now = millis();
-    int remaining = (int)((ledOffTime - now) / 1000);
+    int remaining = (int)((ledOffTime - millis()) / 1000);
     if (remaining < 0) remaining = 0;
     status = "ON:" + String(remaining);
   } else {
@@ -126,7 +296,7 @@ void sendStatus() {
 
   statusCharacteristic->setValue(status.c_str());
   statusCharacteristic->notify();
-  Serial.print("[TX] Status -> ");
+  Serial.print("[TX] ");
   Serial.println(status);
 }
 
@@ -150,40 +320,40 @@ void setup() {
 
   Serial.println();
   Serial.println("=============================================");
-  Serial.println("   CleanCare ESP32 — BLE Firmware v2.0");
+  Serial.println("   CleanCare ESP32 — BLE Firmware v3.0");
   Serial.println("=============================================");
   Serial.println();
 
   // 1. LED
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-  Serial.println("[1/5] LED configurado en GPIO 2");
+  Serial.println("[1/6] LED configurado GPIO 2");
 
-  // 2. BLE Init
-  Serial.println("[2/5] Inicializando BLE...");
+  // 2. NVS
+  Serial.println("[2/6] Inicializando NVS...");
+  int logCount = getLogCount();
+  Serial.print("       Registros guardados: ");
+  Serial.println(logCount);
+
+  // 3. BLE Init
+  Serial.println("[3/6] Inicializando BLE...");
   BLEDevice::init("CleanCare-ESP32");
-  Serial.println("       Nombre BLE: CleanCare-ESP32");
+  Serial.println("       Nombre: CleanCare-ESP32");
 
-  // 3. Server + Callbacks
-  Serial.println("[3/5] Creando servidor BLE...");
+  // 4. Server
+  Serial.println("[4/6] Creando servidor BLE...");
   bleServer = BLEDevice::createServer();
   bleServer->setCallbacks(new ServerCallbacks());
-  Serial.println("       Callbacks registrados");
 
-  // 4. Service + Characteristics
-  Serial.println("[4/5] Creando servicio y caracteristicas...");
+  // 5. Service + Characteristics
+  Serial.println("[5/6] Creando servicio...");
   BLEService *service = bleServer->createService(SERVICE_UUID);
-  Serial.print("       Service UUID: ");
-  Serial.println(SERVICE_UUID);
 
   BLECharacteristic *controlChar = service->createCharacteristic(
     CONTROL_CHAR_UUID,
     BLECharacteristic::PROPERTY_WRITE
   );
   controlChar->setCallbacks(new ControlCallbacks());
-  Serial.print("       Control UUID: ");
-  Serial.print(CONTROL_CHAR_UUID);
-  Serial.println(" (Write)");
 
   statusCharacteristic = service->createCharacteristic(
     STATUS_CHAR_UUID,
@@ -191,15 +361,18 @@ void setup() {
   );
   statusCharacteristic->addDescriptor(new BLE2902());
   statusCharacteristic->setValue("OFF:0");
-  Serial.print("       Status UUID:  ");
-  Serial.print(STATUS_CHAR_UUID);
-  Serial.println(" (Read+Notify)");
 
   service->start();
-  Serial.println("       Servicio iniciado");
+  Serial.println("       UUIDs:");
+  Serial.print("       Service: ");
+  Serial.println(SERVICE_UUID);
+  Serial.print("       Control: ");
+  Serial.println(CONTROL_CHAR_UUID);
+  Serial.print("       Status:  ");
+  Serial.println(STATUS_CHAR_UUID);
 
-  // 5. Advertising
-  Serial.println("[5/5] Iniciando advertising...");
+  // 6. Advertising
+  Serial.println("[6/6] Advertising...");
   BLEAdvertising *advertising = BLEDevice::getAdvertising();
   advertising->addServiceUUID(SERVICE_UUID);
   advertising->setScanResponse(true);
@@ -209,25 +382,27 @@ void setup() {
 
   Serial.println();
   Serial.println("=============================================");
-  Serial.println("   ESP32 LISTO — Esperando conexion BLE");
+  Serial.println("   ESP32 LISTO — Esperando conexion");
+  Serial.println("   Auto-reset en 24h si no hay ciclo activo");
   Serial.println("=============================================");
   Serial.println();
-  Serial.println("Si la app no lo encuentra, verificar:");
-  Serial.println("  1. Bluetooth del celular encendido");
-  Serial.println("  2. Permiso de Ubicacion habilitado en la app");
-  Serial.println("  3. Permiso de Bluetooth habilitado en la app");
-  Serial.println("  4. ESP32 NO vinculado en Ajustes Bluetooth");
-  Serial.println("  5. Celular cerca del ESP32 (< 5 metros)");
+  Serial.println("Comandos BLE disponibles:");
+  Serial.println("  ON:60              Encender 60 seg");
+  Serial.println("  ON:60:USR-XX:lav   Encender con registro");
+  Serial.println("  OFF                Apagar");
+  Serial.println("  STATUS             Pedir estado");
+  Serial.println("  TIME:2026-04-11..  Sincronizar fecha");
+  Serial.println("  LOGS:clave         Extraer registros");
+  Serial.println("  CLEAR_LOGS:clave   Borrar registros");
+  Serial.println("  INFO               Info del ESP32");
   Serial.println();
 
-  // Parpadear LED 3 veces para confirmar que arrancó
+  // Parpadear LED 3 veces
   for (int i = 0; i < 3; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
-    digitalWrite(LED_PIN, LOW);
-    delay(200);
+    digitalWrite(LED_PIN, HIGH); delay(200);
+    digitalWrite(LED_PIN, LOW); delay(200);
   }
-  Serial.println("[OK] LED parpadeó 3 veces — firmware listo");
+  Serial.println("[OK] Firmware v3.0 listo");
   Serial.println();
 }
 
@@ -236,6 +411,15 @@ void setup() {
 // ==========================================
 
 void loop() {
+  // Auto-reset cada 24h (solo si no hay ciclo activo)
+  if (millis() >= RESET_INTERVAL_MS && !ledOn) {
+    Serial.println();
+    Serial.println("[RESET] 24h cumplidas — reiniciando ESP32...");
+    Serial.println();
+    delay(1000);
+    ESP.restart();
+  }
+
   // Apagar LED cuando se cumple el tiempo
   if (ledOn && millis() >= ledOffTime) {
     Serial.println();
@@ -243,19 +427,21 @@ void loop() {
     turnOff();
   }
 
-  // Enviar status cada 2 segundos si está conectado y encendido
+  // Status cada 2 seg si conectado y encendido
   static unsigned long lastNotify = 0;
   if (deviceConnected && ledOn && (millis() - lastNotify > 2000)) {
     sendStatus();
     lastNotify = millis();
   }
 
-  // Heartbeat cada 30 seg si no hay conexión (para saber que sigue vivo)
+  // Heartbeat cada 30 seg
   static unsigned long lastHeartbeat = 0;
   if (!deviceConnected && (millis() - lastHeartbeat > 30000)) {
-    Serial.print("[HEARTBEAT] ESP32 vivo — advertising activo — ");
+    Serial.print("[HEARTBEAT] vivo — ");
     Serial.print(millis() / 1000);
-    Serial.println("s uptime");
+    Serial.print("s uptime — ");
+    Serial.print(getLogCount());
+    Serial.println(" logs guardados");
     lastHeartbeat = millis();
   }
 

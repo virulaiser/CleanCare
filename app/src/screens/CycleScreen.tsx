@@ -143,6 +143,7 @@ export default function CycleScreen({ navigation, route }: Props) {
   const [bleLog, setBleLog] = useState('Buscando ESP32...');
   const [tipTexto, setTipTexto] = useState<string | null>(null);
   const [showTip, setShowTip] = useState(false);
+  const [cycleStarted, setCycleStarted] = useState(false);
 
   const startTimeRef = useRef(Date.now());
   const usoIdRef = useRef<string | null>(null);
@@ -255,9 +256,18 @@ export default function CycleScreen({ navigation, route }: Props) {
               deviceRef.current = null;
             });
 
-            // Paso 4: enviar comando ON
+            // Paso 4: sincronizar fecha/hora con ESP32
+            const now = new Date();
+            const timeCmd = `TIME:${now.toISOString().slice(0, 19)}`;
+            await connected.writeCharacteristicWithResponseForService(
+              SERVICE_UUID, CONTROL_UUID, btoa(timeCmd)
+            );
+
+            // Paso 5: enviar comando ON con usuario
             setBleLog('⚡ Activando máquina...');
-            const cmd = `ON:${cycleDurationSeconds}`;
+            const usuario = await import('../services/api.service').then(m => m.getUsuarioGuardado());
+            const userId = usuario?.usuario_id || 'desconocido';
+            const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}`;
             const encoded = btoa(cmd);
             await connected.writeCharacteristicWithResponseForService(
               SERVICE_UUID,
@@ -265,6 +275,7 @@ export default function CycleScreen({ navigation, route }: Props) {
               encoded
             );
             cycleStartedRef.current = true;
+            setCycleStarted(true);
             const mins = Math.ceil(cycleDurationSeconds / 60);
             setBleLog(`✅ Máquina activada — ${mins} min`);
 
@@ -327,20 +338,14 @@ export default function CycleScreen({ navigation, route }: Props) {
     };
   }, []);
 
-  // --- Timer local como fallback (se sincroniza con BLE) ---
+  // --- Timer descendente ---
   useEffect(() => {
-    if (!cycleStartedRef.current && bleState !== 'connected') return;
+    if (!cycleStarted) return;
 
     const interval = setInterval(() => {
-      if (!cycleStartedRef.current) return;
-
       const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
       const remaining = Math.max(0, cycleDurationSeconds - elapsed);
-
-      // Solo actualizar si BLE no esta enviando datos (fallback)
-      if (bleState !== 'connected') {
-        setSecondsRemaining(remaining);
-      }
+      setSecondsRemaining(remaining);
 
       if (remaining <= 0 && !completedRef.current) {
         clearInterval(interval);
@@ -350,7 +355,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [bleState]);
+  }, [cycleStarted]);
 
   // Cuando la app vuelve de background, recalcular
   useEffect(() => {

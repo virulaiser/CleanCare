@@ -14,7 +14,8 @@
       "Bash(/c/Windows/System32/netstat.exe -ano)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Login OK, usuario_id:', d['usuario'].get\\('usuario_id', 'N/A'\\)\\); print\\('apartamento:', d['usuario'].get\\('apartamento', 'N/A'\\)\\)\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); u=d['usuario']; print\\('OK:', u.get\\('usuario_id'\\), u.get\\('telefono'\\), u.get\\('apartamento'\\)\\)\")",
-      "Bash(/c/Windows/System32/taskkill.exe //F //PID 11780)"
+      "Bash(/c/Windows/System32/taskkill.exe //F //PID 11780)",
+      "Bash(cmd.exe /c \"netstat -ano | findstr 8081\")"
     ]
   }
 }
