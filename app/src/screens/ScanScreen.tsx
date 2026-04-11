@@ -1,13 +1,17 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator, Vibration } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { BleManager, Device } from 'react-native-ble-plx';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, obtenerConfigEdificio, Maquina } from '../services/api.service';
 import { colors } from '../constants/colors';
 
+const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
+type BleStatus = 'off' | 'scanning' | 'connected' | 'disconnected';
 
 function parseQR(data: string): { maquina_id: string; edificio_id: string } | null {
   try {
@@ -32,6 +36,83 @@ export default function ScanScreen({ navigation }: Props) {
   const [duracionLavado, setDuracionLavado] = useState(45);
   const [duracionSecado, setDuracionSecado] = useState(30);
   const [loadingMaquinas, setLoadingMaquinas] = useState(false);
+
+  // BLE state
+  const [bleStatus, setBleStatus] = useState<BleStatus>('off');
+  const [bleDeviceName, setBleDeviceName] = useState('');
+  const managerRef = useRef<BleManager | null>(null);
+  const deviceRef = useRef<Device | null>(null);
+  const wasConnectedRef = useRef(false);
+
+  // BLE: auto-scan on mount
+  useEffect(() => {
+    const manager = new BleManager();
+    managerRef.current = manager;
+    scanForESP32(manager);
+
+    return () => {
+      manager.stopDeviceScan();
+      manager.destroy();
+    };
+  }, []);
+
+  function scanForESP32(manager: BleManager) {
+    setBleStatus('scanning');
+
+    manager.startDeviceScan([SERVICE_UUID], { allowDuplicates: false }, async (error, device) => {
+      if (error) {
+        setBleStatus('off');
+        return;
+      }
+      if (device && device.name === 'CleanCare-ESP32') {
+        manager.stopDeviceScan();
+        try {
+          const connected = await device.connect({ timeout: 10000 });
+          await connected.discoverAllServicesAndCharacteristics();
+          deviceRef.current = connected;
+          setBleStatus('connected');
+          setBleDeviceName(connected.name || 'CleanCare-ESP32');
+          wasConnectedRef.current = true;
+
+          connected.onDisconnected(() => {
+            deviceRef.current = null;
+            setBleStatus('disconnected');
+            if (wasConnectedRef.current) {
+              Vibration.vibrate(500);
+              Alert.alert(
+                '📡 BLE desconectado',
+                'Se perdió la conexión con el ESP32.\nVerificá que estés cerca de la máquina.',
+                [
+                  { text: 'Reconectar', onPress: () => handleReconnect() },
+                  { text: 'OK', style: 'cancel' },
+                ]
+              );
+            }
+          });
+        } catch {
+          setBleStatus('off');
+        }
+      }
+    });
+
+    // Timeout
+    setTimeout(() => {
+      if (managerRef.current) {
+        managerRef.current.stopDeviceScan();
+        setBleStatus(prev => prev === 'scanning' ? 'off' : prev);
+      }
+    }, 12000);
+  }
+
+  function handleReconnect() {
+    if (managerRef.current) {
+      managerRef.current.stopDeviceScan();
+      managerRef.current.destroy();
+    }
+    const manager = new BleManager();
+    managerRef.current = manager;
+    scanForESP32(manager);
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -70,7 +151,6 @@ export default function ScanScreen({ navigation }: Props) {
   const handleBarCodeScanned = ({ data }: { data: string }) => {
     if (scanned) return;
     setScanned(true);
-
     const parsed = parseQR(data);
     if (!parsed) {
       Alert.alert('QR inválido', 'Este código no pertenece a una máquina CleanCare.', [
@@ -78,7 +158,6 @@ export default function ScanScreen({ navigation }: Props) {
       ]);
       return;
     }
-
     setParsedQR(parsed);
   };
 
@@ -94,16 +173,10 @@ export default function ScanScreen({ navigation }: Props) {
 
   const handleConfirmCycle = () => {
     if (!parsedQR) return;
-
     if (saldo !== null && saldo <= 0) {
-      Alert.alert(
-        'Sin fichas',
-        'No tenés fichas suficientes para iniciar un ciclo. Contactá al administrador del edificio.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Sin fichas', 'No tenés fichas suficientes. Contactá al administrador.', [{ text: 'OK' }]);
       return;
     }
-
     const tipo = getTipoFromQR();
     const duracion = tipo === 'lavarropas' ? duracionLavado : duracionSecado;
     const nombre = getNombreMaquina(parsedQR.maquina_id);
@@ -132,11 +205,17 @@ export default function ScanScreen({ navigation }: Props) {
           setMaquinas(m as any);
           setLoadingMaquinas(false);
         }).catch(() => setLoadingMaquinas(false));
-      } else {
-        setLoadingMaquinas(false);
-      }
+      } else { setLoadingMaquinas(false); }
     });
   };
+
+  // BLE status bar color/text
+  const bleBarConfig = {
+    off: { bg: 'rgba(100,100,100,0.85)', dot: '#999', text: 'BLE no disponible', icon: '📡' },
+    scanning: { bg: 'rgba(59,130,246,0.9)', dot: '#93C5FD', text: 'Buscando ESP32...', icon: '📡' },
+    connected: { bg: 'rgba(22,163,74,0.9)', dot: '#4ADE80', text: `Conectado — ${bleDeviceName}`, icon: '✅' },
+    disconnected: { bg: 'rgba(239,68,68,0.9)', dot: '#FCA5A5', text: 'Desconectado', icon: '⚠️' },
+  }[bleStatus];
 
   return (
     <View style={styles.container}>
@@ -146,6 +225,20 @@ export default function ScanScreen({ navigation }: Props) {
         onBarcodeScanned={handleBarCodeScanned}
       />
       <View style={styles.overlay}>
+        {/* BLE status bar */}
+        <TouchableOpacity
+          style={[styles.bleBar, { backgroundColor: bleBarConfig.bg }]}
+          onPress={bleStatus !== 'connected' ? handleReconnect : undefined}
+          activeOpacity={bleStatus !== 'connected' ? 0.7 : 1}
+        >
+          <View style={[styles.bleDot, { backgroundColor: bleBarConfig.dot }]} />
+          <Text style={styles.bleText}>{bleBarConfig.text}</Text>
+          {bleStatus === 'scanning' && <ActivityIndicator size="small" color="#fff" />}
+          {(bleStatus === 'off' || bleStatus === 'disconnected') && (
+            <Text style={styles.bleRetry}>Reconectar</Text>
+          )}
+        </TouchableOpacity>
+
         {/* Badge de saldo */}
         {saldo !== null && (
           <TouchableOpacity style={styles.saldoBadge} onPress={() => navigation.navigate('Wallet')}>
@@ -155,6 +248,7 @@ export default function ScanScreen({ navigation }: Props) {
             </Text>
           </TouchableOpacity>
         )}
+
         <View style={styles.scanFrame}>
           <View style={[styles.corner, styles.cornerTL]} />
           <View style={[styles.corner, styles.cornerTR]} />
@@ -199,6 +293,20 @@ export default function ScanScreen({ navigation }: Props) {
             <Text style={styles.modalSubtitle}>
               {parsedQR ? getNombreMaquina(parsedQR.maquina_id) : ''}
             </Text>
+            {/* BLE status in confirm modal */}
+            <View style={[styles.modalBleBadge, {
+              backgroundColor: bleStatus === 'connected' ? '#DCFCE7' : '#FEF3C7',
+            }]}>
+              <View style={[styles.bleDotSmall, {
+                backgroundColor: bleStatus === 'connected' ? colors.success : '#D97706',
+              }]} />
+              <Text style={{
+                fontSize: 12, fontWeight: '600',
+                color: bleStatus === 'connected' ? colors.success : '#D97706',
+              }}>
+                {bleStatus === 'connected' ? 'ESP32 conectado' : 'Sin conexión BLE'}
+              </Text>
+            </View>
             <View style={styles.modalBadge}>
               <Text style={[styles.modalBadgeText, {
                 color: getTipoFromQR() === 'lavarropas' ? colors.primary : '#D97706',
@@ -230,6 +338,26 @@ export default function ScanScreen({ navigation }: Props) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Máquinas del edificio</Text>
+            {/* BLE status inside machines modal */}
+            <View style={[styles.modalBleBadge, {
+              backgroundColor: bleStatus === 'connected' ? '#DCFCE7' : '#FEF2F2',
+              marginBottom: 16,
+            }]}>
+              <View style={[styles.bleDotSmall, {
+                backgroundColor: bleStatus === 'connected' ? colors.success : colors.error,
+              }]} />
+              <Text style={{
+                fontSize: 12, fontWeight: '600', flex: 1,
+                color: bleStatus === 'connected' ? colors.success : colors.error,
+              }}>
+                {bleStatus === 'connected' ? `ESP32 conectado` : 'ESP32 no conectado'}
+              </Text>
+              {bleStatus !== 'connected' && (
+                <TouchableOpacity onPress={() => { setShowMaquinas(false); handleReconnect(); }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Conectar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             {loadingMaquinas ? (
               <ActivityIndicator size="large" color={colors.primary} style={{ padding: 20 }} />
             ) : (
@@ -267,201 +395,70 @@ export default function ScanScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.textPrimary,
+  container: { flex: 1, backgroundColor: colors.textPrimary },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: colors.bgPage },
+  permIcon: { fontSize: 48, marginBottom: 16 },
+  camera: { flex: 1 },
+  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+  // BLE bar
+  bleBar: {
+    position: 'absolute', top: 12, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999,
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: colors.bgPage,
-  },
-  permIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  camera: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scanFrame: {
-    width: 250,
-    height: 250,
-    backgroundColor: 'transparent',
-  },
-  corner: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    borderColor: colors.primary,
-  },
+  bleDot: { width: 10, height: 10, borderRadius: 5 },
+  bleText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#fff' },
+  bleRetry: { fontSize: 12, fontWeight: '700', color: '#fff', textDecorationLine: 'underline' },
+  // Scan frame
+  scanFrame: { width: 250, height: 250, backgroundColor: 'transparent' },
+  corner: { position: 'absolute', width: 30, height: 30, borderColor: colors.primary },
   cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 12 },
   cornerTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 12 },
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 12 },
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 12 },
   hint: {
-    color: colors.white,
-    fontSize: 16,
-    marginTop: 24,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    color: colors.white, fontSize: 16, marginTop: 24, textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  message: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  permButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 999,
-  },
-  permButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  // Bottom navigation
+  message: { fontSize: 16, color: colors.textPrimary, textAlign: 'center', marginBottom: 20 },
+  permButton: { backgroundColor: colors.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 999 },
+  permButtonText: { color: colors.white, fontSize: 16, fontWeight: '600' },
+  // Bottom nav
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingBottom: 20,
-    paddingTop: 10,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.95)', paddingBottom: 20, paddingTop: 10,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
   },
-  navBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  navIcon: {
-    fontSize: 22,
-    marginBottom: 2,
-  },
-  navLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
+  navBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
+  navIcon: { fontSize: 22, marginBottom: 2 },
+  navLabel: { fontSize: 11, fontWeight: '600', color: colors.textPrimary },
+  // Saldo badge
   saldoBadge: {
-    position: 'absolute',
-    top: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    position: 'absolute', top: 56, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
   },
-  saldoIcon: {
-    fontSize: 16,
-  },
-  saldoText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  maqRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    gap: 12,
-  },
-  maqDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
+  saldoIcon: { fontSize: 16 },
+  saldoText: { fontSize: 16, fontWeight: '700', color: colors.primary },
+  // Machine rows
+  maqRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, marginBottom: 8, gap: 12 },
+  maqDot: { width: 12, height: 12, borderRadius: 6 },
   // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalCard: { backgroundColor: colors.white, borderRadius: 20, padding: 32, width: '85%', alignItems: 'center', maxHeight: '70%' },
+  modalIconCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.bgBlueLight, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  modalIcon: { fontSize: 36 },
+  modalTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  modalSubtitle: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, marginBottom: 8 },
+  modalBleBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, marginBottom: 12,
   },
-  modalCard: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 32,
-    width: '85%',
-    alignItems: 'center',
-    maxHeight: '70%',
-  },
-  modalIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.bgBlueLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalIcon: {
-    fontSize: 36,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontFamily: 'monospace',
-    marginBottom: 12,
-  },
-  modalBadge: {
-    backgroundColor: colors.bgBlueLight,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 24,
-  },
-  modalBadgeText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalConfirmBtn: {
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 999,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modalConfirmText: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  modalCancelBtn: {
-    paddingVertical: 10,
-  },
-  modalCancelText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-  },
+  bleDotSmall: { width: 8, height: 8, borderRadius: 4 },
+  modalBadge: { backgroundColor: colors.bgBlueLight, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 999, marginBottom: 24 },
+  modalBadgeText: { fontSize: 14, fontWeight: '600' },
+  modalConfirmBtn: { paddingVertical: 16, paddingHorizontal: 40, borderRadius: 999, width: '100%', alignItems: 'center', marginBottom: 12 },
+  modalConfirmText: { color: colors.white, fontSize: 18, fontWeight: '700' },
+  modalCancelBtn: { paddingVertical: 10 },
+  modalCancelText: { color: colors.textSecondary, fontSize: 14 },
 });
