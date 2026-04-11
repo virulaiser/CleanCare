@@ -1,16 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, Maquina } from '../services/api.service';
+import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, obtenerConfigEdificio, Maquina } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 
-// QR format: cleancare://maquina?id=LAV-7DED11&edificio=edificio-central
-// (ip es opcional, legacy WiFi)
 function parseQR(data: string): { maquina_id: string; edificio_id: string } | null {
   try {
     const url = new URL(data);
@@ -31,26 +29,39 @@ export default function ScanScreen({ navigation }: Props) {
   const [saldo, setSaldo] = useState<number | null>(null);
   const [maquinas, setMaquinas] = useState<(Maquina & { ocupada?: boolean })[]>([]);
   const [showMaquinas, setShowMaquinas] = useState(false);
+  const [duracionLavado, setDuracionLavado] = useState(45);
+  const [duracionSecado, setDuracionSecado] = useState(30);
+  const [loadingMaquinas, setLoadingMaquinas] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
+      setScanned(false);
       obtenerBilletera().then(data => setSaldo(data.saldo)).catch(() => {});
       getUsuarioGuardado().then(u => {
-        if (u?.edificio_id) listarMaquinas(u.edificio_id).then(m => setMaquinas(m as any)).catch(() => {});
+        if (u?.edificio_id) {
+          listarMaquinas(u.edificio_id).then(m => setMaquinas(m as any)).catch(() => {});
+          obtenerConfigEdificio(u.edificio_id).then(config => {
+            if (config) {
+              setDuracionLavado(config.duracion_lavado || 45);
+              setDuracionSecado(config.duracion_secado || 30);
+            }
+          }).catch(() => {});
+        }
       });
     }, [])
   );
 
   if (!permission) {
-    return <View style={styles.container}><Text>Cargando...</Text></View>;
+    return <View style={styles.container}><ActivityIndicator size="large" color={colors.white} /></View>;
   }
 
   if (!permission.granted) {
     return (
       <View style={styles.centerContainer}>
+        <Text style={styles.permIcon}>📷</Text>
         <Text style={styles.message}>Necesitamos acceso a la cámara para escanear el QR</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Permitir cámara</Text>
+        <TouchableOpacity style={styles.permButton} onPress={requestPermission}>
+          <Text style={styles.permButtonText}>Permitir cámara</Text>
         </TouchableOpacity>
       </View>
     );
@@ -76,10 +87,14 @@ export default function ScanScreen({ navigation }: Props) {
     return 'lavarropas';
   };
 
+  const getNombreMaquina = (id: string): string => {
+    const found = maquinas.find(m => m.maquina_id === id);
+    return found?.nombre || (id.startsWith('SEC') ? 'Secadora' : 'Lavarropas');
+  };
+
   const handleConfirmCycle = () => {
     if (!parsedQR) return;
 
-    // Verificar saldo antes de iniciar
     if (saldo !== null && saldo <= 0) {
       Alert.alert(
         'Sin fichas',
@@ -90,18 +105,37 @@ export default function ScanScreen({ navigation }: Props) {
     }
 
     const tipo = getTipoFromQR();
+    const duracion = tipo === 'lavarropas' ? duracionLavado : duracionSecado;
+    const nombre = getNombreMaquina(parsedQR.maquina_id);
     setParsedQR(null);
     setScanned(false);
     navigation.navigate('Cycle', {
       maquina_id: parsedQR.maquina_id,
       edificio_id: parsedQR.edificio_id,
       tipo,
+      duracion_min: duracion,
+      nombre_maquina: nombre,
     });
   };
 
   const handleCancelModal = () => {
     setParsedQR(null);
     setScanned(false);
+  };
+
+  const handleShowMaquinas = () => {
+    setLoadingMaquinas(true);
+    setShowMaquinas(true);
+    getUsuarioGuardado().then(u => {
+      if (u?.edificio_id) {
+        listarMaquinas(u.edificio_id).then(m => {
+          setMaquinas(m as any);
+          setLoadingMaquinas(false);
+        }).catch(() => setLoadingMaquinas(false));
+      } else {
+        setLoadingMaquinas(false);
+      }
+    });
   };
 
   return (
@@ -115,38 +149,38 @@ export default function ScanScreen({ navigation }: Props) {
         {/* Badge de saldo */}
         {saldo !== null && (
           <TouchableOpacity style={styles.saldoBadge} onPress={() => navigation.navigate('Wallet')}>
-            <Text style={[styles.saldoText, saldo <= 0 && { color: '#EF4444' }]}>
+            <Text style={styles.saldoIcon}>💰 </Text>
+            <Text style={[styles.saldoText, saldo <= 0 && { color: colors.error }]}>
               {saldo} {saldo === 1 ? 'ficha' : 'fichas'}
             </Text>
           </TouchableOpacity>
         )}
-        <View style={styles.scanFrame} />
+        <View style={styles.scanFrame}>
+          <View style={[styles.corner, styles.cornerTL]} />
+          <View style={[styles.corner, styles.cornerTR]} />
+          <View style={[styles.corner, styles.cornerBL]} />
+          <View style={[styles.corner, styles.cornerBR]} />
+        </View>
         <Text style={styles.hint}>Apuntá la cámara al QR de la máquina</Text>
       </View>
+
+      {/* Bottom navigation bar */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.walletButton}
-          onPress={() => navigation.navigate('Wallet')}
-        >
-          <Text style={styles.walletButtonText}>Billetera</Text>
+        <TouchableOpacity style={styles.navBtn} onPress={() => navigation.navigate('Wallet')}>
+          <Text style={styles.navIcon}>💰</Text>
+          <Text style={styles.navLabel}>Billetera</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.historyButton}
-          onPress={() => navigation.navigate('History')}
-        >
-          <Text style={styles.historyButtonText}>Historial</Text>
+        <TouchableOpacity style={styles.navBtn} onPress={handleShowMaquinas}>
+          <Text style={styles.navIcon}>🏠</Text>
+          <Text style={styles.navLabel}>Máquinas</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.maquinasButton}
-          onPress={() => setShowMaquinas(true)}
-        >
-          <Text style={styles.maquinasButtonText}>Máquinas</Text>
+        <TouchableOpacity style={styles.navBtn} onPress={() => navigation.navigate('History')}>
+          <Text style={styles.navIcon}>📋</Text>
+          <Text style={styles.navLabel}>Historial</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.bleButton}
-          onPress={() => navigation.navigate('BleTest')}
-        >
-          <Text style={styles.bleButtonText}>Test BLE</Text>
+        <TouchableOpacity style={styles.navBtn} onPress={() => navigation.navigate('Profile')}>
+          <Text style={styles.navIcon}>👤</Text>
+          <Text style={styles.navLabel}>Perfil</Text>
         </TouchableOpacity>
       </View>
 
@@ -163,13 +197,15 @@ export default function ScanScreen({ navigation }: Props) {
               {getTipoFromQR() === 'lavarropas' ? '¿Querés lavar?' : '¿Querés secar?'}
             </Text>
             <Text style={styles.modalSubtitle}>
-              Máquina: {parsedQR?.maquina_id}
+              {parsedQR ? getNombreMaquina(parsedQR.maquina_id) : ''}
             </Text>
             <View style={styles.modalBadge}>
               <Text style={[styles.modalBadgeText, {
                 color: getTipoFromQR() === 'lavarropas' ? colors.primary : '#D97706',
               }]}>
-                {getTipoFromQR() === 'lavarropas' ? 'Lavarropas' : 'Secadora'}
+                {getTipoFromQR() === 'lavarropas'
+                  ? `Lavarropas — ${duracionLavado} min`
+                  : `Secadora — ${duracionSecado} min`}
               </Text>
             </View>
             <TouchableOpacity
@@ -193,29 +229,33 @@ export default function ScanScreen({ navigation }: Props) {
       <Modal visible={showMaquinas} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Máquinas</Text>
-            <FlatList
-              data={maquinas}
-              keyExtractor={(item) => item.maquina_id}
-              renderItem={({ item }) => (
-                <View style={[styles.maqRow, { backgroundColor: item.ocupada ? '#FEF2F2' : '#F0FDF4' }]}>
-                  <View style={[styles.maqDot, { backgroundColor: item.ocupada ? '#EF4444' : '#22C55E' }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{item.nombre}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                      {item.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}
+            <Text style={styles.modalTitle}>Máquinas del edificio</Text>
+            {loadingMaquinas ? (
+              <ActivityIndicator size="large" color={colors.primary} style={{ padding: 20 }} />
+            ) : (
+              <FlatList
+                data={maquinas}
+                keyExtractor={(item) => item.maquina_id}
+                renderItem={({ item }) => (
+                  <View style={[styles.maqRow, { backgroundColor: item.ocupada ? '#FEF2F2' : '#F0FDF4' }]}>
+                    <View style={[styles.maqDot, { backgroundColor: item.ocupada ? colors.error : colors.success }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{item.nombre}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                        {item.tipo === 'secadora' ? '🌀 Secadora' : '🫧 Lavarropas'}
+                      </Text>
+                    </View>
+                    <Text style={{
+                      fontSize: 12, fontWeight: '700',
+                      color: item.ocupada ? colors.error : colors.success,
+                    }}>
+                      {item.ocupada ? 'Ocupada' : 'Disponible'}
                     </Text>
                   </View>
-                  <Text style={{
-                    fontSize: 12, fontWeight: '700',
-                    color: item.ocupada ? '#DC2626' : '#16A34A',
-                  }}>
-                    {item.ocupada ? 'Ocupada' : 'Disponible'}
-                  </Text>
-                </View>
-              )}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: colors.textSecondary, padding: 20 }}>No hay máquinas</Text>}
-            />
+                )}
+                ListEmptyComponent={<Text style={{ textAlign: 'center', color: colors.textSecondary, padding: 20 }}>No hay máquinas registradas</Text>}
+              />
+            )}
             <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowMaquinas(false)}>
               <Text style={styles.modalCancelText}>Cerrar</Text>
             </TouchableOpacity>
@@ -238,6 +278,10 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: colors.bgPage,
   },
+  permIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
   camera: {
     flex: 1,
   },
@@ -249,16 +293,26 @@ const styles = StyleSheet.create({
   scanFrame: {
     width: 250,
     height: 250,
-    borderWidth: 3,
-    borderColor: colors.primary,
-    borderRadius: 20,
     backgroundColor: 'transparent',
   },
+  corner: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderColor: colors.primary,
+  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 12 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 12 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 12 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 12 },
   hint: {
     color: colors.white,
     fontSize: 16,
     marginTop: 24,
     textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   message: {
     fontSize: 16,
@@ -266,80 +320,66 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  button: {
+  permButton: {
     backgroundColor: colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 999,
   },
-  buttonText: {
+  permButtonText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
+  // Bottom navigation
   bottomBar: {
     position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingBottom: 20,
+    paddingTop: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
-  historyButton: {
-    backgroundColor: colors.white,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 999,
+  navBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
   },
-  historyButtonText: {
-    color: colors.primary,
-    fontSize: 14,
+  navIcon: {
+    fontSize: 22,
+    marginBottom: 2,
+  },
+  navLabel: {
+    fontSize: 11,
     fontWeight: '600',
-  },
-  bleButton: {
-    backgroundColor: colors.textPrimary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 999,
-  },
-  bleButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
+    color: colors.textPrimary,
   },
   saldoBadge: {
     position: 'absolute',
     top: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.95)',
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  saldoIcon: {
+    fontSize: 16,
   },
   saldoText: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
-  },
-  walletButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 999,
-  },
-  walletButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  maquinasButton: {
-    backgroundColor: '#22C55E',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 999,
-  },
-  maquinasButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
   },
   maqRow: {
     flexDirection: 'row',
@@ -367,6 +407,7 @@ const styles = StyleSheet.create({
     padding: 32,
     width: '85%',
     alignItems: 'center',
+    maxHeight: '70%',
   },
   modalIconCircle: {
     width: 72,

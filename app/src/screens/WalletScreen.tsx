@@ -79,7 +79,13 @@ export default function WalletScreen() {
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} colors={[colors.primary]} />}
         ListEmptyComponent={
-          !loading ? <Text style={styles.emptyText}>No hay movimientos registrados.</Text> : null
+          !loading ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>💰</Text>
+              <Text style={styles.emptyTitle}>Sin movimientos</Text>
+              <Text style={styles.emptyText}>Tus transacciones de fichas aparecerán acá</Text>
+            </View>
+          ) : null
         }
         contentContainerStyle={{ paddingBottom: 24 }}
       />
@@ -156,10 +162,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 12,
   },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
   emptyText: {
     textAlign: 'center',
     color: colors.textSecondary,
     fontSize: 14,
-    marginTop: 20,
+    lineHeight: 20,
   },
 });

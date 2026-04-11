@@ -103,17 +103,6 @@ export async function actualizarUso(id: string, estado: 'completado' | 'cancelad
   return data.uso;
 }
 
-// Backward compatible alias
-export async function registrarUso(uso: {
-  maquina_id: string;
-  edificio_id: string;
-  duracion_min: number;
-  tipo?: 'lavarropas' | 'secadora';
-  completado?: boolean;
-}): Promise<Uso> {
-  const { data } = await api.post('/api/uso', uso);
-  return data.uso;
-}
 
 export async function listarUsos(soloMios: boolean = false): Promise<Uso[]> {
   const { data } = await api.get('/api/usos', {
@@ -152,6 +141,24 @@ export async function obtenerTipRandom(tipo: string): Promise<string | null> {
   try {
     const { data } = await api.get('/api/tips', { params: { random: 'true', tipo } });
     return data.tip?.texto || null;
+  } catch { return null; }
+}
+
+// --- Config Edificio ---
+
+export interface ConfigEdificio {
+  edificio_id: string;
+  creditos_mensuales: number;
+  costo_lavado: number;
+  costo_secado: number;
+  duracion_lavado: number;
+  duracion_secado: number;
+}
+
+export async function obtenerConfigEdificio(edificioId: string): Promise<ConfigEdificio | null> {
+  try {
+    const { data } = await api.get('/api/config-edificio', { params: { edificioId } });
+    return data.config || data;
   } catch { return null; }
 }
 

@@ -5,11 +5,11 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegistroScreen from '../screens/RegistroScreen';
 import ScanScreen from '../screens/ScanScreen';
-import MachineScreen from '../screens/MachineScreen';
 import CycleScreen from '../screens/CycleScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import BleTestScreen from '../screens/BleTestScreen';
 import WalletScreen from '../screens/WalletScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import { colors } from '../constants/colors';
 
 export type RootStackParamList = {
@@ -17,17 +17,16 @@ export type RootStackParamList = {
   Login: undefined;
   Registro: undefined;
   Scan: undefined;
-  Machine: {
-    maquina_id: string;
-    edificio_id: string;
-  };
   Cycle: {
     maquina_id: string;
     edificio_id: string;
     tipo: 'lavarropas' | 'secadora';
+    duracion_min: number;
+    nombre_maquina: string;
   };
   History: undefined;
   Wallet: undefined;
+  Profile: undefined;
   BleTest: undefined;
 };
 
@@ -63,12 +62,7 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Scan"
           component={ScanScreen}
-          options={{ title: 'Escanear QR', headerBackVisible: false }}
-        />
-        <Stack.Screen
-          name="Machine"
-          component={MachineScreen}
-          options={{ title: 'Control de Máquina' }}
+          options={{ title: 'Escanear QR', headerShown: false }}
         />
         <Stack.Screen
           name="Cycle"
@@ -84,6 +78,11 @@ export default function AppNavigator() {
           name="Wallet"
           component={WalletScreen}
           options={{ title: 'Mi Billetera' }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ title: 'Mi Perfil' }}
         />
         <Stack.Screen
           name="BleTest"

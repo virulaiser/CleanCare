@@ -13,8 +13,8 @@ const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
 const CONTROL_UUID = '12345678-1234-1234-1234-123456789abd';
 const STATUS_UUID  = '12345678-1234-1234-1234-123456789abe';
 
-// Duracion del ciclo en segundos
-const CYCLE_DURATION_SECONDS = 60;
+// Duracion por defecto (se sobreescribe con route params)
+const DEFAULT_DURATION_MIN = 45;
 
 // Configurar notificaciones para que se muestren en foreground
 Notifications.setNotificationHandler({
@@ -135,8 +135,9 @@ function MachineAnimation({ tipo, active }: { tipo: 'lavarropas' | 'secadora'; a
 }
 
 export default function CycleScreen({ navigation, route }: Props) {
-  const { maquina_id, edificio_id, tipo } = route.params;
-  const [secondsRemaining, setSecondsRemaining] = useState(CYCLE_DURATION_SECONDS);
+  const { maquina_id, edificio_id, tipo, duracion_min, nombre_maquina } = route.params;
+  const cycleDurationSeconds = (duracion_min || DEFAULT_DURATION_MIN) * 60;
+  const [secondsRemaining, setSecondsRemaining] = useState(cycleDurationSeconds);
   const [isComplete, setIsComplete] = useState(false);
   const [bleState, setBleState] = useState<BleState>('scanning');
   const [bleLog, setBleLog] = useState('Buscando ESP32...');
@@ -170,16 +171,44 @@ export default function CycleScreen({ navigation, route }: Props) {
     managerRef.current = manager;
 
     let scanTimeout: ReturnType<typeof setTimeout>;
+    let devicesFound: string[] = [];
 
     async function connectBle() {
       setBleState('scanning');
-      setBleLog('Buscando CleanCare-ESP32...');
+      setBleLog('Verificando Bluetooth...');
 
-      manager.startDeviceScan([SERVICE_UUID], null, async (error, device) => {
+      // Paso 1: verificar estado del Bluetooth
+      const btState = await manager.state();
+      if (btState !== 'PoweredOn') {
+        setBleState('error');
+        const msgs: Record<string, string> = {
+          PoweredOff: '🔴 Bluetooth apagado\n\nActivá el Bluetooth en Ajustes del teléfono.',
+          Unauthorized: '🔒 Permisos BLE denegados\n\nAndá a Ajustes → Apps → CleanCare → Permisos y habilitá Bluetooth y Ubicación.',
+          Unsupported: '❌ Este dispositivo no soporta BLE.',
+          Resetting: '🔄 Bluetooth reiniciándose, esperá unos segundos e intentá de nuevo.',
+        };
+        setBleLog(msgs[btState] || `Estado Bluetooth: ${btState}`);
+        return;
+      }
+
+      setBleLog('📡 Buscando CleanCare-ESP32...');
+
+      manager.startDeviceScan(null, { allowDuplicates: false }, async (error, device) => {
         if (error) {
           setBleState('error');
-          setBleLog(`Error escaneo: ${error.message}`);
+          if (error.message?.includes('permission')) {
+            setBleLog('🔒 Permisos insuficientes\n\nNecesitás permisos de Bluetooth y Ubicación. Revisá Ajustes → Apps → CleanCare → Permisos.');
+          } else if (error.message?.includes('disabled') || error.message?.includes('off')) {
+            setBleLog('🔴 Bluetooth apagado\n\nActivá el Bluetooth desde Ajustes.');
+          } else {
+            setBleLog(`⚠️ Error de escaneo\n\n${error.message}\n\nProbá reiniciar el Bluetooth.`);
+          }
           return;
+        }
+
+        if (device?.name && !devicesFound.includes(device.name)) {
+          devicesFound.push(device.name);
+          setBleLog(`📡 Buscando CleanCare-ESP32...\nDispositivos cerca: ${devicesFound.join(', ')}`);
         }
 
         if (device && device.name === 'CleanCare-ESP32') {
@@ -187,16 +216,19 @@ export default function CycleScreen({ navigation, route }: Props) {
           clearTimeout(scanTimeout);
 
           try {
+            // Paso 2: conectar
             setBleState('connecting');
-            setBleLog('Conectando...');
+            setBleLog('🔗 Conectando al ESP32...');
 
             const connected = await device.connect({ timeout: 10000 });
+            setBleLog('🔍 Descubriendo servicios...');
+
             await connected.discoverAllServicesAndCharacteristics();
             deviceRef.current = connected;
             setBleState('connected');
-            setBleLog('Conectado al ESP32');
+            setBleLog('✅ Conectado al ESP32');
 
-            // Suscribirse a notificaciones de estado
+            // Paso 3: suscribirse a notificaciones
             connected.monitorCharacteristicForService(
               SERVICE_UUID,
               STATUS_UUID,
@@ -211,7 +243,6 @@ export default function CycleScreen({ navigation, route }: Props) {
                   if (state === 'ON' && secs > 0) {
                     setSecondsRemaining(secs);
                   } else if (state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
-                    // ESP32 termino el ciclo
                     completedRef.current = true;
                     handleCycleComplete();
                   }
@@ -219,14 +250,14 @@ export default function CycleScreen({ navigation, route }: Props) {
               }
             );
 
-            // Detectar desconexion
             connected.onDisconnected(() => {
               setBleState('disconnected');
               deviceRef.current = null;
             });
 
-            // Enviar ON al ESP32
-            const cmd = `ON:${CYCLE_DURATION_SECONDS}`;
+            // Paso 4: enviar comando ON
+            setBleLog('⚡ Activando máquina...');
+            const cmd = `ON:${cycleDurationSeconds}`;
             const encoded = btoa(cmd);
             await connected.writeCharacteristicWithResponseForService(
               SERVICE_UUID,
@@ -234,29 +265,37 @@ export default function CycleScreen({ navigation, route }: Props) {
               encoded
             );
             cycleStartedRef.current = true;
-            setBleLog(`Maquina activada (${CYCLE_DURATION_SECONDS}s)`);
+            const mins = Math.ceil(cycleDurationSeconds / 60);
+            setBleLog(`✅ Máquina activada — ${mins} min`);
 
-            // Registrar uso en backend
+            // Paso 5: registrar uso en backend
             startTimeRef.current = Date.now();
             try {
               const uso = await iniciarUso({
                 maquina_id,
                 edificio_id,
-                duracion_min: Math.ceil(CYCLE_DURATION_SECONDS / 60),
+                duracion_min: mins,
                 tipo,
               });
               usoIdRef.current = uso._id || null;
             } catch {}
 
-            // Programar notificacion
             const granted = await requestNotificationPermissions();
             if (granted) {
-              await scheduleEndNotification(tipo, CYCLE_DURATION_SECONDS);
+              await scheduleEndNotification(tipo, cycleDurationSeconds);
             }
 
           } catch (err: any) {
             setBleState('error');
-            setBleLog(`Error conexion: ${err.message}`);
+            if (err.message?.includes('timeout') || err.message?.includes('Timeout')) {
+              setBleLog('⏱️ Timeout de conexión\n\nEl ESP32 fue encontrado pero no responde. Probá:\n• Reiniciar el ESP32\n• Acercarte más a la máquina');
+            } else if (err.message?.includes('133') || err.message?.includes('GATT')) {
+              setBleLog('🔌 Error de conexión GATT\n\nEl ESP32 rechazó la conexión. Probá:\n• Reiniciar el ESP32\n• Apagar y prender Bluetooth\n• Esperar 10 segundos');
+            } else if (err.message?.includes('service') || err.message?.includes('characteristic')) {
+              setBleLog('⚙️ Error de servicios BLE\n\nEl ESP32 conectó pero no tiene los servicios esperados. Verificá que el firmware esté actualizado.');
+            } else {
+              setBleLog(`⚠️ Error de conexión\n\n${err.message}`);
+            }
           }
         }
       });
@@ -265,7 +304,17 @@ export default function CycleScreen({ navigation, route }: Props) {
       scanTimeout = setTimeout(() => {
         manager.stopDeviceScan();
         setBleState('error');
-        setBleLog('No se encontro CleanCare-ESP32. Verifica que el ESP32 este encendido.');
+        const found = devicesFound.length > 0
+          ? `\n\nDispositivos encontrados: ${devicesFound.join(', ')}\n(ninguno es CleanCare-ESP32)`
+          : '\n\nNo se encontró ningún dispositivo BLE cerca.';
+        setBleLog(
+          `📡 No se encontró CleanCare-ESP32\n\nVerificá que:` +
+          `\n• El ESP32 esté encendido (LED azul)` +
+          `\n• Estés cerca de la máquina (< 5m)` +
+          `\n• Bluetooth esté activado` +
+          `\n• Nadie más esté conectado al ESP32` +
+          found
+        );
       }, 15000);
     }
 
@@ -286,7 +335,7 @@ export default function CycleScreen({ navigation, route }: Props) {
       if (!cycleStartedRef.current) return;
 
       const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      const remaining = Math.max(0, CYCLE_DURATION_SECONDS - elapsed);
+      const remaining = Math.max(0, cycleDurationSeconds - elapsed);
 
       // Solo actualizar si BLE no esta enviando datos (fallback)
       if (bleState !== 'connected') {
@@ -308,7 +357,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && cycleStartedRef.current) {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        const remaining = Math.max(0, CYCLE_DURATION_SECONDS - elapsed);
+        const remaining = Math.max(0, cycleDurationSeconds - elapsed);
         setSecondsRemaining(remaining);
         if (remaining <= 0 && !completedRef.current) {
           completedRef.current = true;
@@ -439,7 +488,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           // Si el ciclo ya habia empezado, enviar ON con el tiempo restante
           if (cycleStartedRef.current) {
             const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-            const remaining = Math.max(1, CYCLE_DURATION_SECONDS - elapsed);
+            const remaining = Math.max(1, cycleDurationSeconds - elapsed);
             const encoded = btoa(`ON:${remaining}`);
             await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, encoded);
             setBleLog(`Reenviado ON:${remaining}s`);
@@ -463,7 +512,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     }, 15000);
   };
 
-  const progress = 1 - secondsRemaining / CYCLE_DURATION_SECONDS;
+  const progress = 1 - secondsRemaining / cycleDurationSeconds;
 
   // --- Estado: Buscando/conectando ESP32 ---
   if (bleState === 'scanning' || bleState === 'connecting') {
@@ -471,13 +520,13 @@ export default function CycleScreen({ navigation, route }: Props) {
       <View style={styles.container}>
         <View style={styles.bleConnecting}>
           <Animated.View style={styles.bleIconCircle}>
-            <Text style={styles.bleIcon}>📡</Text>
+            <Text style={styles.bleIcon}>{bleState === 'scanning' ? '📡' : '🔗'}</Text>
           </Animated.View>
           <Text style={styles.bleTitle}>
-            {bleState === 'scanning' ? 'Buscando maquina...' : 'Conectando...'}
+            {bleState === 'scanning' ? 'Buscando máquina...' : 'Conectando...'}
           </Text>
-          <Text style={styles.bleSubtitle}>{bleLog}</Text>
-          <Text style={styles.bleMachineId}>{maquina_id}</Text>
+          <Text style={styles.bleLogText}>{bleLog}</Text>
+          <Text style={styles.bleMachineId}>{nombre_maquina}</Text>
           <TouchableOpacity style={styles.bleCancelBtn} onPress={() => navigation.navigate('Scan')}>
             <Text style={styles.bleCancelText}>Cancelar</Text>
           </TouchableOpacity>
@@ -485,6 +534,32 @@ export default function CycleScreen({ navigation, route }: Props) {
       </View>
     );
   }
+
+  // --- Iniciar ciclo sin BLE (modo simulado) ---
+  const handleStartWithoutBle = async () => {
+    managerRef.current?.stopDeviceScan();
+    managerRef.current?.destroy();
+    setBleState('disconnected');
+    cycleStartedRef.current = true;
+    startTimeRef.current = Date.now();
+
+    // Registrar uso en backend
+    try {
+      const uso = await iniciarUso({
+        maquina_id,
+        edificio_id,
+        duracion_min: duracion_min || DEFAULT_DURATION_MIN,
+        tipo,
+      });
+      usoIdRef.current = uso._id || null;
+    } catch {}
+
+    // Programar notificacion
+    const granted = await requestNotificationPermissions();
+    if (granted) {
+      await scheduleEndNotification(tipo, cycleDurationSeconds);
+    }
+  };
 
   // --- Estado: Error BLE ---
   if (bleState === 'error' && !cycleStartedRef.current) {
@@ -495,12 +570,21 @@ export default function CycleScreen({ navigation, route }: Props) {
             <Text style={styles.bleIcon}>⚠️</Text>
           </View>
           <Text style={styles.bleTitle}>No se pudo conectar</Text>
-          <Text style={styles.bleSubtitle}>{bleLog}</Text>
+          <Text style={styles.bleLogText}>{bleLog}</Text>
           <TouchableOpacity style={[styles.primaryButton, { backgroundColor: accentColor }]} onPress={handleRetryBle}>
-            <Text style={styles.primaryButtonText}>Reintentar</Text>
+            <Text style={styles.primaryButtonText}>Reintentar conexión</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: colors.success, marginTop: 12 }]}
+            onPress={handleStartWithoutBle}
+          >
+            <Text style={styles.primaryButtonText}>Continuar sin ESP32</Text>
+          </TouchableOpacity>
+          <Text style={styles.simInfo}>
+            El ciclo correrá con timer local y se registrará en el sistema, pero no activará la máquina físicamente.
+          </Text>
           <TouchableOpacity style={styles.bleCancelBtn} onPress={() => navigation.navigate('Scan')}>
-            <Text style={styles.bleCancelText}>Volver al escaner</Text>
+            <Text style={styles.bleCancelText}>Volver al escáner</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -567,7 +651,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           </Text>
         </View>
 
-        <Text style={styles.machineId}>{maquina_id}</Text>
+        <Text style={styles.machineId}>{nombre_maquina}</Text>
 
         <MachineAnimation tipo={tipo} active={true} />
 
@@ -619,9 +703,11 @@ const styles = StyleSheet.create({
   bleIcon: { fontSize: 44 },
   bleTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
   bleSubtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 8 },
+  bleLogText: { fontSize: 14, color: colors.textSecondary, textAlign: 'left', marginBottom: 12, lineHeight: 22, paddingHorizontal: 8, alignSelf: 'stretch' },
   bleMachineId: { fontSize: 13, color: colors.textSecondary, fontFamily: 'monospace', marginBottom: 32 },
   bleCancelBtn: { paddingVertical: 12, marginTop: 12 },
   bleCancelText: { color: colors.textSecondary, fontSize: 14 },
+  simInfo: { fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: 18, paddingHorizontal: 16 },
 
   // BLE status bar during cycle
   bleStatusBar: {

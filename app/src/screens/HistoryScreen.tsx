@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
-import { listarUsos, Uso } from '../services/api.service';
+import { listarUsos, listarMaquinas, getUsuarioGuardado, Uso, Maquina } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 function formatFecha(fecha: string): string {
@@ -16,6 +16,7 @@ function formatFecha(fecha: string): string {
 
 export default function HistoryScreen() {
   const [usos, setUsos] = useState<Uso[]>([]);
+  const [maquinasMap, setMaquinasMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +26,14 @@ export default function HistoryScreen() {
       setError(null);
       const data = await listarUsos(true);
       setUsos(data);
+      // Cargar nombres de máquinas
+      const usuario = await getUsuarioGuardado();
+      if (usuario?.edificio_id) {
+        const mqs = await listarMaquinas(usuario.edificio_id);
+        const map: Record<string, string> = {};
+        mqs.forEach(m => { map[m.maquina_id] = m.nombre; });
+        setMaquinasMap(map);
+      }
     } catch {
       setError('No se pudieron cargar los usos.');
     } finally {
@@ -82,7 +91,7 @@ export default function HistoryScreen() {
             </Text>
           </View>
         </View>
-        <Text style={styles.machineId}>{item.maquina_id}</Text>
+        <Text style={styles.machineId}>{maquinasMap[item.maquina_id] || (item.tipo === 'secadora' ? 'Secadora' : 'Lavarropas')}</Text>
         <View style={styles.cardFooter}>
           <Text style={styles.detail}>{item.duracion_min} min</Text>
           {item.fecha_inicio && <Text style={styles.fecha}>{formatFecha(item.fecha_inicio)}</Text>}
@@ -102,8 +111,10 @@ export default function HistoryScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
         ListEmptyComponent={
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No hay usos registrados</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📋</Text>
+            <Text style={styles.emptyTitle}>Sin historial</Text>
+            <Text style={styles.emptyText}>Cuando uses una máquina, tus lavados y secados aparecerán acá</Text>
           </View>
         }
       />
@@ -180,8 +191,26 @@ const styles = StyleSheet.create({
     color: colors.error,
     textAlign: 'center',
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
   emptyText: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -5,6 +5,7 @@ import { colors } from '../constants/colors';
 export default function Home() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showDev, setShowDev] = useState(false);
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -215,8 +216,26 @@ export default function Home() {
         </div>
         <div style={styles.footerBottom}>
           <span>© 2026 CleanCare. Todos los derechos reservados.</span>
+          <span
+            onClick={() => setShowDev(true)}
+            style={{ marginLeft: 12, cursor: 'pointer', opacity: 0.5, fontFamily: 'monospace', fontSize: 12 }}
+          >{'</>'}</span>
         </div>
       </footer>
+
+      {/* Modal dev signature */}
+      {showDev && (
+        <div onClick={() => setShowDev(false)} style={styles.devOverlay}>
+          <div onClick={e => e.stopPropagation()} style={styles.devCard}>
+            <span style={{ fontFamily: 'monospace', fontSize: 28, fontWeight: 700, color: colors.primary }}>{'</>'}</span>
+            <p style={{ fontSize: 14, color: colors.textSecondary, margin: '12px 0 4px' }}>Desarrollado por</p>
+            <a href="mailto:jsiutto@gmail.com" style={{ fontSize: 18, fontWeight: 700, color: colors.primary, textDecoration: 'none' }}>
+              jsiutto@gmail.com
+            </a>
+            <button onClick={() => setShowDev(false)} style={styles.devClose}>Cerrar</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -364,5 +383,19 @@ const styles: Record<string, React.CSSProperties> = {
   footerBottom: {
     maxWidth: 1200, margin: '0 auto', padding: '20px 0',
     fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center' as const,
+  },
+  devOverlay: {
+    position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
+    justifyContent: 'center', alignItems: 'center', zIndex: 9999,
+  },
+  devCard: {
+    backgroundColor: '#fff', borderRadius: 20, padding: 32,
+    textAlign: 'center' as const, minWidth: 280,
+    display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
+  },
+  devClose: {
+    marginTop: 20, padding: '8px 24px', border: 'none',
+    background: 'none', color: colors.textSecondary, fontSize: 14, cursor: 'pointer',
   },
 };

@@ -11,6 +11,7 @@ export default function RegistroScreen({ navigation }: Props) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [telefono, setTelefono] = useState('');
   const [apartamento, setApartamento] = useState('');
   const [edificio, setEdificio] = useState('');
@@ -60,18 +61,33 @@ export default function RegistroScreen({ navigation }: Props) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Crear cuenta</Text>
 
-      <TextInput style={styles.input} placeholder="Nombre completo" placeholderTextColor={colors.textSecondary} value={nombre} onChangeText={setNombre} />
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textSecondary} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Contraseña (mínimo 6 caracteres)" placeholderTextColor={colors.textSecondary} value={password} onChangeText={setPassword} secureTextEntry />
+      <TextInput style={styles.input} placeholder="Nombre completo *" placeholderTextColor={colors.textSecondary} value={nombre} onChangeText={setNombre} />
+      <TextInput style={styles.input} placeholder="Email *" placeholderTextColor={colors.textSecondary} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Contraseña (mínimo 6) *"
+          placeholderTextColor={colors.textSecondary}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+        />
+        <TouchableOpacity style={styles.eyeButton} onPress={() => setShowPassword(!showPassword)}>
+          <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+        </TouchableOpacity>
+      </View>
+
       <TextInput style={styles.input} placeholder="Teléfono (ej: 099123456)" placeholderTextColor={colors.textSecondary} value={telefono} onChangeText={setTelefono} keyboardType="phone-pad" />
-      <TextInput style={styles.input} placeholder="Apartamento (ej: 3B)" placeholderTextColor={colors.textSecondary} value={apartamento} onChangeText={setApartamento} />
-      <TouchableOpacity style={styles.input} onPress={() => setShowEdificios(true)}>
+      <TextInput style={styles.input} placeholder="Apartamento (ej: 3B) *" placeholderTextColor={colors.textSecondary} value={apartamento} onChangeText={setApartamento} />
+      <TouchableOpacity style={styles.selectorInput} onPress={() => setShowEdificios(true)}>
         <Text style={{ fontSize: 16, color: edificio ? colors.textPrimary : colors.textSecondary }}>
-          {edificioNombre || 'Seleccioná tu edificio'}
+          {edificioNombre || 'Seleccioná tu edificio *'}
         </Text>
+        <Text style={{ fontSize: 14, color: colors.textSecondary }}>▼</Text>
       </TouchableOpacity>
       <TextInput style={styles.input} placeholder="Unidad (ej: apto-302) — opcional" placeholderTextColor={colors.textSecondary} value={unidad} onChangeText={setUnidad} />
 
@@ -82,9 +98,10 @@ export default function RegistroScreen({ navigation }: Props) {
             <FlatList
               data={edificios}
               keyExtractor={(item) => item.edificio_id}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.modalItem}
+                  style={[styles.modalItem, edificio === item.edificio_id && { backgroundColor: colors.bgBlueLight }]}
                   onPress={() => {
                     setEdificio(item.edificio_id);
                     setEdificioNombre(item.nombre);
@@ -139,6 +156,39 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 16,
   },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 14,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  eyeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  eyeIcon: {
+    fontSize: 18,
+  },
+  selectorInput: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   button: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
@@ -182,6 +232,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    borderRadius: 8,
   },
   modalItemText: {
     fontSize: 16,
