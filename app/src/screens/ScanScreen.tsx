@@ -27,6 +27,7 @@ async function requestBlePermissions(): Promise<boolean> {
 }
 
 const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
+const STATUS_UUID  = '12345678-1234-1234-1234-123456789abe';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 type BleStatus = 'off' | 'scanning' | 'connected' | 'disconnected';
@@ -58,6 +59,8 @@ export default function ScanScreen({ navigation }: Props) {
   // BLE state
   const [bleStatus, setBleStatus] = useState<BleStatus>('off');
   const [bleDeviceName, setBleDeviceName] = useState('');
+  const [esp32Running, setEsp32Running] = useState(false);
+  const [esp32Remaining, setEsp32Remaining] = useState(0);
   const managerRef = useRef<BleManager | null>(null);
   const deviceRef = useRef<Device | null>(null);
   const wasConnectedRef = useRef(false);
@@ -130,6 +133,38 @@ export default function ScanScreen({ navigation }: Props) {
           setBleDeviceName(connected.name || connected.localName || 'CleanCare-ESP32');
           wasConnectedRef.current = true;
 
+          // Leer estado del ESP32 para saber si ya hay ciclo activo
+          try {
+            const statusChar = await connected.readCharacteristicForService(SERVICE_UUID, STATUS_UUID);
+            if (statusChar?.value) {
+              const decoded = atob(statusChar.value);
+              if (decoded.startsWith('ON:')) {
+                const secs = parseInt(decoded.split(':')[1] || '0', 10);
+                if (secs > 0) {
+                  setEsp32Running(true);
+                  setEsp32Remaining(secs);
+                  setBleLog(`Máquina en uso — ${Math.ceil(secs / 60)} min restantes`);
+                }
+              } else {
+                setEsp32Running(false);
+              }
+            }
+          } catch {}
+
+          // Monitorear cambios de estado en tiempo real
+          connected.monitorCharacteristicForService(SERVICE_UUID, STATUS_UUID, (err, char) => {
+            if (err || !char?.value) return;
+            const decoded = atob(char.value);
+            if (decoded.startsWith('ON:')) {
+              const secs = parseInt(decoded.split(':')[1] || '0', 10);
+              setEsp32Running(secs > 0);
+              setEsp32Remaining(secs);
+            } else if (decoded.startsWith('OFF:')) {
+              setEsp32Running(false);
+              setEsp32Remaining(0);
+            }
+          });
+
           connected.onDisconnected(() => {
             deviceRef.current = null;
             setBleStatus('disconnected');
@@ -162,13 +197,33 @@ export default function ScanScreen({ navigation }: Props) {
   }
 
   function handleReconnect() {
-    if (managerRef.current) {
-      managerRef.current.stopDeviceScan();
-      managerRef.current.destroy();
-    }
-    const manager = new BleManager();
-    managerRef.current = manager;
-    scanForESP32(manager);
+    // Limpiar todo antes de reintentar
+    try {
+      if (deviceRef.current) {
+        deviceRef.current.cancelConnection().catch(() => {});
+        deviceRef.current = null;
+      }
+      if (managerRef.current) {
+        managerRef.current.stopDeviceScan();
+        managerRef.current.destroy();
+      }
+    } catch {}
+
+    setBleStatus('scanning');
+    setBleLog('Reconectando...');
+
+    // Pequeño delay para que el BLE stack se limpie
+    setTimeout(() => {
+      const manager = new BleManager();
+      managerRef.current = manager;
+
+      const sub = manager.onStateChange((state) => {
+        if (state === 'PoweredOn') {
+          sub.remove();
+          scanForESP32(manager);
+        }
+      }, true);
+    }, 500);
   }
 
   useFocusEffect(
@@ -230,6 +285,14 @@ export default function ScanScreen({ navigation }: Props) {
 
   const handleConfirmCycle = () => {
     if (!parsedQR) return;
+    if (esp32Running) {
+      Alert.alert(
+        'Máquina en uso',
+        `Hay un ciclo activo (${Math.ceil(esp32Remaining / 60)} min restantes). Esperá a que termine.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     if (saldo !== null && saldo <= 0) {
       Alert.alert('Sin fichas', 'No tenés fichas suficientes. Contactá al administrador.', [{ text: 'OK' }]);
       return;
@@ -270,7 +333,7 @@ export default function ScanScreen({ navigation }: Props) {
   const bleBarConfig = {
     off: { bg: 'rgba(100,100,100,0.85)', dot: '#999', text: bleLog || 'BLE no disponible', icon: '📡' },
     scanning: { bg: 'rgba(59,130,246,0.9)', dot: '#93C5FD', text: bleLog || 'Buscando ESP32...', icon: '📡' },
-    connected: { bg: 'rgba(22,163,74,0.9)', dot: '#4ADE80', text: `Conectado — ${bleDeviceName}`, icon: '✅' },
+    connected: { bg: esp32Running ? 'rgba(217,119,6,0.9)' : 'rgba(22,163,74,0.9)', dot: esp32Running ? '#FDE68A' : '#4ADE80', text: esp32Running ? `En uso — ${Math.ceil(esp32Remaining / 60)} min restantes` : `Conectado — ${bleDeviceName}`, icon: esp32Running ? '🔄' : '✅' },
     disconnected: { bg: 'rgba(239,68,68,0.9)', dot: '#FCA5A5', text: 'Desconectado', icon: '⚠️' },
   }[bleStatus];
 
