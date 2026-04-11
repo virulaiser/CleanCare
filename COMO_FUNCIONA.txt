@@ -1,0 +1,150 @@
+============================================================
+  CleanCare — Como Funciona el Sistema
+============================================================
+
+1. QUE ES CLEANCARE
+-------------------
+Sistema de gestion de lavarropas y secadoras por domotica
+para edificios residenciales. Los residentes escanean un QR,
+activan la maquina desde el celular, y la administracion
+recibe reportes de uso para facturacion.
+
+
+2. ARQUITECTURA GENERAL
+------------------------
+
+  [QR en maquina] → [App celular] ←BLE→ [ESP32/Relay]
+                          |                    |
+                          |                [Lavadora]
+                          v
+                    [Backend API]
+                          |
+                     [MongoDB Atlas]
+                          |
+                    [Panel web admin]
+
+  - App ←→ ESP32: Bluetooth Low Energy (BLE)
+  - App ←→ Backend: HTTPS (API REST)
+  - Panel ←→ Backend: HTTPS (API REST)
+  - Backend ←→ MongoDB: conexion directa
+  - El ESP32 NO se conecta a internet
+
+
+3. FLUJO DEL RESIDENTE
+-----------------------
+
+  a) Primera vez:
+     - Descarga la app
+     - Onboarding (3 pasos explicativos)
+     - Registro con nombre, email, password, apartamento, edificio
+     - Recibe fichas mensuales automaticamente
+
+  b) Cada uso:
+     1. Abre la app → pantalla de camara QR
+     2. La app busca el ESP32 por BLE automaticamente
+     3. Escanea el QR pegado en la maquina
+     4. Modal: "Queres lavar?" con nombre de maquina y duracion
+     5. Verifica: tiene fichas? ESP32 no esta en uso?
+     6. Conecta al ESP32 → sincroniza hora → envia ON:2700:usuario:tipo
+     7. ESP32 activa relay → lavadora prende
+     8. Timer descendente en la app (45 min lavado, 30 min secado)
+     9. Notificacion cuando termina (funciona con pantalla apagada)
+     10. Vibracion + sonido al completar
+     11. Se registra el uso en el backend
+
+  c) Sin ESP32 (modo simulado):
+     - Si no encuentra el ESP32, ofrece "Continuar sin ESP32"
+     - El ciclo corre con timer local
+     - Se registra en el backend igual
+     - Util para testing y demos
+
+
+4. FLUJO DEL ADMINISTRADOR
+---------------------------
+
+  a) Accede al panel web con email/password admin
+  b) Dashboard: KPIs, resumen de facturacion, exportar Excel
+  c) Maquinas: crear, ver QR, imprimir etiquetas
+  d) Creditos: configurar fichas mensuales, costos, agregar fichas
+  e) Usuarios: crear, editar, desactivar, ver stats, subir foto
+  f) Tips: crear consejos que aparecen en la app durante el ciclo
+
+
+5. SISTEMA DE FICHAS (CREDITOS)
+-------------------------------
+
+  - Cada edificio tiene una config: fichas mensuales, costo lavado/secado
+  - El 1ro de cada mes, un cron asigna fichas a todos los residentes
+  - Cada uso descuenta 1 ficha (configurable)
+  - Si cancela o reporta averia, se devuelve la ficha
+  - El admin puede agregar fichas extras a un usuario o a todos
+  - El residente ve su saldo y movimientos en la billetera
+
+
+6. COMPONENTES DEL SISTEMA
+---------------------------
+
+  a) App movil (React Native / Expo SDK 54):
+     - Onboarding, Login, Registro
+     - Escaner QR con camara
+     - Conexion BLE al ESP32
+     - Ciclo con timer, animacion, notificaciones
+     - Billetera, historial, perfil
+     - Funciona en Android (iOS pendiente)
+
+  b) Backend API (Node.js / Express / Vercel):
+     - Autenticacion JWT (7 dias)
+     - CRUD de maquinas, usuarios, edificios, tips
+     - Sistema de billetera/transacciones
+     - Resumen de facturacion
+     - Cron mensual de asignacion de fichas
+     - Deploy en Vercel (serverless)
+
+  c) Panel web (React / Vite / TypeScript / Vercel):
+     - Landing publica responsive
+     - Login de residentes y admin
+     - Dashboard con KPIs y exportacion Excel
+     - Gestion de maquinas, creditos, usuarios, tips
+     - Deploy en Vercel (SPA)
+
+  d) Firmware ESP32 (C++ / PlatformIO):
+     - Servidor BLE "CleanCare-ESP32"
+     - Control de relay (on/off con timer)
+     - Registro de usos en memoria no volatil (NVS)
+     - Sincronizacion de hora desde la app
+     - Auto-reset cada 24 horas
+     - Extraccion de logs con clave
+
+
+7. COSAS PREVISTAS PARA EL FUTURO
+-----------------------------------
+
+  Infraestructura:
+  - [ ] Adaptar firmware a Raspberry Pi Pico W
+  - [ ] Multi-ESP32 (un ESP32 por maquina, la app los diferencia)
+  - [ ] OTA updates del firmware via BLE
+  - [ ] Modo offline completo en la app (sync cuando hay internet)
+
+  App:
+  - [ ] Foto de perfil con expo-image-picker
+  - [ ] Recuperar contrasena (email o codigo)
+  - [ ] Push notifications desde el backend
+  - [ ] Soporte iOS (TestFlight)
+  - [ ] Deep linking (abrir app desde QR sin camara)
+  - [ ] Modo oscuro
+
+  Panel:
+  - [ ] Dashboard en tiempo real (WebSocket)
+  - [ ] Exportar PDF de facturacion
+  - [ ] Notificaciones de averias al admin
+  - [ ] Multi-edificio con roles por edificio
+  - [ ] Historial de cambios (audit log)
+
+  Negocio:
+  - [ ] Dominio custom cleancare.uy
+  - [ ] Play Store / App Store
+  - [ ] Pasarela de pago para recargar fichas
+  - [ ] QR dinamico con firma digital
+  - [ ] API publica para integraciones
+
+============================================================

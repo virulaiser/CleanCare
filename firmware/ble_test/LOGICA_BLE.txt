@@ -1,0 +1,161 @@
+============================================================
+  CleanCare — Logica BLE del Firmware ESP32 (v3.0)
+  Para adaptar a Raspberry Pi Pico u otro microcontrolador
+============================================================
+
+1. RESUMEN
+----------
+El microcontrolador actua como SERVIDOR BLE (peripheral).
+La app del celular es el CLIENTE (central).
+No requiere pairing/vinculacion — conexion directa.
+
+2. SERVICIO BLE
+---------------
+Se anuncia UN servicio con DOS caracteristicas:
+
+  Nombre BLE: "CleanCare-ESP32"
+
+  Service UUID:  12345678-1234-1234-1234-123456789abc
+
+  Caracteristica CONTROL (Write):
+    UUID: 12345678-1234-1234-1234-123456789abd
+    La app ESCRIBE comandos aca.
+
+  Caracteristica STATUS (Read + Notify):
+    UUID: 12345678-1234-1234-1234-123456789abe
+    El firmware NOTIFICA el estado por aca.
+    Tambien se puede LEER el ultimo estado.
+
+3. COMANDOS QUE RECIBE (via CONTROL)
+-------------------------------------
+  "ON:60"
+    Enciende relay/LED por 60 segundos.
+    Formato: ON:<segundos>
+
+  "ON:2700:USR-ABC123:lavarropas"
+    Enciende con registro completo.
+    Formato: ON:<segundos>:<usuario_id>:<tipo>
+    Guarda en memoria no volatil: fecha, usuario, duracion, tipo.
+
+  "OFF"
+    Apaga relay/LED inmediatamente.
+
+  "STATUS"
+    Responde con el estado actual via Notify.
+
+  "TIME:2026-04-11T15:30:00"
+    Sincroniza fecha/hora (el micro no tiene RTC).
+    La app envia esto cada vez que conecta.
+
+  "LOGS:cleancare2026"
+    Extrae todos los registros de uso guardados.
+    "cleancare2026" es la clave de acceso.
+    Responde multiples notificaciones:
+      LOGS:5          (header: cantidad)
+      LOG:0:fecha|usuario|duracion|tipo
+      LOG:1:fecha|usuario|duracion|tipo
+      ...
+      LOGS_END        (fin)
+
+  "CLEAR_LOGS:cleancare2026"
+    Borra todos los registros. Requiere la clave.
+
+  "INFO"
+    Responde: INFO:<conexiones>:<logs>:<uptime_seg>:<fecha>
+
+4. RESPUESTAS QUE ENVIA (via STATUS Notify)
+--------------------------------------------
+  "ON:45"
+    Relay encendido, 45 segundos restantes.
+    Se envia cada 2 segundos mientras esta encendido.
+
+  "OFF:0"
+    Relay apagado.
+    Se envia al apagar (manual o por timer).
+
+  "LOGS:N"          Header de logs
+  "LOG:i:datos"     Cada registro
+  "LOGS_END"        Fin de logs
+  "LOGS_ERROR:msg"  Error (clave incorrecta)
+  "LOGS_CLEARED"    Logs borrados
+  "INFO:..."        Respuesta a INFO
+
+5. FLUJO PRINCIPAL
+------------------
+
+  [BOOT]
+    |
+    v
+  Inicializar GPIO (LED/relay pin)
+    |
+    v
+  Inicializar memoria no volatil (NVS/flash)
+    |
+    v
+  Inicializar BLE con nombre "CleanCare-ESP32"
+    |
+    v
+  Crear servicio + caracteristicas
+    |
+    v
+  Iniciar advertising
+    |
+    v
+  [LOOP] ─────────────────────────────────┐
+    |                                      |
+    ├─ Si hay cliente conectado:           |
+    |    └─ Esperar comandos (callbacks)   |
+    |                                      |
+    ├─ Si relay encendido:                 |
+    |    ├─ Enviar status cada 2s          |
+    |    └─ Si timer=0 → apagar relay     |
+    |                                      |
+    ├─ Si 24h pasaron Y relay apagado:     |
+    |    └─ Reiniciar microcontrolador     |
+    |                                      |
+    ├─ Heartbeat cada 30s (serial debug)   |
+    |                                      |
+    └──────────────────────────────────────┘
+
+6. MEMORIA NO VOLATIL (NVS)
+----------------------------
+  - Almacena hasta 200 registros de uso
+  - Cada registro: "FECHA|USUARIO|DURACION|TIPO"
+  - Ejemplo: "2026-04-11T15:30:00|USR-DD3FAD|2700|lavarropas"
+  - Cuando se llena, rota (borra el mas viejo)
+  - Sobrevive reinicios y cortes de luz
+  - Se extrae via BLE con comando LOGS
+
+  En ESP32: usa libreria Preferences (clave-valor en flash)
+  En Pico:  usar flash interna o EEPROM externa
+
+7. PARA ADAPTAR A RASPBERRY PI PICO
+------------------------------------
+  Equivalencias:
+
+  ESP32                    Pico (MicroPython o C)
+  ─────────────────────    ────────────────────────
+  BLEDevice                bluetooth (MicroPython) o btstack (C)
+  BLEServer                BLE.gap_advertise + BLE.gatts_register
+  BLECharacteristic        gatts_register_services con UUIDs
+  Preferences (NVS)        archivo en flash o littlefs
+  digitalWrite(pin)        Pin(pin).value(1/0)
+  ESP.restart()            machine.reset()
+  millis()                 time.ticks_ms()
+  Serial.println()         print()
+
+  Pasos:
+  1. Crear servicio BLE con los mismos 3 UUIDs
+  2. Implementar callback de escritura para CONTROL
+  3. Implementar notify periodico para STATUS
+  4. Guardar logs en archivo JSON en flash
+  5. Timer con ticks_ms() para countdown
+  6. Reset periodico con machine.reset()
+
+8. PINES
+--------
+  LED/Relay: GPIO 2 (ESP32 LED integrado)
+  Para produccion: cambiar a GPIO del relay (ej: GPIO 4)
+  El relay controla la alimentacion de la lavadora/secadora.
+
+============================================================

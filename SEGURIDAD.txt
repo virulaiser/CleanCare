@@ -1,0 +1,151 @@
+============================================================
+  CleanCare — Medidas de Seguridad y Ciberseguridad
+============================================================
+
+1. AUTENTICACION Y ACCESO
+--------------------------
+
+  a) JWT (JSON Web Token):
+     - Algoritmo: HS256 con clave secreta en variable de entorno
+     - Expiracion: 7 dias
+     - Payload: id, usuario_id, email, rol, edificio_id
+     - Se envia en header Authorization: Bearer <token>
+     - Interceptor automatico en app y panel
+
+  b) Passwords:
+     - Hash con bcrypt (10 rounds) — no se guarda en texto plano
+     - Minimo 6 caracteres, validado en backend, app y panel
+     - Validacion de formato email con regex en los 3 puntos
+
+  c) Roles:
+     - "residente" — acceso a su propia data
+     - "admin" — acceso a todo el edificio
+     - Middleware soloAdmin() bloquea endpoints administrativos
+     - Un residente NO puede ver datos de otro residente
+
+  d) Almacenamiento seguro en celular:
+     - Token guardado en expo-secure-store
+       - iOS: Keychain (cifrado por hardware)
+       - Android: EncryptedSharedPreferences (AES-256)
+     - NO se usa AsyncStorage para credenciales
+
+  e) Panel web:
+     - Token en localStorage (riesgo aceptable para admin panel)
+     - Interceptor 401: borra token y redirige a /login
+     - No hay sesion server-side — stateless
+
+
+2. COMUNICACION
+----------------
+
+  a) App ↔ Backend:
+     - HTTPS obligatorio (Vercel fuerza TLS)
+     - Certificado SSL automatico de Vercel
+     - Axios con timeout de 10 segundos
+     - CORS habilitado
+
+  b) App ↔ ESP32 (BLE):
+     - Bluetooth Low Energy — alcance ~10 metros
+     - Sin pairing requerido (por diseño, para facilidad de uso)
+     - Los comandos son texto simple sobre BLE
+     - RIESGO: alguien cercano podria enviar comandos
+     - MITIGACION: proximidad fisica requerida + QR como validacion
+
+  c) Backend ↔ MongoDB:
+     - Conexion TLS (ssl=true en connection string)
+     - Autenticacion con usuario/password
+     - IP whitelist en MongoDB Atlas (o 0.0.0.0 para serverless)
+     - Replica set para alta disponibilidad
+
+
+3. PROTECCION DE DATOS
+-----------------------
+
+  a) Base de datos:
+     - MongoDB Atlas en AWS Sao Paulo (sa-east-1)
+     - Cifrado en reposo (Atlas lo habilita por defecto)
+     - Backups automaticos
+     - Soft-delete en usuarios y maquinas (no se borra data)
+
+  b) Variables de entorno:
+     - MONGODB_URI y JWT_SECRET en Vercel env vars
+     - .env NO se commitea (esta en .gitignore)
+     - .env.example con valores vacios como referencia
+
+  c) Fotos de perfil:
+     - Se comprimen a 200x200 JPEG (calidad 70%)
+     - Se guardan como base64 en MongoDB
+     - Limite de body: 5MB en Express
+     - No se suben a servicios externos
+
+  d) Logs del ESP32:
+     - Guardados en NVS (memoria flash interna)
+     - Protegidos con clave de acceso ("cleancare2026")
+     - Maximo 200 registros con rotacion
+     - Solo accesibles via BLE con la clave correcta
+
+
+4. VALIDACIONES Y PROTECCION DE ENDPOINTS
+-------------------------------------------
+
+  a) Validacion de entrada:
+     - Email: regex en backend, app y panel
+     - Password: minimo 6 caracteres
+     - Campos obligatorios verificados antes de procesar
+     - Email duplicado verificado antes de crear
+
+  b) Proteccion de endpoints:
+     - Publicos: solo /api (health), /api/auth, /api/edificios, /api/tips
+     - Protegidos: requieren Bearer token (verificarToken middleware)
+     - Admin-only: requieren rol admin (soloAdmin middleware)
+     - Cron: endpoint separado sin JWT (protegido por Vercel Cron)
+
+  c) Soft-delete:
+     - Usuarios y maquinas se desactivan, no se borran
+     - Preserva historial de usos y transacciones
+     - Permite reactivar si fue error
+
+  d) Creditos/fichas:
+     - Se verifica saldo ANTES de iniciar ciclo
+     - Si cancela o averia, se devuelve la ficha automaticamente
+     - Todas las transacciones quedan registradas con tipo y fecha
+     - Un usuario no puede asignarse fichas a si mismo
+
+
+5. RIESGOS CONOCIDOS Y MITIGACIONES
+-------------------------------------
+
+  RIESGO                          MITIGACION ACTUAL           MEJORA FUTURA
+  ─────────────────────────────   ─────────────────────────   ─────────────────────
+  BLE sin cifrado                 Proximidad fisica + QR      Cifrado AES en comandos BLE
+  BLE una sola conexion           App detecta si esta en uso  Multi-ESP32 por maquina
+  JWT en localStorage (panel)     Expiracion 7 dias + 401     HttpOnly cookies + refresh token
+  Sin rate limiting               Timeout 10s en axios        Rate limiter en Express
+  Sin CAPTCHA en login            Validacion email/pass       Agregar rate limit por IP
+  QR estatico (copiable)          QR solo funciona con app    QR con firma digital + timestamp
+  No hay audit log                Transacciones registradas   Log de todas las acciones admin
+  Password recovery no existe     Admin puede resetear        Flujo de recovery por email
+  Sin 2FA                         Solo password               TOTP o SMS para admin
+  ESP32 sin OTA                   Reprogramar por USB         OTA via BLE o WiFi
+  Base64 fotos en MongoDB         Compresion 200x200          Migrar a Vercel Blob / S3
+  CORS abierto                    Solo HTTPS                  Restringir origenes permitidos
+
+
+6. BUENAS PRACTICAS IMPLEMENTADAS
+-----------------------------------
+
+  [x] Passwords hasheados con bcrypt (nunca texto plano)
+  [x] JWT con expiracion y clave secreta en env var
+  [x] HTTPS forzado (Vercel TLS)
+  [x] Credenciales en secure storage (no AsyncStorage)
+  [x] .env en .gitignore
+  [x] Validacion de entrada en backend (email, password, campos)
+  [x] Soft-delete (no se pierde data)
+  [x] Transacciones atomicas de creditos
+  [x] Interceptor 401 (auto-logout en token expirado)
+  [x] MongoDB con TLS y autenticacion
+  [x] Logs del ESP32 protegidos con clave
+  [x] Auto-reset ESP32 cada 24h (limpieza de memoria)
+  [x] Compresion de imagenes antes de guardar
+
+============================================================
