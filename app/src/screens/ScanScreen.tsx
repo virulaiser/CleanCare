@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, FlatList, ActivityIndicator, Vibration, Platform, PermissionsAndroid } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,6 +7,24 @@ import { BleManager, Device } from 'react-native-ble-plx';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, obtenerConfigEdificio, Maquina } from '../services/api.service';
 import { colors } from '../constants/colors';
+
+async function requestBlePermissions(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+
+  // Android 12+ (API 31+)
+  if (Platform.Version >= 31) {
+    const results = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    ]);
+    return Object.values(results).every(r => r === PermissionsAndroid.RESULTS.GRANTED);
+  }
+
+  // Android < 12
+  const loc = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+  return loc === PermissionsAndroid.RESULTS.GRANTED;
+}
 
 const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
 
@@ -44,34 +62,72 @@ export default function ScanScreen({ navigation }: Props) {
   const deviceRef = useRef<Device | null>(null);
   const wasConnectedRef = useRef(false);
 
+  const [bleLog, setBleLog] = useState('');
+
   // BLE: auto-scan on mount
   useEffect(() => {
     const manager = new BleManager();
     managerRef.current = manager;
-    scanForESP32(manager);
+
+    // Esperar a que BLE esté listo
+    const sub = manager.onStateChange((state) => {
+      if (state === 'PoweredOn') {
+        sub.remove();
+        scanForESP32(manager);
+      }
+    }, true);
 
     return () => {
+      sub.remove();
       manager.stopDeviceScan();
       manager.destroy();
     };
   }, []);
 
-  function scanForESP32(manager: BleManager) {
+  async function scanForESP32(manager: BleManager) {
     setBleStatus('scanning');
+    setBleLog('Pidiendo permisos...');
 
-    manager.startDeviceScan([SERVICE_UUID], { allowDuplicates: false }, async (error, device) => {
+    // Pedir permisos BLE en Android
+    const granted = await requestBlePermissions();
+    if (!granted) {
+      setBleStatus('off');
+      setBleLog('Permisos BLE denegados. Habilitá Bluetooth y Ubicación en Ajustes.');
+      return;
+    }
+
+    // Verificar estado Bluetooth
+    const btState = await manager.state();
+    if (btState !== 'PoweredOn') {
+      setBleStatus('off');
+      setBleLog('Bluetooth apagado. Activalo en Ajustes.');
+      return;
+    }
+
+    const foundNames: string[] = [];
+    setBleLog('Escaneando...');
+
+    // Escanear SIN filtro de UUID (más compatible con Android)
+    manager.startDeviceScan(null, { allowDuplicates: false }, async (error, device) => {
       if (error) {
+        setBleLog(`Error: ${error.message}`);
         setBleStatus('off');
         return;
       }
-      if (device && device.name === 'CleanCare-ESP32') {
+      // Log de dispositivos encontrados
+      if (device?.name && !foundNames.includes(device.name)) {
+        foundNames.push(device.name);
+        setBleLog(`Encontrados: ${foundNames.join(', ')}`);
+      }
+      if (device && (device.name === 'CleanCare-ESP32' || device.localName === 'CleanCare-ESP32')) {
         manager.stopDeviceScan();
         try {
+          setBleStatus('scanning');
           const connected = await device.connect({ timeout: 10000 });
           await connected.discoverAllServicesAndCharacteristics();
           deviceRef.current = connected;
           setBleStatus('connected');
-          setBleDeviceName(connected.name || 'CleanCare-ESP32');
+          setBleDeviceName(connected.name || connected.localName || 'CleanCare-ESP32');
           wasConnectedRef.current = true;
 
           connected.onDisconnected(() => {
@@ -81,7 +137,7 @@ export default function ScanScreen({ navigation }: Props) {
               Vibration.vibrate(500);
               Alert.alert(
                 '📡 BLE desconectado',
-                'Se perdió la conexión con el ESP32.\nVerificá que estés cerca de la máquina.',
+                'Se perdió la conexión con el ESP32.\nVerificá que estés cerca de la máquina y que nadie más esté conectado.',
                 [
                   { text: 'Reconectar', onPress: () => handleReconnect() },
                   { text: 'OK', style: 'cancel' },
@@ -89,19 +145,20 @@ export default function ScanScreen({ navigation }: Props) {
               );
             }
           });
-        } catch {
+        } catch (err: any) {
+          console.log('BLE connect error:', err.message);
           setBleStatus('off');
         }
       }
     });
 
-    // Timeout
+    // Timeout 15s
     setTimeout(() => {
       if (managerRef.current) {
         managerRef.current.stopDeviceScan();
         setBleStatus(prev => prev === 'scanning' ? 'off' : prev);
       }
-    }, 12000);
+    }, 15000);
   }
 
   function handleReconnect() {
@@ -211,8 +268,8 @@ export default function ScanScreen({ navigation }: Props) {
 
   // BLE status bar color/text
   const bleBarConfig = {
-    off: { bg: 'rgba(100,100,100,0.85)', dot: '#999', text: 'BLE no disponible', icon: '📡' },
-    scanning: { bg: 'rgba(59,130,246,0.9)', dot: '#93C5FD', text: 'Buscando ESP32...', icon: '📡' },
+    off: { bg: 'rgba(100,100,100,0.85)', dot: '#999', text: bleLog || 'BLE no disponible', icon: '📡' },
+    scanning: { bg: 'rgba(59,130,246,0.9)', dot: '#93C5FD', text: bleLog || 'Buscando ESP32...', icon: '📡' },
     connected: { bg: 'rgba(22,163,74,0.9)', dot: '#4ADE80', text: `Conectado — ${bleDeviceName}`, icon: '✅' },
     disconnected: { bg: 'rgba(239,68,68,0.9)', dot: '#FCA5A5', text: 'Desconectado', icon: '⚠️' },
   }[bleStatus];
