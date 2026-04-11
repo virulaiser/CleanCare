@@ -92,6 +92,7 @@ export default function Dashboard() {
           <button onClick={() => navigate('/dashboard')} style={{ ...styles.logoutBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.logoutBtn}>Máquinas</button>
           <button onClick={() => navigate('/creditos')} style={styles.logoutBtn}>Créditos</button>
+          <button onClick={() => navigate('/admin-usuarios')} style={styles.logoutBtn}>Usuarios</button>
           <button onClick={() => navigate('/tips')} style={styles.logoutBtn}>Tips</button>
           <button onClick={handleLogout} style={styles.logoutBtn}>Cerrar sesión</button>
         </nav>

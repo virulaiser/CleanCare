@@ -161,6 +161,7 @@ export default function Maquinas() {
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtnActive}>Máquinas</button>
           <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
+          <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
           <button onClick={() => navigate('/tips')} style={styles.navBtn}>Tips</button>
           <button onClick={() => { localStorage.removeItem('cleancare_token'); localStorage.removeItem('cleancare_usuario'); navigate('/'); }} style={styles.navBtn}>Cerrar sesión</button>
         </nav>

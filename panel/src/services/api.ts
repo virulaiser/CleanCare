@@ -197,6 +197,28 @@ export async function listarUsuariosEdificio(edificioId?: string): Promise<{ usu
   return data.usuarios;
 }
 
+// --- Admin Usuarios ---
+
+export async function crearUsuarioAdmin(campos: {
+  nombre: string; email: string; password: string;
+  telefono?: string; apartamento?: string; edificio_id: string; unidad?: string;
+}): Promise<{ usuario_id: string; nombre: string; email: string }> {
+  const { data } = await api.post('/api/usuarios', campos);
+  return data.usuario;
+}
+
+export async function editarUsuarioAdmin(usuarioId: string, campos: {
+  nombre?: string; email?: string; password?: string;
+  telefono?: string; apartamento?: string; edificio_id?: string; unidad?: string;
+}): Promise<{ usuario_id: string; nombre: string; email: string }> {
+  const { data } = await api.patch('/api/usuarios', campos, { params: { usuarioId } });
+  return data.usuario;
+}
+
+export async function eliminarUsuarioAdmin(usuarioId: string): Promise<void> {
+  await api.delete('/api/usuarios', { params: { usuarioId } });
+}
+
 // --- Edificios ---
 
 export interface Edificio {

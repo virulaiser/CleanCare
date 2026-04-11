@@ -40,6 +40,9 @@ app.post('/api/billetera/creditos-masivo', verificarToken, soloAdmin, billeteraH
 
 // Rutas solo admin
 app.get('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
+app.post('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
+app.patch('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
+app.delete('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
 app.get('/api/resumen', verificarToken, soloAdmin, resumenHandler);
 app.get('/api/resumen-creditos', verificarToken, soloAdmin, resumenCreditosHandler);
 app.get('/api/config-edificio', verificarToken, soloAdmin, configEdificioHandler);
