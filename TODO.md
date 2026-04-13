@@ -14,7 +14,23 @@
 - [ ] **CI/CD** — GitHub Actions para auto-deploy en push
 - [ ] **Multi-ESP32** — un ESP32 por máquina, la app los diferencia por QR
 - [ ] **OTA firmware** — actualizar ESP32 sin cable USB
-- [ ] **Adaptar a Raspberry Pi Pico** — documentación lista en LOGICA_BLE.txt
+- [x] **Adaptar a Raspberry Pi Pico** — firmware creado en firmware/pico_w_ble/
+- [ ] **Permisos iOS** — agregar a app.json: NSBluetoothAlwaysUsageDescription, NSCameraUsageDescription
+- [ ] **Distribuir APK (~40 MB)** — hostear el build release para que residentes lo bajen
+      Opciones analizadas:
+      1. **GitHub Releases** — GRATIS, ilimitado, URL estable, CDN global. Ideal.
+         Flujo: `git tag v1.0.0` → GitHub Actions builds APK → attach a release.
+         URL: `github.com/virulaiser/CleanCare/releases/download/v1.0.0/cleancare.apk`
+      2. **Vercel Blob** — 1 GB gratis, CDN, integrado con backend que ya tenés en Vercel.
+         `vercel blob put cleancare.apk --public` → URL directa.
+      3. **Supabase Storage** — 1 GB gratis / 2 GB bandwidth mes. Bucket público.
+         Buena opción si ya vas a usar Supabase para otra cosa. Si no, agrega infra nueva.
+      4. **MongoDB Atlas** — NO recomendado. Límite de **16 MB por documento**,
+         un APK de 40 MB requiere GridFS (chunks de 255 KB). Consume bandwidth del
+         cluster, sin CDN, sin Content-Type correcto, descarga lenta. Free tier
+         M0 tiene solo 512 MB total — cabría pero es mal encaje.
+      Recomendación: **GitHub Releases** (cero infra, versionado automático).
+      Segunda opción: **Vercel Blob** (ya tenés Vercel).
 
 ## Completado (2026-04-11)
 - [x] **ProfileScreen** — avatar, info usuario, logout, links, firma dev
