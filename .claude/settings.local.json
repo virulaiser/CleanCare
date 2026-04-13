@@ -27,7 +27,10 @@
       "Bash(./gradlew.bat --stop)",
       "Bash(find:*)",
       "Bash(gh --version)",
-      "Bash(gh auth:*)"
+      "Bash(gh auth:*)",
+      "Bash(file /tmp_test.bin)",
+      "Bash(rm -f /tmp_test.bin)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('private:', d.get\\('private'\\)\\); print\\('visibility:', d.get\\('visibility'\\)\\)\")"
     ]
   }
 }
