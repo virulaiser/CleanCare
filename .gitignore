@@ -3,3 +3,8 @@ dist/
 .env
 .expo/
 *.log
+
+# temp build artifacts
+*_tmp.json
+build_release.log
+.claude/scheduled_tasks.lock
