@@ -50,7 +50,7 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 |---|---|
 | Backend API | https://backend-one-tau-21.vercel.app |
 | Panel web | https://panel-three-blush.vercel.app |
-| Landing page | https://panel-three-blush.vercel.app/ |
+| Landing page | https://panel-three-blush.Avercel.app/ |
 | Login usuario | https://panel-three-blush.vercel.app/usuarios |
 | Registro usuario | https://panel-three-blush.vercel.app/registro |
 | Mi cuenta | https://panel-three-blush.vercel.app/mi-cuenta |

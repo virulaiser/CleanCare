@@ -4,10 +4,10 @@
   "description": "CleanCare — App móvil React Native (Expo)",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web"
+    "start": "expo start --port 19000",
+    "android": "expo run:android --port 19000",
+    "ios": "expo run:ios --port 19000",
+    "web": "expo start --web --port 19000"
   },
   "keywords": [
     "cleancare",

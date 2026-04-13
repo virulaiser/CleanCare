@@ -55,7 +55,13 @@ export default function Home() {
               Solicitar visita gratuita
             </a>
             <a href="#como-funciona" style={styles.btnSecondary}>Ver cómo funciona</a>
-            <a href="#" onClick={(e) => e.preventDefault()} style={styles.btnDownload}>Bajar App</a>
+            <a
+              href="https://github.com/virulaiser/CleanCare/releases/download/v1.0.0/cleancare-v1.0.0.apk"
+              download="cleancare-v1.0.0.apk"
+              style={styles.btnDownload}
+            >
+              📲 Bajar App (Android)
+            </a>
           </div>
           <div className="hero-stats" style={styles.heroStats}>
             <div style={styles.stat}><span style={styles.statNum}>50+</span><span style={styles.statLabel}>Edificios</span></div>

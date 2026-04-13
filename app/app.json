@@ -13,8 +13,13 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "uy.cleancare.app",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "CleanCare necesita la cámara para escanear códigos QR de las máquinas"
+        "NSCameraUsageDescription": "CleanCare necesita la cámara para escanear los códigos QR de las máquinas",
+        "NSBluetoothAlwaysUsageDescription": "CleanCare usa Bluetooth para activar las máquinas de lavado y secado",
+        "NSBluetoothPeripheralUsageDescription": "CleanCare usa Bluetooth para activar las máquinas de lavado y secado",
+        "NSLocationWhenInUseUsageDescription": "Algunas versiones de iOS requieren permiso de ubicación para escanear dispositivos Bluetooth cercanos",
+        "UIBackgroundModes": ["bluetooth-central"]
       }
     },
     "android": {
