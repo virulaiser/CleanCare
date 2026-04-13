@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import NetInfoLite from '../services/netinfo';
 import { iniciarUso, actualizarUso, obtenerTipRandom } from '../services/api.service';
 import { colors } from '../constants/colors';
 
@@ -144,6 +145,8 @@ export default function CycleScreen({ navigation, route }: Props) {
   const [tipTexto, setTipTexto] = useState<string | null>(null);
   const [showTip, setShowTip] = useState(false);
   const [cycleStarted, setCycleStarted] = useState(false);
+  const [online, setOnline] = useState(true);
+  const [queued, setQueued] = useState(0);
 
   const startTimeRef = useRef(Date.now());
   const usoIdRef = useRef<string | null>(null);
@@ -151,9 +154,24 @@ export default function CycleScreen({ navigation, route }: Props) {
   const deviceRef = useRef<Device | null>(null);
   const cycleStartedRef = useRef(false);
   const completedRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectingRef = useRef(false);
 
   const isWasher = tipo === 'lavarropas';
   const accentColor = isWasher ? colors.primary : '#F59E0B';
+
+  // --- Online + queue badge poll ---
+  useEffect(() => {
+    let mounted = true;
+    const check = async () => {
+      const o = await NetInfoLite.isOnline();
+      const q = await NetInfoLite.pendingCount();
+      if (mounted) { setOnline(o); setQueued(q); }
+    };
+    check();
+    const id = setInterval(check, 15000);
+    return () => { mounted = false; clearInterval(id); };
+  }, []);
 
   // --- Tip: fetch random tip and show after 5s ---
   useEffect(() => {
@@ -212,7 +230,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           setBleLog(`📡 Buscando CleanCare-ESP32...\nDispositivos cerca: ${devicesFound.join(', ')}`);
         }
 
-        if (device && device.name === 'CleanCare-ESP32') {
+        if (device && (device.name === 'CleanCare-ESP32' || device.name === 'CleanCare-Pico')) {
           manager.stopDeviceScan();
           clearTimeout(scanTimeout);
 
@@ -254,6 +272,11 @@ export default function CycleScreen({ navigation, route }: Props) {
             connected.onDisconnected(() => {
               setBleState('disconnected');
               deviceRef.current = null;
+              // Auto-reconectar si el ciclo está activo y no terminado
+              if (cycleStartedRef.current && !completedRef.current) {
+                Vibration.vibrate(300);
+                attemptAutoReconnect();
+              }
             });
 
             // Paso 4: sincronizar fecha/hora con ESP32
@@ -373,6 +396,64 @@ export default function CycleScreen({ navigation, route }: Props) {
     return () => sub.remove();
   }, []);
 
+  async function attemptAutoReconnect() {
+    if (reconnectingRef.current) return;
+    if (completedRef.current) return;
+    if (reconnectAttemptsRef.current >= 5) {
+      setBleLog('Reconexión fallida tras 5 intentos. El timer continúa localmente.');
+      return;
+    }
+    reconnectingRef.current = true;
+    reconnectAttemptsRef.current++;
+    setBleLog(`Reconectando (intento ${reconnectAttemptsRef.current}/5)...`);
+
+    const manager = managerRef.current;
+    if (!manager) { reconnectingRef.current = false; return; }
+
+    let resolved = false;
+    const stopAfter = setTimeout(() => {
+      if (resolved) return;
+      manager.stopDeviceScan();
+      reconnectingRef.current = false;
+      // Reintento exponencial: 2s, 4s, 8s...
+      const delay = Math.min(8000, 2000 * reconnectAttemptsRef.current);
+      setTimeout(() => attemptAutoReconnect(), delay);
+    }, 8000);
+
+    manager.startDeviceScan(null, { allowDuplicates: false }, async (error, device) => {
+      if (error || !device) return;
+      if (device.name !== 'CleanCare-ESP32') return;
+      manager.stopDeviceScan();
+      clearTimeout(stopAfter);
+      try {
+        const connected = await device.connect({ timeout: 8000 });
+        await connected.discoverAllServicesAndCharacteristics();
+        deviceRef.current = connected;
+        setBleState('connected');
+        reconnectAttemptsRef.current = 0;
+        setBleLog('Reconectado');
+        // Re-sincronizar estado: enviar tiempo restante al ESP32
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        const remaining = Math.max(1, cycleDurationSeconds - elapsed);
+        await connected.writeCharacteristicWithResponseForService(
+          SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}`)
+        );
+        connected.onDisconnected(() => {
+          setBleState('disconnected');
+          deviceRef.current = null;
+          if (cycleStartedRef.current && !completedRef.current) attemptAutoReconnect();
+        });
+      } catch {
+        // Reintento programado
+        const delay = Math.min(8000, 2000 * reconnectAttemptsRef.current);
+        setTimeout(() => attemptAutoReconnect(), delay);
+      } finally {
+        resolved = true;
+        reconnectingRef.current = false;
+      }
+    });
+  }
+
   async function handleCycleComplete() {
     setIsComplete(true);
     setSecondsRemaining(0);
@@ -457,7 +538,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         setBleLog(`Error: ${error.message}`);
         return;
       }
-      if (device && device.name === 'CleanCare-ESP32') {
+      if (device && (device.name === 'CleanCare-ESP32' || device.name === 'CleanCare-Pico')) {
         manager.stopDeviceScan();
         // Reconectar (mismo flujo simplificado)
         try {
@@ -649,6 +730,16 @@ export default function CycleScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Offline / queued indicator */}
+        {(!online || queued > 0) && (
+          <View style={[styles.bleStatusBar, { backgroundColor: '#FEF3C7', marginTop: -8 }]}>
+            <View style={[styles.bleStatusDot, { backgroundColor: '#D97706' }]} />
+            <Text style={[styles.bleStatusText, { color: '#92400E' }]}>
+              {!online ? 'Sin conexión — el uso se sincronizará luego' : `${queued} pendiente${queued > 1 ? 's' : ''} de sincronizar`}
+            </Text>
+          </View>
+        )}
 
         <View style={[styles.badge, { backgroundColor: isWasher ? colors.bgBlueLight : '#FEF3C7' }]}>
           <Text style={[styles.badgeText, { color: accentColor }]}>

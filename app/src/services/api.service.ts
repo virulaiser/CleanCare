@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { enqueue, registerPendingUso, flushQueue, queueLength } from './offlineQueue';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -7,6 +8,9 @@ const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
 });
+
+export { flushQueue, queueLength };
+export function getApi() { return api; }
 
 // Inyectar token en cada request
 api.interceptors.request.use(async (config) => {
@@ -93,14 +97,56 @@ export async function iniciarUso(uso: {
   edificio_id: string;
   duracion_min: number;
   tipo?: 'lavarropas' | 'secadora';
-}): Promise<Uso> {
-  const { data } = await api.post('/api/uso', uso);
-  return data.uso;
+}): Promise<Uso & { _localId?: string; _queued?: boolean }> {
+  const payload = { ...uso, fecha_inicio: new Date().toISOString() };
+  try {
+    const { data } = await api.post('/api/uso', payload);
+    return data.uso;
+  } catch (err: any) {
+    const isNetwork = !err?.response || err?.code === 'ECONNABORTED';
+    if (!isNetwork) throw err;
+    // Offline → encolar y devolver placeholder
+    const localId = await registerPendingUso({
+      maquina_id: payload.maquina_id,
+      edificio_id: payload.edificio_id,
+      duracion_min: payload.duracion_min,
+      tipo: payload.tipo,
+      fecha_inicio: payload.fecha_inicio,
+    });
+    await enqueue({ method: 'POST', url: '/api/uso', data: payload });
+    return {
+      maquina_id: payload.maquina_id,
+      edificio_id: payload.edificio_id,
+      duracion_min: payload.duracion_min,
+      residente_id: '',
+      _id: localId,
+      _localId: localId,
+      _queued: true,
+    } as any;
+  }
 }
 
 export async function actualizarUso(id: string, estado: 'completado' | 'cancelado' | 'averia'): Promise<Uso> {
-  const { data } = await api.patch(`/api/uso?id=${id}`, { estado });
-  return data.uso;
+  const isLocal = id.startsWith('local-');
+  if (!isLocal) {
+    try {
+      const { data } = await api.patch(`/api/uso?id=${id}`, { estado });
+      return data.uso;
+    } catch (err: any) {
+      const isNetwork = !err?.response || err?.code === 'ECONNABORTED';
+      if (!isNetwork) throw err;
+      await enqueue({ method: 'PATCH', url: `/api/uso?id=${id}`, data: { estado } });
+      return { _id: id, estado } as any;
+    }
+  }
+  // Es local: encolar PATCH ligado al POST pendiente
+  await enqueue({
+    method: 'PATCH',
+    url: `/api/uso?id=${id}`,
+    data: { estado },
+    pendingUsoLocalId: id,
+  });
+  return { _id: id, estado } as any;
 }
 
 

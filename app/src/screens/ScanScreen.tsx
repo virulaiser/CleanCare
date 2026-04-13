@@ -122,7 +122,8 @@ export default function ScanScreen({ navigation }: Props) {
         foundNames.push(device.name);
         setBleLog(`Encontrados: ${foundNames.join(', ')}`);
       }
-      if (device && (device.name === 'CleanCare-ESP32' || device.localName === 'CleanCare-ESP32')) {
+      const isCleanCare = (n?: string | null) => n === 'CleanCare-ESP32' || n === 'CleanCare-Pico';
+      if (device && (isCleanCare(device.name) || isCleanCare(device.localName))) {
         manager.stopDeviceScan();
         try {
           setBleStatus('scanning');
