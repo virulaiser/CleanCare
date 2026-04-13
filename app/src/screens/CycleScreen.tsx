@@ -156,6 +156,7 @@ export default function CycleScreen({ navigation, route }: Props) {
   const completedRef = useRef(false);
   const reconnectAttemptsRef = useRef(0);
   const reconnectingRef = useRef(false);
+  const userExitedRef = useRef(false);
 
   const isWasher = tipo === 'lavarropas';
   const accentColor = isWasher ? colors.primary : '#F59E0B';
@@ -355,6 +356,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     connectBle();
 
     return () => {
+      userExitedRef.current = true;
       clearTimeout(scanTimeout);
       manager.stopDeviceScan();
       manager.destroy();
@@ -398,7 +400,7 @@ export default function CycleScreen({ navigation, route }: Props) {
 
   async function attemptAutoReconnect() {
     if (reconnectingRef.current) return;
-    if (completedRef.current) return;
+    if (completedRef.current || userExitedRef.current) return;
     if (reconnectAttemptsRef.current >= 5) {
       setBleLog('Reconexión fallida tras 5 intentos. El timer continúa localmente.');
       return;
@@ -489,6 +491,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         text: 'Si, cancelar',
         style: 'destructive',
         onPress: async () => {
+          userExitedRef.current = true;
           await cancelAllNotifications();
           await sendBleOff();
           if (usoIdRef.current) {
@@ -510,6 +513,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           text: 'Si, reportar',
           style: 'destructive',
           onPress: async () => {
+            userExitedRef.current = true;
             await cancelAllNotifications();
             await sendBleOff();
             if (usoIdRef.current) {

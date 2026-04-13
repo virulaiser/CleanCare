@@ -1,6 +1,22 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosInstance } from 'axios';
-import * as SecureStore from 'expo-secure-store';
+
+// Storage resiliente: intenta AsyncStorage, fallback a memoria si el módulo nativo no está linkeado.
+let storage: { getItem: (k: string) => Promise<string | null>; setItem: (k: string, v: string) => Promise<void> };
+const memStore: Record<string, string> = {};
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  // Smoke test — si el módulo nativo no está linkeado, lanza al primer call
+  storage = {
+    getItem: (k: string) => AsyncStorage.getItem(k),
+    setItem: (k: string, v: string) => AsyncStorage.setItem(k, v),
+  };
+} catch {
+  storage = {
+    getItem: async (k: string) => memStore[k] ?? null,
+    setItem: async (k: string, v: string) => { memStore[k] = v; },
+  };
+}
 
 const QUEUE_KEY = 'cleancare_offline_queue_v1';
 const PENDING_USOS_KEY = 'cleancare_pending_usos_v1';
@@ -34,21 +50,21 @@ function genId(): string {
 }
 
 async function readQueue(): Promise<QueuedRequest[]> {
-  const raw = await AsyncStorage.getItem(QUEUE_KEY);
+  const raw = await storage.getItem(QUEUE_KEY);
   return raw ? JSON.parse(raw) : [];
 }
 
 async function writeQueue(q: QueuedRequest[]): Promise<void> {
-  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+  await storage.setItem(QUEUE_KEY, JSON.stringify(q));
 }
 
 async function readPending(): Promise<PendingUso[]> {
-  const raw = await AsyncStorage.getItem(PENDING_USOS_KEY);
+  const raw = await storage.getItem(PENDING_USOS_KEY);
   return raw ? JSON.parse(raw) : [];
 }
 
 async function writePending(p: PendingUso[]): Promise<void> {
-  await AsyncStorage.setItem(PENDING_USOS_KEY, JSON.stringify(p));
+  await storage.setItem(PENDING_USOS_KEY, JSON.stringify(p));
 }
 
 export async function enqueue(req: Omit<QueuedRequest, 'id' | 'createdAt' | 'attempts'>): Promise<string> {
