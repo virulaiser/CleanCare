@@ -258,6 +258,44 @@ export async function eliminarTip(id: string): Promise<void> {
   await api.delete('/api/tips', { params: { id } });
 }
 
+// --- Dispositivos (ESP32 / Pico) ---
+export interface Dispositivo {
+  _id: string;
+  esp32_id: string;
+  tipo_hw: 'esp32' | 'pico';
+  ble_name: string;
+  service_uuid: string;
+  control_uuid: string;
+  status_uuid: string;
+  maquina_asignada: string | null;
+  edificio_id: string | null;
+  ubicacion: string;
+  activo: boolean;
+  creado: string;
+}
+
+export async function listarDispositivos(): Promise<Dispositivo[]> {
+  const { data } = await api.get('/api/dispositivos');
+  return data.dispositivos;
+}
+
+export async function crearDispositivo(campos: {
+  tipo_hw?: string; ble_name?: string; ubicacion?: string;
+  maquina_asignada?: string | null; edificio_id?: string | null;
+}): Promise<Dispositivo> {
+  const { data } = await api.post('/api/dispositivos', campos);
+  return data.dispositivo;
+}
+
+export async function actualizarDispositivo(id: string, campos: Partial<Dispositivo>): Promise<Dispositivo> {
+  const { data } = await api.patch('/api/dispositivos', campos, { params: { id } });
+  return data.dispositivo;
+}
+
+export async function eliminarDispositivo(id: string): Promise<void> {
+  await api.delete('/api/dispositivos', { params: { id } });
+}
+
 export async function crearEdificio(campos: { nombre: string; direccion?: string; admin_nombre?: string; admin_telefono?: string }): Promise<Edificio> {
   const { data } = await api.post('/api/edificios', campos);
   return data.edificio;

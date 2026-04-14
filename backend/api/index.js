@@ -14,6 +14,7 @@ const cronAsignacionHandler = require('./cron-asignacion');
 const usuariosHandler = require('./usuarios');
 const edificiosHandler = require('./edificios');
 const tipsHandler = require('./tips');
+const dispositivosHandler = require('./dispositivos');
 
 const app = express();
 app.use(cors());
@@ -53,6 +54,10 @@ app.post('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
 app.delete('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
 app.post('/api/tips', verificarToken, soloAdmin, tipsHandler);
 app.delete('/api/tips', verificarToken, soloAdmin, tipsHandler);
+app.get('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
+app.post('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
+app.patch('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
+app.delete('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
 
 // Cron (protegido por CRON_SECRET, no por JWT)
 app.get('/api/cron/asignacion-mensual', cronAsignacionHandler);

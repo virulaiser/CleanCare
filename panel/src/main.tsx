@@ -11,6 +11,7 @@ import Maquinas from './pages/Maquinas';
 import Creditos from './pages/Creditos';
 import Tips from './pages/Tips';
 import AdminUsuarios from './pages/AdminUsuarios';
+import Dispositivos from './pages/Dispositivos';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/creditos" element={<Creditos />} />
         <Route path="/tips" element={<Tips />} />
         <Route path="/admin-usuarios" element={<AdminUsuarios />} />
+        <Route path="/dispositivos" element={<Dispositivos />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
