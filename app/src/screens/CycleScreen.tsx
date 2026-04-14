@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Vibration, 
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 import { BleManager, Device } from 'react-native-ble-plx';
+import { getBleManager, getConnectedDevice, setConnectedDevice } from '../services/bleManager';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import NetInfoLite from '../services/netinfo';
@@ -185,15 +186,83 @@ export default function CycleScreen({ navigation, route }: Props) {
     });
   }, [tipo]);
 
-  // --- BLE: buscar, conectar, enviar ON ---
+  // --- BLE: reusar device conectado o buscar+conectar ---
   useEffect(() => {
-    const manager = new BleManager();
+    const manager = getBleManager();
     managerRef.current = manager;
 
     let scanTimeout: ReturnType<typeof setTimeout>;
     let devicesFound: string[] = [];
 
     async function connectBle() {
+      // Si ya hay device conectado desde ScanScreen, usarlo
+      const existing = getConnectedDevice();
+      if (existing) {
+        try {
+          deviceRef.current = existing;
+          setBleState('connected');
+          setBleLog('Conectado al ESP32');
+
+          existing.monitorCharacteristicForService(
+            SERVICE_UUID, STATUS_UUID,
+            (err, char) => {
+              if (err) return;
+              if (char?.value) {
+                const decoded = atob(char.value);
+                const parts = decoded.split(':');
+                const state = parts[0];
+                const secs = parseInt(parts[1] || '0', 10);
+                if (state === 'ON' && secs > 0) setSecondsRemaining(secs);
+                else if (state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
+                  completedRef.current = true;
+                  handleCycleComplete();
+                }
+              }
+            }
+          );
+
+          existing.onDisconnected(() => {
+            setBleState('disconnected');
+            deviceRef.current = null;
+            setConnectedDevice(null);
+            if (cycleStartedRef.current && !completedRef.current) {
+              Vibration.vibrate(300);
+              attemptAutoReconnect();
+            }
+          });
+
+          // Sincronizar hora y enviar ON
+          const now = new Date();
+          const timeCmd = `TIME:${now.toISOString().slice(0, 19)}`;
+          await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(timeCmd));
+
+          setBleLog('⚡ Activando máquina...');
+          const usuario = await import('../services/api.service').then(m => m.getUsuarioGuardado());
+          const userId = usuario?.usuario_id || 'desconocido';
+          const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}`;
+          await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
+
+          cycleStartedRef.current = true;
+          setCycleStarted(true);
+          const mins = Math.ceil(cycleDurationSeconds / 60);
+          setBleLog(`✅ Máquina activada — ${mins} min`);
+
+          startTimeRef.current = Date.now();
+          try {
+            const uso = await iniciarUso({ maquina_id, edificio_id, duracion_min: mins, tipo });
+            usoIdRef.current = uso._id || null;
+          } catch {}
+
+          const granted = await requestNotificationPermissions();
+          if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds);
+          return;
+        } catch (err: any) {
+          // Si falla con device existente, limpiar y caer al flujo de scan
+          setConnectedDevice(null);
+          deviceRef.current = null;
+        }
+      }
+
       setBleState('scanning');
       setBleLog('Verificando Bluetooth...');
 
@@ -231,7 +300,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           setBleLog(`📡 Buscando CleanCare-ESP32...\nDispositivos cerca: ${devicesFound.join(', ')}`);
         }
 
-        if (device && (device.name === 'CleanCare-ESP32' || device.name === 'CleanCare-Pico')) {
+        if (device && device.name === 'CleanCare-ESP32') {
           manager.stopDeviceScan();
           clearTimeout(scanTimeout);
 
@@ -358,8 +427,8 @@ export default function CycleScreen({ navigation, route }: Props) {
     return () => {
       userExitedRef.current = true;
       clearTimeout(scanTimeout);
-      manager.stopDeviceScan();
-      manager.destroy();
+      try { manager.stopDeviceScan(); } catch {}
+      // NO destruir el manager compartido — sigue vivo para ScanScreen
     };
   }, []);
 
@@ -528,12 +597,11 @@ export default function CycleScreen({ navigation, route }: Props) {
   };
 
   const handleRetryBle = () => {
-    // Destruir manager viejo y reintentar
-    managerRef.current?.destroy();
+    managerRef.current?.stopDeviceScan();
     setBleState('scanning');
     setBleLog('Reintentando...');
 
-    const manager = new BleManager();
+    const manager = getBleManager();
     managerRef.current = manager;
 
     manager.startDeviceScan([SERVICE_UUID], null, async (error, device) => {
@@ -542,7 +610,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         setBleLog(`Error: ${error.message}`);
         return;
       }
-      if (device && (device.name === 'CleanCare-ESP32' || device.name === 'CleanCare-Pico')) {
+      if (device && device.name === 'CleanCare-ESP32') {
         manager.stopDeviceScan();
         // Reconectar (mismo flujo simplificado)
         try {
@@ -628,7 +696,6 @@ export default function CycleScreen({ navigation, route }: Props) {
   // --- Iniciar ciclo sin BLE (modo simulado) ---
   const handleStartWithoutBle = async () => {
     managerRef.current?.stopDeviceScan();
-    managerRef.current?.destroy();
     setBleState('disconnected');
     cycleStartedRef.current = true;
     startTimeRef.current = Date.now();

@@ -201,11 +201,26 @@ export interface ConfigEdificio {
   duracion_secado: number;
 }
 
+const CONFIG_CACHE_KEY = (edificioId: string) => `cleancare_config_${edificioId}`;
+
 export async function obtenerConfigEdificio(edificioId: string): Promise<ConfigEdificio | null> {
   try {
     const { data } = await api.get('/api/config-edificio', { params: { edificioId } });
-    return data.config || data;
-  } catch { return null; }
+    const config = data.config || data;
+    if (config) {
+      try {
+        await SecureStore.setItemAsync(CONFIG_CACHE_KEY(edificioId), JSON.stringify(config));
+      } catch {}
+    }
+    return config;
+  } catch {
+    // Fallback a cache local si no hay red
+    try {
+      const raw = await SecureStore.getItemAsync(CONFIG_CACHE_KEY(edificioId));
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  }
 }
 
 // --- Edificios ---

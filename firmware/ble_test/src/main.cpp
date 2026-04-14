@@ -29,7 +29,13 @@
 
 #define LED_PIN 2
 #define RELAY_PIN 21                     // D21 — relay de la máquina
+#define BOOT_PULSE_PIN 32                // D32 — pulso al arrancar (reset BLE externo)
+#define BOOT_PULSE_MS 3000               // Duración del pulso de boot
+#define BUZZER_PIN 26                    // Buzzer del shield Cytron Robo ESP32
+#define BUZZER_CHANNEL 0
 #define RESET_INTERVAL_MS   86400000UL  // 24 horas en ms
+#define WARNING_THRESHOLD_SEC 30         // Beep cada 5s en los últimos 30s
+#define WARNING_INTERVAL_MS 5000
 #define MAX_LOGS            200         // Máximo de registros en NVS
 #define LOG_ACCESS_KEY      "cleancare2026"
 
@@ -40,7 +46,12 @@ BLEServer *bleServer;
 bool deviceConnected = false;
 bool advertisingRestartPending = false;
 unsigned long advertisingRestartAt = 0;
+bool bootPulseActive = true;
+unsigned long bootPulseEndsAt = 0;
 bool ledOn = false;
+unsigned long lastWarningBeepAt = 0;
+unsigned long ledBlinkAt = 0;
+bool ledBlinkState = false;
 unsigned long ledOffTime = 0;
 unsigned long durationMs = 0;
 unsigned long startTime = 0;
@@ -49,6 +60,15 @@ int connectionCount = 0;
 // Fecha/hora recibida de la app
 String currentDateTime = "";
 unsigned long dateTimeReceivedAt = 0;  // millis() cuando se recibió
+
+// Forward declarations
+void buzzerInit();
+void playTone(int freq, int durationMs);
+void playBootMelody();
+void playStartMelody();
+void playEndMelody();
+void playDisconnectBeep();
+void playWarningBeep();
 
 // ==========================================
 // NVS — REGISTRO DE USOS
@@ -164,6 +184,7 @@ class ServerCallbacks : public BLEServerCallbacks {
     Serial.println("[!!] CLIENTE DESCONECTADO");
     Serial.println("[INFO] Programando re-advertising en 500ms...");
     Serial.println("=========================================");
+    playDisconnectBeep();
     // Marcar para reiniciar advertising desde el loop (evita problemas dentro del callback)
     advertisingRestartPending = true;
     advertisingRestartAt = millis() + 500;
@@ -171,7 +192,7 @@ class ServerCallbacks : public BLEServerCallbacks {
 };
 
 void sendStatus();
-void turnOff();
+void turnOff(bool playEndMel);
 
 class ControlCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pChar) {
@@ -211,8 +232,11 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
       durationMs = (unsigned long)durationSec * 1000;
       startTime = millis();
       ledOffTime = startTime + durationMs;
+      lastWarningBeepAt = 0;
+      ledBlinkAt = millis();
       digitalWrite(LED_PIN, HIGH);
       digitalWrite(RELAY_PIN, HIGH);
+      playStartMelody();
       Serial.println("[OK] RELAY D21 ACTIVADO");
 
       Serial.print("[OK] LED ON por ");
@@ -229,7 +253,7 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
     // --- OFF ---
     } else if (value == "OFF") {
       Serial.println("[CMD] Apagando...");
-      turnOff();
+      turnOff(false);  // cancelado manualmente — sin melodía de fin
 
     // --- STATUS ---
     } else if (value == "STATUS") {
@@ -284,6 +308,49 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
 };
 
 // ==========================================
+// BUZZER — patrones de sonido (Cytron shield)
+// ==========================================
+
+void buzzerInit() {
+  ledcSetup(BUZZER_CHANNEL, 1000, 8);
+  ledcAttachPin(BUZZER_PIN, BUZZER_CHANNEL);
+  ledcWrite(BUZZER_CHANNEL, 0);
+}
+
+void playTone(int freq, int durationMs) {
+  ledcWriteTone(BUZZER_CHANNEL, freq);
+  delay(durationMs);
+  ledcWriteTone(BUZZER_CHANNEL, 0);
+}
+
+void playBootMelody() {
+  playTone(523, 80); delay(30);   // C5
+  playTone(784, 120);             // G5
+}
+
+void playStartMelody() {
+  playTone(523, 80); delay(40);   // C5
+  playTone(659, 80); delay(40);   // E5
+  playTone(784, 150);             // G5
+}
+
+void playEndMelody() {
+  playTone(784, 100); delay(50);  // G5
+  playTone(880, 100); delay(50);  // A5
+  playTone(988, 100); delay(50);  // B5
+  playTone(1047, 300);            // C6
+}
+
+void playDisconnectBeep() {
+  playTone(400, 100); delay(60);
+  playTone(300, 150);
+}
+
+void playWarningBeep() {
+  playTone(1500, 60);
+}
+
+// ==========================================
 // FUNCIONES
 // ==========================================
 
@@ -305,7 +372,7 @@ void sendStatus() {
   Serial.println(status);
 }
 
-void turnOff() {
+void turnOff(bool playEndMel = true) {
   ledOn = false;
   ledOffTime = 0;
   durationMs = 0;
@@ -313,6 +380,7 @@ void turnOff() {
   digitalWrite(LED_PIN, LOW);
   digitalWrite(RELAY_PIN, LOW);
   Serial.println("[OK] LED + RELAY D21 APAGADOS");
+  if (playEndMel) playEndMelody();
   sendStatus();
 }
 
@@ -330,12 +398,16 @@ void setup() {
   Serial.println("=============================================");
   Serial.println();
 
-  // 1. LED + RELAY
+  // 1. LED + RELAY + PULSO BOOT D32
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
-  Serial.println("[1/6] LED GPIO 2 + RELAY GPIO 21 configurados");
+  pinMode(BOOT_PULSE_PIN, OUTPUT);
+  digitalWrite(BOOT_PULSE_PIN, HIGH);
+  bootPulseEndsAt = millis() + BOOT_PULSE_MS;
+  buzzerInit();
+  Serial.println("[1/6] LED GPIO 2 + RELAY GPIO 21 + BOOT PULSE GPIO 32 HIGH (3s) + BUZZER GPIO 26");
 
   // 2. NVS
   Serial.println("[2/6] Inicializando NVS...");
@@ -405,11 +477,12 @@ void setup() {
   Serial.println("  INFO               Info del ESP32");
   Serial.println();
 
-  // Parpadear LED 3 veces
+  // Parpadear LED 3 veces + melodía de boot
   for (int i = 0; i < 3; i++) {
     digitalWrite(LED_PIN, HIGH); delay(200);
     digitalWrite(LED_PIN, LOW); delay(200);
   }
+  playBootMelody();
   Serial.println("[OK] Firmware v3.0 listo");
   Serial.println();
 }
@@ -419,6 +492,13 @@ void setup() {
 // ==========================================
 
 void loop() {
+  // Pulso de boot en D32 (3s HIGH al arrancar)
+  if (bootPulseActive && millis() >= bootPulseEndsAt) {
+    bootPulseActive = false;
+    digitalWrite(BOOT_PULSE_PIN, LOW);
+    Serial.println("[OK] Boot pulse D32 terminado (LOW)");
+  }
+
   // Reiniciar advertising tras desconexión (desde loop, no desde callback)
   if (advertisingRestartPending && millis() >= advertisingRestartAt) {
     advertisingRestartPending = false;
@@ -439,7 +519,24 @@ void loop() {
   if (ledOn && millis() >= ledOffTime) {
     Serial.println();
     Serial.println("[TIMER] Tiempo cumplido!");
-    turnOff();
+    turnOff(true);  // melodía de fin
+  }
+
+  // Warning beeps en los últimos 30s + LED parpadea rápido
+  if (ledOn) {
+    unsigned long remaining = (ledOffTime - millis()) / 1000;
+    if (remaining <= WARNING_THRESHOLD_SEC) {
+      if (millis() - lastWarningBeepAt > WARNING_INTERVAL_MS) {
+        playWarningBeep();
+        lastWarningBeepAt = millis();
+      }
+      // LED parpadea cada 250ms en el tramo final
+      if (millis() - ledBlinkAt > 250) {
+        ledBlinkState = !ledBlinkState;
+        digitalWrite(LED_PIN, ledBlinkState ? HIGH : LOW);
+        ledBlinkAt = millis();
+      }
+    }
   }
 
   // Status cada 2 seg si conectado y encendido

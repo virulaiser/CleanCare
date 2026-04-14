@@ -4,6 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { BleManager, Device } from 'react-native-ble-plx';
+import { getBleManager, getConnectedDevice, setConnectedDevice } from '../services/bleManager';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, obtenerConfigEdificio, Maquina } from '../services/api.service';
 import { colors } from '../constants/colors';
@@ -64,26 +65,54 @@ export default function ScanScreen({ navigation }: Props) {
   const managerRef = useRef<BleManager | null>(null);
   const deviceRef = useRef<Device | null>(null);
   const wasConnectedRef = useRef(false);
+  const unmountedRef = useRef(false);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [bleLog, setBleLog] = useState('');
 
-  // BLE: auto-scan on mount
+  // BLE: auto-scan on mount — manager compartido entre pantallas
   useEffect(() => {
-    const manager = new BleManager();
+    unmountedRef.current = false;
+    const manager = getBleManager();
     managerRef.current = manager;
 
-    // Esperar a que BLE esté listo
-    const sub = manager.onStateChange((state) => {
-      if (state === 'PoweredOn') {
+    // Si ya hay un device conectado (volviendo de Cycle), reutilizarlo
+    const existing = getConnectedDevice();
+    if (existing) {
+      deviceRef.current = existing;
+      setBleStatus('connected');
+      setBleDeviceName(existing.name || 'CleanCare-ESP32');
+      wasConnectedRef.current = true;
+      setBleLog('Conectado al ESP32');
+    } else {
+      // Esperar a que BLE esté listo y escanear
+      const sub = manager.onStateChange((state) => {
+        if (state === 'PoweredOn') {
+          sub.remove();
+          scanForESP32(manager);
+        }
+      }, true);
+
+      return () => {
+        unmountedRef.current = true;
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
         sub.remove();
-        scanForESP32(manager);
-      }
-    }, true);
+        // NO destruir el manager — es compartido con otras pantallas
+        try { manager.stopDeviceScan(); } catch {}
+      };
+    }
 
     return () => {
-      sub.remove();
-      manager.stopDeviceScan();
-      manager.destroy();
+      unmountedRef.current = true;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      // NO destruir el manager ni la conexión — persisten en navegación
+      try { manager.stopDeviceScan(); } catch {}
     };
   }, []);
 
@@ -122,7 +151,7 @@ export default function ScanScreen({ navigation }: Props) {
         foundNames.push(device.name);
         setBleLog(`Encontrados: ${foundNames.join(', ')}`);
       }
-      const isCleanCare = (n?: string | null) => n === 'CleanCare-ESP32' || n === 'CleanCare-Pico';
+      const isCleanCare = (n?: string | null) => n === 'CleanCare-ESP32';
       if (device && (isCleanCare(device.name) || isCleanCare(device.localName))) {
         manager.stopDeviceScan();
         try {
@@ -130,6 +159,7 @@ export default function ScanScreen({ navigation }: Props) {
           const connected = await device.connect({ timeout: 10000 });
           await connected.discoverAllServicesAndCharacteristics();
           deviceRef.current = connected;
+          setConnectedDevice(connected);
           setBleStatus('connected');
           setBleDeviceName(connected.name || connected.localName || 'CleanCare-ESP32');
           wasConnectedRef.current = true;
@@ -168,17 +198,15 @@ export default function ScanScreen({ navigation }: Props) {
 
           connected.onDisconnected(() => {
             deviceRef.current = null;
+            setConnectedDevice(null);
+            if (unmountedRef.current) return;  // screen ya desmontó, no reconectar
             setBleStatus('disconnected');
             if (wasConnectedRef.current) {
-              Vibration.vibrate(500);
-              Alert.alert(
-                '📡 BLE desconectado',
-                'Se perdió la conexión con el ESP32.\nVerificá que estés cerca de la máquina y que nadie más esté conectado.',
-                [
-                  { text: 'Reconectar', onPress: () => handleReconnect() },
-                  { text: 'OK', style: 'cancel' },
-                ]
-              );
+              Vibration.vibrate(200);
+              setBleLog('Se perdió la conexión, reintentando en 1s...');
+              reconnectTimeoutRef.current = setTimeout(() => {
+                if (!unmountedRef.current) handleReconnect();
+              }, 1000);
             }
           });
         } catch (err: any) {
@@ -198,26 +226,24 @@ export default function ScanScreen({ navigation }: Props) {
   }
 
   function handleReconnect() {
-    // Limpiar todo antes de reintentar
+    // Limpiar device y detener scan (no destruir manager — es compartido)
     try {
       if (deviceRef.current) {
         deviceRef.current.cancelConnection().catch(() => {});
         deviceRef.current = null;
+        setConnectedDevice(null);
       }
       if (managerRef.current) {
         managerRef.current.stopDeviceScan();
-        managerRef.current.destroy();
       }
     } catch {}
 
     setBleStatus('scanning');
     setBleLog('Reconectando...');
 
-    // Pequeño delay para que el BLE stack se limpie
     setTimeout(() => {
-      const manager = new BleManager();
+      const manager = getBleManager();
       managerRef.current = manager;
-
       const sub = manager.onStateChange((state) => {
         if (state === 'PoweredOn') {
           sub.remove();
