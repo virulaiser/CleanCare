@@ -7,13 +7,11 @@ import { getBleManager, getConnectedDevice, setConnectedDevice } from '../servic
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import NetInfoLite from '../services/netinfo';
-import { iniciarUso, actualizarUso, obtenerTipRandom } from '../services/api.service';
+import { iniciarUso, actualizarUso, obtenerTipRandom, guardarCicloActivo, obtenerCicloActivo, clearCicloActivo } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 // BLE UUIDs (deben coincidir con el firmware ESP32)
-const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
-const CONTROL_UUID = '12345678-1234-1234-1234-123456789abd';
-const STATUS_UUID  = '12345678-1234-1234-1234-123456789abe';
+import { SERVICE_UUID, CONTROL_UUID, STATUS_UUID } from '../constants/ble';
 
 // Duracion por defecto (se sobreescribe con route params)
 const DEFAULT_DURATION_MIN = 45;
@@ -158,9 +156,35 @@ export default function CycleScreen({ navigation, route }: Props) {
   const reconnectAttemptsRef = useRef(0);
   const reconnectingRef = useRef(false);
   const userExitedRef = useRef(false);
+  const resumingRef = useRef(false);
 
   const isWasher = tipo === 'lavarropas';
   const accentColor = isWasher ? colors.primary : '#F59E0B';
+
+  // --- Restauración de ciclo en curso (app reabrió durante ciclo) ---
+  useEffect(() => {
+    (async () => {
+      const ciclo = await obtenerCicloActivo();
+      if (!ciclo) return;
+      // Solo restaurar si coincide la máquina con los params
+      if (ciclo.maquina_id !== maquina_id) return;
+      const elapsed = Math.floor((Date.now() - ciclo.startTime) / 1000);
+      const remaining = Math.max(0, ciclo.duracionSeconds - elapsed);
+      if (remaining <= 0) {
+        completedRef.current = true;
+        setIsComplete(true);
+        setSecondsRemaining(0);
+        clearCicloActivo().catch(() => {});
+        return;
+      }
+      resumingRef.current = true;
+      cycleStartedRef.current = true;
+      setCycleStarted(true);
+      startTimeRef.current = ciclo.startTime;
+      setSecondsRemaining(remaining);
+      setBleLog(`Reanudando ciclo — ${Math.ceil(remaining / 60)} min restantes`);
+    })();
+  }, [maquina_id]);
 
   // --- Online + queue badge poll ---
   useEffect(() => {
@@ -231,15 +255,21 @@ export default function CycleScreen({ navigation, route }: Props) {
             }
           });
 
-          // Sincronizar hora y enviar ON
+          // Sincronizar hora
           const now = new Date();
           const timeCmd = `TIME:${now.toISOString().slice(0, 19)}`;
           await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(timeCmd));
 
-          setBleLog('⚡ Activando máquina...');
+          // Si estamos restaurando, usar remaining y NO duplicar uso/guardarCiclo
+          const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+          const secsToSend = resumingRef.current
+            ? Math.max(1, cycleDurationSeconds - elapsed)
+            : cycleDurationSeconds;
+
+          setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
           const usuario = await import('../services/api.service').then(m => m.getUsuarioGuardado());
           const userId = usuario?.usuario_id || 'desconocido';
-          const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}`;
+          const cmd = `ON:${secsToSend}:${userId}:${tipo}`;
           await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
 
           cycleStartedRef.current = true;
@@ -247,14 +277,21 @@ export default function CycleScreen({ navigation, route }: Props) {
           const mins = Math.ceil(cycleDurationSeconds / 60);
           setBleLog(`✅ Máquina activada — ${mins} min`);
 
-          startTimeRef.current = Date.now();
-          try {
-            const uso = await iniciarUso({ maquina_id, edificio_id, duracion_min: mins, tipo });
-            usoIdRef.current = uso._id || null;
-          } catch {}
+          if (!resumingRef.current) {
+            startTimeRef.current = Date.now();
+            guardarCicloActivo({
+              maquina_id, edificio_id, tipo, duracion_min: mins, nombre_maquina,
+              startTime: startTimeRef.current,
+              duracionSeconds: cycleDurationSeconds,
+            }).catch(() => {});
+            try {
+              const uso = await iniciarUso({ maquina_id, edificio_id, duracion_min: mins, tipo });
+              usoIdRef.current = uso._id || null;
+            } catch {}
+          }
 
           const granted = await requestNotificationPermissions();
-          if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds);
+          if (granted) await scheduleEndNotification(tipo, secsToSend);
           return;
         } catch (err: any) {
           // Si falla con device existente, limpiar y caer al flujo de scan
@@ -356,11 +393,16 @@ export default function CycleScreen({ navigation, route }: Props) {
               SERVICE_UUID, CONTROL_UUID, btoa(timeCmd)
             );
 
-            // Paso 5: enviar comando ON con usuario
-            setBleLog('⚡ Activando máquina...');
+            // Paso 5: enviar comando ON (si resumiendo, usar tiempo restante)
+            const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+            const secsToSend = resumingRef.current
+              ? Math.max(1, cycleDurationSeconds - elapsed)
+              : cycleDurationSeconds;
+
+            setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
             const usuario = await import('../services/api.service').then(m => m.getUsuarioGuardado());
             const userId = usuario?.usuario_id || 'desconocido';
-            const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}`;
+            const cmd = `ON:${secsToSend}:${userId}:${tipo}`;
             const encoded = btoa(cmd);
             await connected.writeCharacteristicWithResponseForService(
               SERVICE_UUID,
@@ -372,22 +414,26 @@ export default function CycleScreen({ navigation, route }: Props) {
             const mins = Math.ceil(cycleDurationSeconds / 60);
             setBleLog(`✅ Máquina activada — ${mins} min`);
 
-            // Paso 5: registrar uso en backend
-            startTimeRef.current = Date.now();
-            try {
-              const uso = await iniciarUso({
-                maquina_id,
-                edificio_id,
-                duracion_min: mins,
-                tipo,
-              });
-              usoIdRef.current = uso._id || null;
-            } catch {}
+            if (!resumingRef.current) {
+              startTimeRef.current = Date.now();
+              guardarCicloActivo({
+                maquina_id, edificio_id, tipo, duracion_min: mins, nombre_maquina,
+                startTime: startTimeRef.current,
+                duracionSeconds: cycleDurationSeconds,
+              }).catch(() => {});
+              try {
+                const uso = await iniciarUso({
+                  maquina_id,
+                  edificio_id,
+                  duracion_min: mins,
+                  tipo,
+                });
+                usoIdRef.current = uso._id || null;
+              } catch {}
+            }
 
             const granted = await requestNotificationPermissions();
-            if (granted) {
-              await scheduleEndNotification(tipo, cycleDurationSeconds);
-            }
+            if (granted) await scheduleEndNotification(tipo, secsToSend);
 
           } catch (err: any) {
             setBleState('error');
@@ -451,7 +497,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     return () => clearInterval(interval);
   }, [cycleStarted]);
 
-  // Cuando la app vuelve de background, recalcular
+  // Cuando la app vuelve de background: recalcular timer + reconectar BLE si se perdió
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && cycleStartedRef.current) {
@@ -461,6 +507,13 @@ export default function CycleScreen({ navigation, route }: Props) {
         if (remaining <= 0 && !completedRef.current) {
           completedRef.current = true;
           handleCycleComplete();
+          return;
+        }
+        // Si la conexión BLE se perdió al suspender, intentar reconectar
+        if (!deviceRef.current && !completedRef.current && !reconnectingRef.current) {
+          reconnectAttemptsRef.current = 0;  // resetear backoff al volver
+          setBleLog('App reactivada, reconectando BLE...');
+          attemptAutoReconnect();
         }
       }
     });
@@ -500,9 +553,28 @@ export default function CycleScreen({ navigation, route }: Props) {
         const connected = await device.connect({ timeout: 8000 });
         await connected.discoverAllServicesAndCharacteristics();
         deviceRef.current = connected;
+        setConnectedDevice(connected);
         setBleState('connected');
         reconnectAttemptsRef.current = 0;
         setBleLog('Reconectado');
+
+        // Re-suscribirse a notificaciones de estado
+        connected.monitorCharacteristicForService(
+          SERVICE_UUID, STATUS_UUID,
+          (err, char) => {
+            if (err || !char?.value) return;
+            const decoded = atob(char.value);
+            const parts = decoded.split(':');
+            const state = parts[0];
+            const secs = parseInt(parts[1] || '0', 10);
+            if (state === 'ON' && secs > 0) setSecondsRemaining(secs);
+            else if (state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
+              completedRef.current = true;
+              handleCycleComplete();
+            }
+          }
+        );
+
         // Re-sincronizar estado: enviar tiempo restante al ESP32
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         const remaining = Math.max(1, cycleDurationSeconds - elapsed);
@@ -512,6 +584,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         connected.onDisconnected(() => {
           setBleState('disconnected');
           deviceRef.current = null;
+          setConnectedDevice(null);
           if (cycleStartedRef.current && !completedRef.current) attemptAutoReconnect();
         });
       } catch {
@@ -530,6 +603,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     setSecondsRemaining(0);
     Vibration.vibrate([0, 500, 200, 500, 200, 500]);
     playNotificationSound();
+    clearCicloActivo().catch(() => {});
 
     if (usoIdRef.current) {
       actualizarUso(usoIdRef.current, 'completado').catch(() => {});
@@ -563,6 +637,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           userExitedRef.current = true;
           await cancelAllNotifications();
           await sendBleOff();
+          await clearCicloActivo();
           if (usoIdRef.current) {
             actualizarUso(usoIdRef.current, 'cancelado').catch(() => {});
           }
@@ -700,12 +775,19 @@ export default function CycleScreen({ navigation, route }: Props) {
     cycleStartedRef.current = true;
     startTimeRef.current = Date.now();
 
+    const mins = duracion_min || DEFAULT_DURATION_MIN;
+    guardarCicloActivo({
+      maquina_id, edificio_id, tipo, duracion_min: mins, nombre_maquina,
+      startTime: startTimeRef.current,
+      duracionSeconds: cycleDurationSeconds,
+    }).catch(() => {});
+
     // Registrar uso en backend
     try {
       const uso = await iniciarUso({
         maquina_id,
         edificio_id,
-        duracion_min: duracion_min || DEFAULT_DURATION_MIN,
+        duracion_min: mins,
         tipo,
       });
       usoIdRef.current = uso._id || null;

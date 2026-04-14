@@ -27,8 +27,7 @@ async function requestBlePermissions(): Promise<boolean> {
   return loc === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
-const STATUS_UUID  = '12345678-1234-1234-1234-123456789abe';
+import { SERVICE_UUID, STATUS_UUID } from '../constants/ble';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 type BleStatus = 'off' | 'scanning' | 'connected' | 'disconnected';

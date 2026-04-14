@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { loginUsuario, getToken } from '../services/api.service';
+import { loginUsuario, getToken, obtenerCicloActivo } from '../services/api.service';
 import { colors } from '../constants/colors';
 import SignatureBadge from '../components/SignatureBadge';
 
@@ -15,10 +15,23 @@ export default function LoginScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getToken().then((token) => {
-      if (token) navigation.replace('Scan');
-      else setLoading(false);
-    });
+    (async () => {
+      const token = await getToken();
+      if (!token) { setLoading(false); return; }
+      // Si hay ciclo activo válido, ir directo a Cycle
+      const ciclo = await obtenerCicloActivo();
+      if (ciclo) {
+        navigation.replace('Cycle', {
+          maquina_id: ciclo.maquina_id,
+          edificio_id: ciclo.edificio_id,
+          tipo: ciclo.tipo,
+          duracion_min: ciclo.duracion_min,
+          nombre_maquina: ciclo.nombre_maquina,
+        });
+      } else {
+        navigation.replace('Scan');
+      }
+    })();
   }, [navigation]);
 
   const handleLogin = async () => {

@@ -22,10 +22,12 @@
 #include <BLE2902.h>
 #include <Preferences.h>
 
-// UUIDs — DEBEN coincidir con la app
-#define SERVICE_UUID        "12345678-1234-1234-1234-123456789abc"
-#define CONTROL_CHAR_UUID   "12345678-1234-1234-1234-123456789abd"
-#define STATUS_CHAR_UUID    "12345678-1234-1234-1234-123456789abe"
+// UUIDs — DEBEN coincidir con app/src/constants/ble.ts
+// ESP32-001 — ver firmware/ble_test/.env
+#define ESP32_ID            "001"
+#define SERVICE_UUID        "cc7a5001-bb73-4e02-8f1d-a0b0c0d0e0f1"
+#define CONTROL_CHAR_UUID   "cc7a5001-bb73-4e02-8f1d-a0b0c0d0e0f2"
+#define STATUS_CHAR_UUID    "cc7a5001-bb73-4e02-8f1d-a0b0c0d0e0f3"
 
 #define LED_PIN 2
 #define RELAY_PIN 21                     // D21 — relay de la máquina

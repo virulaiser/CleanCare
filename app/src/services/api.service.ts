@@ -90,6 +90,41 @@ export async function getToken(): Promise<string | null> {
 export async function logout(): Promise<void> {
   await SecureStore.deleteItemAsync('cleancare_token');
   await SecureStore.deleteItemAsync('cleancare_usuario');
+  await clearCicloActivo();
+}
+
+// --- Ciclo activo (persistencia en SecureStore) ---
+export interface CicloActivo {
+  maquina_id: string;
+  edificio_id: string;
+  tipo: 'lavarropas' | 'secadora';
+  duracion_min: number;
+  nombre_maquina: string;
+  startTime: number;         // Date.now() al iniciar
+  duracionSeconds: number;   // duracion total del ciclo
+}
+
+export async function guardarCicloActivo(c: CicloActivo): Promise<void> {
+  try { await SecureStore.setItemAsync('cleancare_ciclo_activo', JSON.stringify(c)); } catch {}
+}
+
+export async function obtenerCicloActivo(): Promise<CicloActivo | null> {
+  try {
+    const raw = await SecureStore.getItemAsync('cleancare_ciclo_activo');
+    if (!raw) return null;
+    const c = JSON.parse(raw) as CicloActivo;
+    // Si ya terminó (con margen de 2 min), limpiarlo
+    const finishedAt = c.startTime + c.duracionSeconds * 1000;
+    if (Date.now() > finishedAt + 120000) {
+      await clearCicloActivo();
+      return null;
+    }
+    return c;
+  } catch { return null; }
+}
+
+export async function clearCicloActivo(): Promise<void> {
+  try { await SecureStore.deleteItemAsync('cleancare_ciclo_activo'); } catch {}
 }
 
 export async function iniciarUso(uso: {

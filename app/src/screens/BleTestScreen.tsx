@@ -5,10 +5,7 @@ import {
 } from 'react-native';
 import { BleManager, Device, Characteristic } from 'react-native-ble-plx';
 import { colors } from '../constants/colors';
-
-const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
-const CONTROL_UUID = '12345678-1234-1234-1234-123456789abd';
-const STATUS_UUID  = '12345678-1234-1234-1234-123456789abe';
+import { SERVICE_UUID, CONTROL_UUID, STATUS_UUID } from '../constants/ble';
 
 // Duracion de prueba en segundos
 const TEST_DURATION = 60;
