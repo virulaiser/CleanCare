@@ -28,6 +28,7 @@
 #define STATUS_CHAR_UUID    "12345678-1234-1234-1234-123456789abe"
 
 #define LED_PIN 2
+#define RELAY_PIN 21                     // D21 — relay de la máquina
 #define RESET_INTERVAL_MS   86400000UL  // 24 horas en ms
 #define MAX_LOGS            200         // Máximo de registros en NVS
 #define LOG_ACCESS_KEY      "cleancare2026"
@@ -37,6 +38,8 @@ BLECharacteristic *statusCharacteristic;
 BLEServer *bleServer;
 
 bool deviceConnected = false;
+bool advertisingRestartPending = false;
+unsigned long advertisingRestartAt = 0;
 bool ledOn = false;
 unsigned long ledOffTime = 0;
 unsigned long durationMs = 0;
@@ -159,11 +162,11 @@ class ServerCallbacks : public BLEServerCallbacks {
     deviceConnected = false;
     Serial.println("=========================================");
     Serial.println("[!!] CLIENTE DESCONECTADO");
-    Serial.println("[INFO] Reiniciando advertising...");
+    Serial.println("[INFO] Programando re-advertising en 500ms...");
     Serial.println("=========================================");
-    delay(500);
-    pServer->startAdvertising();
-    Serial.println("[OK] Advertising reiniciado");
+    // Marcar para reiniciar advertising desde el loop (evita problemas dentro del callback)
+    advertisingRestartPending = true;
+    advertisingRestartAt = millis() + 500;
   }
 };
 
@@ -209,6 +212,8 @@ class ControlCallbacks : public BLECharacteristicCallbacks {
       startTime = millis();
       ledOffTime = startTime + durationMs;
       digitalWrite(LED_PIN, HIGH);
+      digitalWrite(RELAY_PIN, HIGH);
+      Serial.println("[OK] RELAY D21 ACTIVADO");
 
       Serial.print("[OK] LED ON por ");
       Serial.print(durationSec);
@@ -306,7 +311,8 @@ void turnOff() {
   durationMs = 0;
   startTime = 0;
   digitalWrite(LED_PIN, LOW);
-  Serial.println("[OK] LED APAGADO");
+  digitalWrite(RELAY_PIN, LOW);
+  Serial.println("[OK] LED + RELAY D21 APAGADOS");
   sendStatus();
 }
 
@@ -324,10 +330,12 @@ void setup() {
   Serial.println("=============================================");
   Serial.println();
 
-  // 1. LED
+  // 1. LED + RELAY
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-  Serial.println("[1/6] LED configurado GPIO 2");
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+  Serial.println("[1/6] LED GPIO 2 + RELAY GPIO 21 configurados");
 
   // 2. NVS
   Serial.println("[2/6] Inicializando NVS...");
@@ -411,6 +419,13 @@ void setup() {
 // ==========================================
 
 void loop() {
+  // Reiniciar advertising tras desconexión (desde loop, no desde callback)
+  if (advertisingRestartPending && millis() >= advertisingRestartAt) {
+    advertisingRestartPending = false;
+    BLEDevice::startAdvertising();
+    Serial.println("[OK] Advertising reiniciado — ESP32 visible de nuevo");
+  }
+
   // Auto-reset cada 24h (solo si no hay ciclo activo)
   if (millis() >= RESET_INTERVAL_MS && !ledOn) {
     Serial.println();
