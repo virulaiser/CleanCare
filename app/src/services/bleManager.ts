@@ -1,12 +1,10 @@
-import { BleManager, Device } from 'react-native-ble-plx';
+import { BleManager, Device, Characteristic } from 'react-native-ble-plx';
 
 let sharedManager: BleManager | null = null;
 let connectedDevice: Device | null = null;
 
 export function getBleManager(): BleManager {
-  if (!sharedManager) {
-    sharedManager = new BleManager();
-  }
+  if (!sharedManager) sharedManager = new BleManager();
   return sharedManager;
 }
 
@@ -30,4 +28,13 @@ export async function releaseBle() {
       sharedManager = null;
     }
   } catch {}
+}
+
+// Decodifica base64 → "ON:45" / "OFF:0" en { state, secs }
+export function parseBleStatus(char: Characteristic | null | undefined): { state: string; secs: number } | null {
+  if (!char?.value) return null;
+  try {
+    const [state, secsRaw] = atob(char.value).split(':');
+    return { state, secs: parseInt(secsRaw || '0', 10) };
+  } catch { return null; }
 }

@@ -26,35 +26,35 @@ async function listar(req, res) {
   res.json({ ok: true, dispositivos });
 }
 
-// Genera el próximo esp32_id incremental: "001", "002", ...
-async function siguienteEsp32Id() {
-  const ultimo = await Dispositivo.findOne().sort({ esp32_id: -1 }).lean();
-  const n = ultimo ? parseInt(ultimo.esp32_id, 10) + 1 : 1;
-  return String(n).padStart(3, '0');
-}
-
 // POST /api/dispositivos — crea con UUIDs autogeneradas
 async function crear(req, res) {
   const { tipo_hw, ble_name, ubicacion, maquina_asignada, edificio_id } = req.body;
-  const esp32_id = await siguienteEsp32Id();
-
-  // Esquema: cc7a5XXX-bb73-4e02-8f1d-a0b0c0d0e0fY
-  const prefix = `cc7a5${esp32_id}`;
   const suffix = 'bb73-4e02-8f1d-a0b0c0d0e0f';
 
-  const dispositivo = await Dispositivo.create({
-    esp32_id,
-    tipo_hw: tipo_hw || 'esp32',
-    ble_name: ble_name || 'CleanCare-ESP32',
-    service_uuid: `${prefix}-${suffix}1`,
-    control_uuid: `${prefix}-${suffix}2`,
-    status_uuid:  `${prefix}-${suffix}3`,
-    ubicacion: ubicacion || '',
-    maquina_asignada: maquina_asignada || null,
-    edificio_id: edificio_id || null,
-  });
-
-  res.status(201).json({ ok: true, dispositivo });
+  // Reintenta ante colisión de esp32_id (unique index en el modelo gatilla E11000)
+  for (let intento = 0; intento < 5; intento++) {
+    const ultimo = await Dispositivo.findOne().sort({ esp32_id: -1 }).lean();
+    const n = (ultimo ? parseInt(ultimo.esp32_id, 10) + 1 : 1) + intento;
+    const esp32_id = String(n).padStart(3, '0');
+    const prefix = `cc7a5${esp32_id}`;
+    try {
+      const dispositivo = await Dispositivo.create({
+        esp32_id,
+        tipo_hw: tipo_hw || 'esp32',
+        ble_name: ble_name || 'CleanCare-ESP32',
+        service_uuid: `${prefix}-${suffix}1`,
+        control_uuid: `${prefix}-${suffix}2`,
+        status_uuid:  `${prefix}-${suffix}3`,
+        ubicacion: ubicacion || '',
+        maquina_asignada: maquina_asignada || null,
+        edificio_id: edificio_id || null,
+      });
+      return res.status(201).json({ ok: true, dispositivo });
+    } catch (err) {
+      if (err.code !== 11000) throw err;
+    }
+  }
+  res.status(500).json({ ok: false, error: 'No se pudo generar esp32_id único' });
 }
 
 // PATCH /api/dispositivos?id=X — edita ubicacion / maquina_asignada

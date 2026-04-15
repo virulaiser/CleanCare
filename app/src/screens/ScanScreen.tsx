@@ -27,7 +27,7 @@ async function requestBlePermissions(): Promise<boolean> {
   return loc === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-import { SERVICE_UUID, STATUS_UUID } from '../constants/ble';
+import { SERVICE_UUID, STATUS_UUID, ESP32_BLE_NAME } from '../constants/ble';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 type BleStatus = 'off' | 'scanning' | 'connected' | 'disconnected';
@@ -66,6 +66,7 @@ export default function ScanScreen({ navigation }: Props) {
   const wasConnectedRef = useRef(false);
   const unmountedRef = useRef(false);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [bleLog, setBleLog] = useState('');
 
@@ -80,7 +81,7 @@ export default function ScanScreen({ navigation }: Props) {
     if (existing) {
       deviceRef.current = existing;
       setBleStatus('connected');
-      setBleDeviceName(existing.name || 'CleanCare-ESP32');
+      setBleDeviceName(existing.name || ESP32_BLE_NAME);
       wasConnectedRef.current = true;
       setBleLog('Conectado al ESP32');
     } else {
@@ -94,23 +95,18 @@ export default function ScanScreen({ navigation }: Props) {
 
       return () => {
         unmountedRef.current = true;
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
+        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
         sub.remove();
-        // NO destruir el manager — es compartido con otras pantallas
         try { manager.stopDeviceScan(); } catch {}
       };
     }
 
     return () => {
       unmountedRef.current = true;
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      // NO destruir el manager ni la conexión — persisten en navegación
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+      // El manager + device persisten entre pantallas — no se destruyen acá.
       try { manager.stopDeviceScan(); } catch {}
     };
   }, []);
@@ -150,7 +146,7 @@ export default function ScanScreen({ navigation }: Props) {
         foundNames.push(device.name);
         setBleLog(`Encontrados: ${foundNames.join(', ')}`);
       }
-      const isCleanCare = (n?: string | null) => n === 'CleanCare-ESP32';
+      const isCleanCare = (n?: string | null) => n === ESP32_BLE_NAME;
       if (device && (isCleanCare(device.name) || isCleanCare(device.localName))) {
         manager.stopDeviceScan();
         try {
@@ -160,7 +156,7 @@ export default function ScanScreen({ navigation }: Props) {
           deviceRef.current = connected;
           setConnectedDevice(connected);
           setBleStatus('connected');
-          setBleDeviceName(connected.name || connected.localName || 'CleanCare-ESP32');
+          setBleDeviceName(connected.name || connected.localName || ESP32_BLE_NAME);
           wasConnectedRef.current = true;
 
           // Leer estado del ESP32 para saber si ya hay ciclo activo
@@ -215,8 +211,8 @@ export default function ScanScreen({ navigation }: Props) {
       }
     });
 
-    // Timeout 15s
-    setTimeout(() => {
+    scanTimeoutRef.current = setTimeout(() => {
+      if (unmountedRef.current) return;
       if (managerRef.current) {
         managerRef.current.stopDeviceScan();
         setBleStatus(prev => prev === 'scanning' ? 'off' : prev);
@@ -257,15 +253,17 @@ export default function ScanScreen({ navigation }: Props) {
       setScanned(false);
       obtenerBilletera().then(data => setSaldo(data.saldo)).catch(() => {});
       getUsuarioGuardado().then(u => {
-        if (u?.edificio_id) {
-          listarMaquinas(u.edificio_id).then(m => setMaquinas(m as any)).catch(() => {});
-          obtenerConfigEdificio(u.edificio_id).then(config => {
-            if (config) {
-              setDuracionLavado(config.duracion_lavado || 45);
-              setDuracionSecado(config.duracion_secado || 30);
-            }
-          }).catch(() => {});
-        }
+        if (!u?.edificio_id) return;
+        Promise.all([
+          listarMaquinas(u.edificio_id).catch(() => [] as any[]),
+          obtenerConfigEdificio(u.edificio_id).catch(() => null),
+        ]).then(([m, config]) => {
+          setMaquinas(m as any);
+          if (config) {
+            setDuracionLavado(config.duracion_lavado || 45);
+            setDuracionSecado(config.duracion_secado || 30);
+          }
+        });
       });
     }, [])
   );

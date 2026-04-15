@@ -3,15 +3,13 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Vibration, 
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
 import { BleManager, Device } from 'react-native-ble-plx';
-import { getBleManager, getConnectedDevice, setConnectedDevice } from '../services/bleManager';
+import { getBleManager, getConnectedDevice, setConnectedDevice, parseBleStatus } from '../services/bleManager';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import NetInfoLite from '../services/netinfo';
-import { iniciarUso, actualizarUso, obtenerTipRandom, guardarCicloActivo, obtenerCicloActivo, clearCicloActivo } from '../services/api.service';
+import { iniciarUso, actualizarUso, obtenerTipRandom, guardarCicloActivo, obtenerCicloActivo, clearCicloActivo, getUsuarioGuardado } from '../services/api.service';
 import { colors } from '../constants/colors';
-
-// BLE UUIDs (deben coincidir con el firmware ESP32)
-import { SERVICE_UUID, CONTROL_UUID, STATUS_UUID } from '../constants/ble';
+import { SERVICE_UUID, CONTROL_UUID, STATUS_UUID, ESP32_BLE_NAME } from '../constants/ble';
 
 // Duracion por defecto (se sobreescribe con route params)
 const DEFAULT_DURATION_MIN = 45;
@@ -190,24 +188,25 @@ export default function CycleScreen({ navigation, route }: Props) {
   useEffect(() => {
     let mounted = true;
     const check = async () => {
-      const o = await NetInfoLite.isOnline();
-      const q = await NetInfoLite.pendingCount();
-      if (mounted) { setOnline(o); setQueued(q); }
+      const [o, q] = await Promise.all([NetInfoLite.isOnline(), NetInfoLite.pendingCount()]);
+      if (!mounted) return;
+      setOnline(prev => prev === o ? prev : o);
+      setQueued(prev => prev === q ? prev : q);
     };
     check();
     const id = setInterval(check, 15000);
     return () => { mounted = false; clearInterval(id); };
   }, []);
 
-  // --- Tip: fetch random tip and show after 5s ---
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     obtenerTipRandom(tipo).then(t => {
       if (t) {
         setTipTexto(t);
-        const timer = setTimeout(() => setShowTip(true), 5000);
-        return () => clearTimeout(timer);
+        timer = setTimeout(() => setShowTip(true), 5000);
       }
     });
+    return () => { if (timer) clearTimeout(timer); };
   }, [tipo]);
 
   // --- BLE: reusar device conectado o buscar+conectar ---
@@ -227,23 +226,16 @@ export default function CycleScreen({ navigation, route }: Props) {
           setBleState('connected');
           setBleLog('Conectado al ESP32');
 
-          existing.monitorCharacteristicForService(
-            SERVICE_UUID, STATUS_UUID,
-            (err, char) => {
-              if (err) return;
-              if (char?.value) {
-                const decoded = atob(char.value);
-                const parts = decoded.split(':');
-                const state = parts[0];
-                const secs = parseInt(parts[1] || '0', 10);
-                if (state === 'ON' && secs > 0) setSecondsRemaining(secs);
-                else if (state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
-                  completedRef.current = true;
-                  handleCycleComplete();
-                }
-              }
+          existing.monitorCharacteristicForService(SERVICE_UUID, STATUS_UUID, (err, char) => {
+            if (err) return;
+            const s = parseBleStatus(char);
+            if (!s) return;
+            if (s.state === 'ON' && s.secs > 0) setSecondsRemaining(s.secs);
+            else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
+              completedRef.current = true;
+              handleCycleComplete();
             }
-          );
+          });
 
           existing.onDisconnected(() => {
             setBleState('disconnected');
@@ -267,7 +259,7 @@ export default function CycleScreen({ navigation, route }: Props) {
             : cycleDurationSeconds;
 
           setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
-          const usuario = await import('../services/api.service').then(m => m.getUsuarioGuardado());
+          const usuario = await getUsuarioGuardado();
           const userId = usuario?.usuario_id || 'desconocido';
           const cmd = `ON:${secsToSend}:${userId}:${tipo}`;
           await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
@@ -303,7 +295,6 @@ export default function CycleScreen({ navigation, route }: Props) {
       setBleState('scanning');
       setBleLog('Verificando Bluetooth...');
 
-      // Paso 1: verificar estado del Bluetooth
       const btState = await manager.state();
       if (btState !== 'PoweredOn') {
         setBleState('error');
@@ -337,12 +328,11 @@ export default function CycleScreen({ navigation, route }: Props) {
           setBleLog(`📡 Buscando CleanCare-ESP32...\nDispositivos cerca: ${devicesFound.join(', ')}`);
         }
 
-        if (device && device.name === 'CleanCare-ESP32') {
+        if (device && device.name === ESP32_BLE_NAME) {
           manager.stopDeviceScan();
           clearTimeout(scanTimeout);
 
           try {
-            // Paso 2: conectar
             setBleState('connecting');
             setBleLog('🔗 Conectando al ESP32...');
 
@@ -354,27 +344,16 @@ export default function CycleScreen({ navigation, route }: Props) {
             setBleState('connected');
             setBleLog('✅ Conectado al ESP32');
 
-            // Paso 3: suscribirse a notificaciones
-            connected.monitorCharacteristicForService(
-              SERVICE_UUID,
-              STATUS_UUID,
-              (err, char) => {
-                if (err) return;
-                if (char?.value) {
-                  const decoded = atob(char.value);
-                  const parts = decoded.split(':');
-                  const state = parts[0];
-                  const secs = parseInt(parts[1] || '0', 10);
-
-                  if (state === 'ON' && secs > 0) {
-                    setSecondsRemaining(secs);
-                  } else if (state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
-                    completedRef.current = true;
-                    handleCycleComplete();
-                  }
-                }
+            connected.monitorCharacteristicForService(SERVICE_UUID, STATUS_UUID, (err, char) => {
+              if (err) return;
+              const s = parseBleStatus(char);
+              if (!s) return;
+              if (s.state === 'ON' && s.secs > 0) setSecondsRemaining(s.secs);
+              else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
+                completedRef.current = true;
+                handleCycleComplete();
               }
-            );
+            });
 
             connected.onDisconnected(() => {
               setBleState('disconnected');
@@ -386,21 +365,21 @@ export default function CycleScreen({ navigation, route }: Props) {
               }
             });
 
-            // Paso 4: sincronizar fecha/hora con ESP32
             const now = new Date();
             const timeCmd = `TIME:${now.toISOString().slice(0, 19)}`;
             await connected.writeCharacteristicWithResponseForService(
               SERVICE_UUID, CONTROL_UUID, btoa(timeCmd)
             );
 
-            // Paso 5: enviar comando ON (si resumiendo, usar tiempo restante)
+            // Si estamos restaurando tras reload, el ESP32 necesita el tiempo restante,
+            // no la duración completa — si no, reinicia el ciclo desde cero.
             const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
             const secsToSend = resumingRef.current
               ? Math.max(1, cycleDurationSeconds - elapsed)
               : cycleDurationSeconds;
 
             setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
-            const usuario = await import('../services/api.service').then(m => m.getUsuarioGuardado());
+            const usuario = await getUsuarioGuardado();
             const userId = usuario?.usuario_id || 'desconocido';
             const cmd = `ON:${secsToSend}:${userId}:${tipo}`;
             const encoded = btoa(cmd);
@@ -558,22 +537,16 @@ export default function CycleScreen({ navigation, route }: Props) {
         reconnectAttemptsRef.current = 0;
         setBleLog('Reconectado');
 
-        // Re-suscribirse a notificaciones de estado
-        connected.monitorCharacteristicForService(
-          SERVICE_UUID, STATUS_UUID,
-          (err, char) => {
-            if (err || !char?.value) return;
-            const decoded = atob(char.value);
-            const parts = decoded.split(':');
-            const state = parts[0];
-            const secs = parseInt(parts[1] || '0', 10);
-            if (state === 'ON' && secs > 0) setSecondsRemaining(secs);
-            else if (state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
-              completedRef.current = true;
-              handleCycleComplete();
-            }
+        connected.monitorCharacteristicForService(SERVICE_UUID, STATUS_UUID, (err, char) => {
+          if (err) return;
+          const s = parseBleStatus(char);
+          if (!s) return;
+          if (s.state === 'ON' && s.secs > 0) setSecondsRemaining(s.secs);
+          else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
+            completedRef.current = true;
+            handleCycleComplete();
           }
-        );
+        });
 
         // Re-sincronizar estado: enviar tiempo restante al ESP32
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
@@ -685,7 +658,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         setBleLog(`Error: ${error.message}`);
         return;
       }
-      if (device && device.name === 'CleanCare-ESP32') {
+      if (device && device.name === ESP32_BLE_NAME) {
         manager.stopDeviceScan();
         // Reconectar (mismo flujo simplificado)
         try {
@@ -697,21 +670,16 @@ export default function CycleScreen({ navigation, route }: Props) {
           setBleState('connected');
           setBleLog('Reconectado al ESP32');
 
-          connected.monitorCharacteristicForService(
-            SERVICE_UUID, STATUS_UUID,
-            (err, char) => {
-              if (err) return;
-              if (char?.value) {
-                const decoded = atob(char.value);
-                const parts = decoded.split(':');
-                if (parts[0] === 'ON') setSecondsRemaining(parseInt(parts[1] || '0', 10));
-                else if (parts[0] === 'OFF' && cycleStartedRef.current && !completedRef.current) {
-                  completedRef.current = true;
-                  handleCycleComplete();
-                }
-              }
+          connected.monitorCharacteristicForService(SERVICE_UUID, STATUS_UUID, (err, char) => {
+            if (err) return;
+            const s = parseBleStatus(char);
+            if (!s) return;
+            if (s.state === 'ON') setSecondsRemaining(s.secs);
+            else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
+              completedRef.current = true;
+              handleCycleComplete();
             }
-          );
+          });
 
           connected.onDisconnected(() => {
             setBleState('disconnected');

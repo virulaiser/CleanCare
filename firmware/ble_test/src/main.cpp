@@ -50,6 +50,7 @@ bool advertisingRestartPending = false;
 unsigned long advertisingRestartAt = 0;
 bool bootPulseActive = true;
 unsigned long bootPulseEndsAt = 0;
+bool disconnectBeepPending = false;
 bool ledOn = false;
 unsigned long lastWarningBeepAt = 0;
 unsigned long ledBlinkAt = 0;
@@ -186,8 +187,8 @@ class ServerCallbacks : public BLEServerCallbacks {
     Serial.println("[!!] CLIENTE DESCONECTADO");
     Serial.println("[INFO] Programando re-advertising en 500ms...");
     Serial.println("=========================================");
-    playDisconnectBeep();
-    // Marcar para reiniciar advertising desde el loop (evita problemas dentro del callback)
+    // Beep y re-advertising diferidos al loop — evita bloquear la callback BLE.
+    disconnectBeepPending = true;
     advertisingRestartPending = true;
     advertisingRestartAt = millis() + 500;
   }
@@ -506,6 +507,11 @@ void loop() {
     advertisingRestartPending = false;
     BLEDevice::startAdvertising();
     Serial.println("[OK] Advertising reiniciado — ESP32 visible de nuevo");
+  }
+
+  if (disconnectBeepPending) {
+    disconnectBeepPending = false;
+    playDisconnectBeep();
   }
 
   // Auto-reset cada 24h (solo si no hay ciclo activo)
