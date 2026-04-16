@@ -30,11 +30,16 @@ export async function releaseBle() {
   } catch {}
 }
 
-// Decodifica base64 → "ON:45" / "OFF:0" en { state, secs }
-export function parseBleStatus(char: Characteristic | null | undefined): { state: string; secs: number } | null {
+// Decodifica base64 → "ON:45" / "OFF:0" / "ON:45:LAV-XXX" (multi-máquina)
+// Devuelve { state, secs, maquina_id? } — maquina_id solo existe en firmware v4+
+export function parseBleStatus(char: Characteristic | null | undefined): { state: string; secs: number; maquina_id?: string } | null {
   if (!char?.value) return null;
   try {
-    const [state, secsRaw] = atob(char.value).split(':');
-    return { state, secs: parseInt(secsRaw || '0', 10) };
+    const [state, secsRaw, maquinaId] = atob(char.value).split(':');
+    return {
+      state,
+      secs: parseInt(secsRaw || '0', 10),
+      maquina_id: maquinaId || undefined,
+    };
   } catch { return null; }
 }

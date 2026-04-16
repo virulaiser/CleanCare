@@ -230,6 +230,8 @@ export default function CycleScreen({ navigation, route }: Props) {
             if (err) return;
             const s = parseBleStatus(char);
             if (!s) return;
+            // Multi-máquina: ignorar notificaciones de otra máquina
+            if (s.maquina_id && s.maquina_id !== maquina_id) return;
             if (s.state === 'ON' && s.secs > 0) setSecondsRemaining(s.secs);
             else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
               completedRef.current = true;
@@ -348,6 +350,7 @@ export default function CycleScreen({ navigation, route }: Props) {
               if (err) return;
               const s = parseBleStatus(char);
               if (!s) return;
+              if (s.maquina_id && s.maquina_id !== maquina_id) return;
               if (s.state === 'ON' && s.secs > 0) setSecondsRemaining(s.secs);
               else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
                 completedRef.current = true;
@@ -541,6 +544,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           if (err) return;
           const s = parseBleStatus(char);
           if (!s) return;
+          if (s.maquina_id && s.maquina_id !== maquina_id) return;
           if (s.state === 'ON' && s.secs > 0) setSecondsRemaining(s.secs);
           else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
             completedRef.current = true;
@@ -674,6 +678,7 @@ export default function CycleScreen({ navigation, route }: Props) {
             if (err) return;
             const s = parseBleStatus(char);
             if (!s) return;
+            if (s.maquina_id && s.maquina_id !== maquina_id) return;
             if (s.state === 'ON') setSecondsRemaining(s.secs);
             else if (s.state === 'OFF' && cycleStartedRef.current && !completedRef.current) {
               completedRef.current = true;
