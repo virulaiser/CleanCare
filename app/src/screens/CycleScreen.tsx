@@ -254,25 +254,38 @@ export default function CycleScreen({ navigation, route }: Props) {
           const timeCmd = `TIME:${now.toISOString().slice(0, 19)}`;
           await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(timeCmd));
 
-          // Si estamos restaurando, usar remaining y NO duplicar uso/guardarCiclo
-          const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-          const secsToSend = resumingRef.current
-            ? Math.max(1, cycleDurationSeconds - elapsed)
-            : cycleDurationSeconds;
-
-          setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
           const usuario = await getUsuarioGuardado();
           const userId = usuario?.usuario_id || 'desconocido';
-          const cmd = `ON:${secsToSend}:${userId}:${tipo}:${maquina_id}`;
-          await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
 
-          cycleStartedRef.current = true;
-          setCycleStarted(true);
-          const mins = Math.ceil(cycleDurationSeconds / 60);
-          setBleLog(`✅ Máquina activada — ${mins} min`);
+          if (resumingRef.current) {
+            // Reanudando: leer STATUS del ESP32 en vez de pisar el timer
+            try {
+              const statusChar = await existing.readCharacteristicForService(SERVICE_UUID, STATUS_UUID);
+              const st = parseBleStatus(statusChar);
+              if (st && st.state === 'ON' && st.secs > 0 && (!st.maquina_id || st.maquina_id === maquina_id)) {
+                setSecondsRemaining(st.secs);
+                setBleLog(`🔄 Sincronizado — ${Math.ceil(st.secs / 60)} min restantes`);
+              } else {
+                const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+                const remaining = Math.max(1, cycleDurationSeconds - elapsed);
+                await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}:${userId}:${tipo}:${maquina_id}`));
+                setBleLog(`🔄 Reenviado ON:${remaining}s`);
+              }
+            } catch {}
+            cycleStartedRef.current = true;
+            setCycleStarted(true);
+          } else {
+            // Primer inicio: enviar ON con duración completa + registrar uso
+            setBleLog('⚡ Activando máquina...');
+            const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}:${maquina_id}`;
+            await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
 
-          if (!resumingRef.current) {
+            cycleStartedRef.current = true;
+            setCycleStarted(true);
             startTimeRef.current = Date.now();
+            const mins = Math.ceil(cycleDurationSeconds / 60);
+            setBleLog(`✅ Máquina activada — ${mins} min`);
+
             guardarCicloActivo({
               maquina_id, edificio_id, tipo, duracion_min: mins, nombre_maquina,
               startTime: startTimeRef.current,
@@ -281,11 +294,14 @@ export default function CycleScreen({ navigation, route }: Props) {
             try {
               const uso = await iniciarUso({ maquina_id, edificio_id, duracion_min: mins, tipo });
               usoIdRef.current = uso._id || null;
-            } catch {}
+            } catch (err: any) {
+              const msg = err?.response?.data?.error || 'Error al registrar el uso';
+              setBleLog(`⚠ ${msg}`);
+            }
           }
 
           const granted = await requestNotificationPermissions();
-          if (granted) await scheduleEndNotification(tipo, secsToSend);
+          if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds);
           return;
         } catch (err: any) {
           // Si falla con device existente, limpiar y caer al flujo de scan
@@ -374,48 +390,52 @@ export default function CycleScreen({ navigation, route }: Props) {
               SERVICE_UUID, CONTROL_UUID, btoa(timeCmd)
             );
 
-            // Si estamos restaurando tras reload, el ESP32 necesita el tiempo restante,
-            // no la duración completa — si no, reinicia el ciclo desde cero.
-            const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-            const secsToSend = resumingRef.current
-              ? Math.max(1, cycleDurationSeconds - elapsed)
-              : cycleDurationSeconds;
-
-            setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
             const usuario = await getUsuarioGuardado();
             const userId = usuario?.usuario_id || 'desconocido';
-            const cmd = `ON:${secsToSend}:${userId}:${tipo}:${maquina_id}`;
-            const encoded = btoa(cmd);
-            await connected.writeCharacteristicWithResponseForService(
-              SERVICE_UUID,
-              CONTROL_UUID,
-              encoded
-            );
-            cycleStartedRef.current = true;
-            setCycleStarted(true);
-            const mins = Math.ceil(cycleDurationSeconds / 60);
-            setBleLog(`✅ Máquina activada — ${mins} min`);
 
-            if (!resumingRef.current) {
+            if (resumingRef.current) {
+              try {
+                const statusChar = await connected.readCharacteristicForService(SERVICE_UUID, STATUS_UUID);
+                const st = parseBleStatus(statusChar);
+                if (st && st.state === 'ON' && st.secs > 0 && (!st.maquina_id || st.maquina_id === maquina_id)) {
+                  setSecondsRemaining(st.secs);
+                  setBleLog(`🔄 Sincronizado — ${Math.ceil(st.secs / 60)} min restantes`);
+                } else {
+                  const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+                  const remaining = Math.max(1, cycleDurationSeconds - elapsed);
+                  await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}:${userId}:${tipo}:${maquina_id}`));
+                  setBleLog(`🔄 Reenviado ON:${remaining}s`);
+                }
+              } catch {}
+              cycleStartedRef.current = true;
+              setCycleStarted(true);
+            } else {
+              setBleLog('⚡ Activando máquina...');
+              const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}:${maquina_id}`;
+              await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
+
+              cycleStartedRef.current = true;
+              setCycleStarted(true);
               startTimeRef.current = Date.now();
+              const mins = Math.ceil(cycleDurationSeconds / 60);
+              setBleLog(`✅ Máquina activada — ${mins} min`);
+
               guardarCicloActivo({
                 maquina_id, edificio_id, tipo, duracion_min: mins, nombre_maquina,
                 startTime: startTimeRef.current,
                 duracionSeconds: cycleDurationSeconds,
               }).catch(() => {});
               try {
-                const uso = await iniciarUso({
-                  maquina_id,
-                  edificio_id,
-                  duracion_min: mins,
-                  tipo,
-                });
+                const uso = await iniciarUso({ maquina_id, edificio_id, duracion_min: mins, tipo });
                 usoIdRef.current = uso._id || null;
-              } catch {}
+              } catch (err: any) {
+                const msg = err?.response?.data?.error || 'Error al registrar el uso';
+                setBleLog(`⚠ ${msg}`);
+              }
             }
 
             const granted = await requestNotificationPermissions();
-            if (granted) await scheduleEndNotification(tipo, secsToSend);
+            if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds);
 
           } catch (err: any) {
             setBleState('error');
