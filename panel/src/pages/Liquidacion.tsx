@@ -10,23 +10,33 @@ function getUsuario(): Usuario | null {
 }
 
 interface Tarifas {
-  precio_agua_m3: number;
-  litros_lavado: number;
-  precio_kwh: number;
-  kwh_lavado: number;
-  kwh_secado: number;
+  // Agua — OSE
+  precio_agua_m3: number;            // cargo variable agua (bloque 10-15 m³)
+  precio_saneamiento_m3: number;     // 100% del cargo variable de agua
+  litros_lavado: number;             // litros por ciclo de lavado
+  // Electricidad — UTE
+  precio_kwh: number;                // tarifa sin IVA
+  iva_porcentaje: number;            // IVA sobre electricidad (22%)
+  kwh_lavado: number;                // consumo por ciclo de lavado
+  kwh_secado: number;                // consumo por ciclo de secado
+  // Otros
   otros_gastos: number;
   otros_gastos_desc: string;
+  // Ingresos
   valor_ficha_lavado: number;
   valor_ficha_secado: number;
 }
 
+// Valores oficiales — UTE Pliego Tarifario + OSE Decreto 340/025 (vigentes 01/01/2026)
+// Fichas técnicas Speed Queen LWN311SP301NW22 (lavadora) + LES17AWF3022 (secador)
 const TARIFAS_DEFAULT: Tarifas = {
-  precio_agua_m3: 45,
-  litros_lavado: 55,
-  precio_kwh: 8.5,
-  kwh_lavado: 1.2,
-  kwh_secado: 3,
+  precio_agua_m3: 36.91,
+  precio_saneamiento_m3: 36.91,
+  litros_lavado: 110,
+  precio_kwh: 8.452,
+  iva_porcentaje: 22,
+  kwh_lavado: 0.17,
+  kwh_secado: 4.09,
   otros_gastos: 0,
   otros_gastos_desc: 'Mantenimiento',
   valor_ficha_lavado: 150,
@@ -161,12 +171,15 @@ export default function Liquidacion() {
     const litrosTotal = usosLav * tarifas.litros_lavado;
     const m3Total = litrosTotal / 1000;
     const costoAgua = m3Total * tarifas.precio_agua_m3;
+    const costoSaneamiento = m3Total * tarifas.precio_saneamiento_m3;
 
     const kwhTotal = usosLav * tarifas.kwh_lavado + usosSec * tarifas.kwh_secado;
-    const costoElectricidad = kwhTotal * tarifas.precio_kwh;
+    const costoElectricidadSinIva = kwhTotal * tarifas.precio_kwh;
+    const ivaElectricidad = costoElectricidadSinIva * (tarifas.iva_porcentaje / 100);
+    const costoElectricidad = costoElectricidadSinIva + ivaElectricidad;
 
     const costoOtros = Number(tarifas.otros_gastos) || 0;
-    const totalGasto = costoAgua + costoElectricidad + costoOtros;
+    const totalGasto = costoAgua + costoSaneamiento + costoElectricidad + costoOtros;
 
     const ingresoLavado = usosLav * tarifas.valor_ficha_lavado;
     const ingresoSecado = usosSec * tarifas.valor_ficha_secado;
@@ -175,8 +188,8 @@ export default function Liquidacion() {
 
     return {
       usosLav, minLav, usosSec, minSec,
-      litrosTotal, m3Total, costoAgua,
-      kwhTotal, costoElectricidad,
+      litrosTotal, m3Total, costoAgua, costoSaneamiento,
+      kwhTotal, costoElectricidadSinIva, ivaElectricidad, costoElectricidad,
       costoOtros, totalGasto,
       ingresoLavado, ingresoSecado, ingresoTotal, utilidad,
       fallas,
@@ -270,8 +283,10 @@ export default function Liquidacion() {
         <h2>Gastos</h2>
         <table>
           <tr><th>Recurso</th><th>Consumo</th><th>Tarifa</th><th style="text-align:right">Costo</th></tr>
-          <tr><td>💧 Agua</td><td>${Math.round(calculo.litrosTotal).toLocaleString()} L (${calculo.m3Total.toFixed(2)} m³)</td><td>$ ${tarifas.precio_agua_m3} / m³</td><td style="text-align:right"><strong>$ ${calculo.costoAgua.toFixed(2)}</strong></td></tr>
-          <tr><td>⚡ Electricidad</td><td>${calculo.kwhTotal.toFixed(1)} kWh</td><td>$ ${tarifas.precio_kwh} / kWh</td><td style="text-align:right"><strong>$ ${calculo.costoElectricidad.toFixed(2)}</strong></td></tr>
+          <tr><td>💧 Agua OSE</td><td>${Math.round(calculo.litrosTotal).toLocaleString()} L (${calculo.m3Total.toFixed(3)} m³)</td><td>$ ${tarifas.precio_agua_m3} / m³</td><td style="text-align:right"><strong>$ ${calculo.costoAgua.toFixed(2)}</strong></td></tr>
+          <tr><td>🚰 Saneamiento</td><td>${calculo.m3Total.toFixed(3)} m³</td><td>$ ${tarifas.precio_saneamiento_m3} / m³</td><td style="text-align:right"><strong>$ ${calculo.costoSaneamiento.toFixed(2)}</strong></td></tr>
+          <tr><td>⚡ Electricidad UTE</td><td>${calculo.kwhTotal.toFixed(2)} kWh</td><td>$ ${tarifas.precio_kwh} / kWh</td><td style="text-align:right"><strong>$ ${calculo.costoElectricidadSinIva.toFixed(2)}</strong></td></tr>
+          <tr><td>&nbsp;&nbsp;&nbsp;IVA electricidad</td><td>—</td><td>${tarifas.iva_porcentaje}%</td><td style="text-align:right"><strong>$ ${calculo.ivaElectricidad.toFixed(2)}</strong></td></tr>
           ${calculo.costoOtros > 0 ? `<tr><td>🛠 ${tarifas.otros_gastos_desc}</td><td>—</td><td>—</td><td style="text-align:right"><strong>$ ${calculo.costoOtros.toFixed(2)}</strong></td></tr>` : ''}
           <tr><td colspan="3" style="text-align:right"><strong>Total gastos</strong></td><td style="text-align:right"><strong>$ ${calculo.totalGasto.toFixed(2)}</strong></td></tr>
         </table>
@@ -294,7 +309,11 @@ export default function Liquidacion() {
           </div>
         </div>
 
-        <div class="footer">CleanCare — sistema de gestión de lavarropas y secadoras • cleancare.uy</div>
+        <div class="footer">
+          <strong>Fuentes oficiales</strong><br/>
+          UTE — Pliego Tarifario vigente desde 01/01/2026. Tarifa Residencial Simple: $8,452/kWh (tramo 101–600 kWh/mes). IVA 22% sobre energía eléctrica.<br/>
+          OSE — Decreto Tarifario 340/025 vigente desde 01/01/2026. Cargo variable bloque 10–15 m³: $36,91/m³. Saneamiento = 100% del cargo variable de agua.
+        </div>
         <script>setTimeout(function(){window.print();}, 400);</script>
       </body></html>
     `);
@@ -312,19 +331,23 @@ export default function Liquidacion() {
       ['Lavados', calculo.usosLav, 'usos'],
       ['Secados', calculo.usosSec, 'usos'],
       [],
-      ['Agua'],
+      ['Agua OSE'],
       ['Litros por lavado', tarifas.litros_lavado],
       ['Total litros', Math.round(calculo.litrosTotal)],
       ['Total m³', calculo.m3Total.toFixed(3)],
-      ['Precio m³', tarifas.precio_agua_m3],
+      ['Precio agua $/m³', tarifas.precio_agua_m3],
+      ['Precio saneamiento $/m³', tarifas.precio_saneamiento_m3],
       ['Costo agua', `$ ${calculo.costoAgua.toFixed(2)}`],
+      ['Costo saneamiento', `$ ${calculo.costoSaneamiento.toFixed(2)}`],
       [],
-      ['Electricidad'],
+      ['Electricidad UTE'],
       ['kWh por lavado', tarifas.kwh_lavado],
       ['kWh por secado', tarifas.kwh_secado],
       ['Total kWh', calculo.kwhTotal.toFixed(2)],
-      ['Precio kWh', tarifas.precio_kwh],
-      ['Costo electricidad', `$ ${calculo.costoElectricidad.toFixed(2)}`],
+      ['Precio kWh (sin IVA)', tarifas.precio_kwh],
+      ['Subtotal electricidad (sin IVA)', `$ ${calculo.costoElectricidadSinIva.toFixed(2)}`],
+      [`IVA ${tarifas.iva_porcentaje}%`, `$ ${calculo.ivaElectricidad.toFixed(2)}`],
+      ['Costo electricidad (con IVA)', `$ ${calculo.costoElectricidad.toFixed(2)}`],
       [],
       ['Otros'],
       [tarifas.otros_gastos_desc, `$ ${calculo.costoOtros.toFixed(2)}`],
@@ -337,6 +360,10 @@ export default function Liquidacion() {
       ['TOTAL INGRESOS', `$ ${calculo.ingresoTotal.toFixed(2)}`],
       [],
       ['UTILIDAD', `$ ${calculo.utilidad.toFixed(2)}`],
+      [],
+      ['Fuentes oficiales'],
+      ['UTE', 'Pliego Tarifario 01/01/2026 — Residencial Simple $8,452/kWh + IVA 22%'],
+      ['OSE', 'Decreto 340/025 01/01/2026 — bloque 10-15 m³ $36,91/m³ + saneamiento 100%'],
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -425,9 +452,14 @@ export default function Liquidacion() {
           </div>
           <div style={styles.tarifaGrid}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Precio por m³ ($)</label>
+              <label style={styles.label}>Agua OSE — $/m³</label>
               <NumericInput style={styles.input} value={tarifas.precio_agua_m3}
                 onChange={(n) => actualizarTarifa('precio_agua_m3', n)} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Saneamiento — $/m³</label>
+              <NumericInput style={styles.input} value={tarifas.precio_saneamiento_m3}
+                onChange={(n) => actualizarTarifa('precio_saneamiento_m3', n)} />
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>Litros por lavado</label>
@@ -436,18 +468,30 @@ export default function Liquidacion() {
             </div>
           </div>
           <div style={styles.resumenRow}>
-            <span>Total consumo: <strong>{Math.round(calculo.litrosTotal).toLocaleString()} L</strong> ({calculo.m3Total.toFixed(2)} m³)</span>
+            <span>Agua: <strong>{Math.round(calculo.litrosTotal).toLocaleString()} L</strong> ({calculo.m3Total.toFixed(3)} m³)</span>
             <span style={styles.costoPill}>$ {calculo.costoAgua.toFixed(2)}</span>
           </div>
+          <div style={{ ...styles.resumenRow, marginTop: 8 }}>
+            <span>Saneamiento: <strong>100%</strong> del cargo de agua</span>
+            <span style={styles.costoPill}>$ {calculo.costoSaneamiento.toFixed(2)}</span>
+          </div>
+          <p style={{ fontSize: 11, color: colors.textSecondary, marginTop: 8 }}>
+            📋 OSE Decreto 340/025 — Cargo variable bloque 10–15 m³: $36,91/m³. Saneamiento = 100% del cargo de agua.
+          </p>
         </div>
 
         <div style={styles.card}>
           <h3 style={styles.cardTitle}>⚡ Electricidad</h3>
           <div style={styles.tarifaGrid}>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Precio por kWh ($)</label>
+              <label style={styles.label}>UTE — $/kWh (sin IVA)</label>
               <NumericInput style={styles.input} value={tarifas.precio_kwh}
                 onChange={(n) => actualizarTarifa('precio_kwh', n)} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>IVA (%)</label>
+              <NumericInput style={styles.input} value={tarifas.iva_porcentaje}
+                onChange={(n) => actualizarTarifa('iva_porcentaje', n)} />
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>kWh por lavado</label>
@@ -461,9 +505,20 @@ export default function Liquidacion() {
             </div>
           </div>
           <div style={styles.resumenRow}>
-            <span>Total consumo: <strong>{calculo.kwhTotal.toFixed(1)} kWh</strong></span>
-            <span style={styles.costoPill}>$ {calculo.costoElectricidad.toFixed(2)}</span>
+            <span>Consumo: <strong>{calculo.kwhTotal.toFixed(2)} kWh</strong> × ${tarifas.precio_kwh}</span>
+            <span style={styles.costoPill}>$ {calculo.costoElectricidadSinIva.toFixed(2)}</span>
           </div>
+          <div style={{ ...styles.resumenRow, marginTop: 8 }}>
+            <span>IVA {tarifas.iva_porcentaje}% sobre electricidad</span>
+            <span style={styles.costoPill}>$ {calculo.ivaElectricidad.toFixed(2)}</span>
+          </div>
+          <div style={{ ...styles.resumenRow, marginTop: 8, backgroundColor: colors.bgBlueLight }}>
+            <span><strong>Total electricidad (con IVA)</strong></span>
+            <span style={{ ...styles.costoPill, backgroundColor: colors.primary, color: colors.white }}>$ {calculo.costoElectricidad.toFixed(2)}</span>
+          </div>
+          <p style={{ fontSize: 11, color: colors.textSecondary, marginTop: 8 }}>
+            📋 UTE Pliego Tarifario vigente 01/01/2026 — Residencial Simple tramo 101–600 kWh/mes: $8,452/kWh. IVA 22% sobre energía eléctrica.
+          </p>
         </div>
 
         <div style={styles.card}>
