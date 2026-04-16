@@ -193,6 +193,28 @@ export async function obtenerResumenCreditos(edificioId: string, mes: number, an
   return data;
 }
 
+// --- Resumen por apartamento ---
+// Un apartamento puede tener varios usuarios (pareja, familia). La facturación
+// va al dueño del apto, así que se agrupa el consumo por (apartamento + edificio).
+export interface ResumenApartamentoItem {
+  apartamento: string;
+  edificio_id: string;
+  usuarios: Array<{ usuario_id: string; nombre: string; email: string; telefono?: string }>;
+  cant_usuarios: number;
+  lavados: number;
+  secados: number;
+  min_lavado: number;
+  min_secado: number;
+  usos_total: number;
+  minutos_total: number;
+  saldo_total: number;
+}
+
+export async function obtenerResumenApartamento(edificioId: string, mes: number, anio: number): Promise<{ resumen: ResumenApartamentoItem[]; total_aptos: number; total_usos: number }> {
+  const { data } = await api.get('/api/resumen-apartamento', { params: { edificioId, mes, anio } });
+  return data;
+}
+
 export async function listarUsuariosEdificio(edificioId?: string): Promise<{ usuario_id: string; nombre: string; apartamento: string; email: string; edificio_id: string; saldo: number }[]> {
   const params = edificioId ? { edificioId } : {};
   const { data } = await api.get('/api/usuarios', { params });

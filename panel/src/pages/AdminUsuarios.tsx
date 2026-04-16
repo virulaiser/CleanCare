@@ -362,6 +362,15 @@ export default function AdminUsuarios() {
     return 0;
   });
 
+  // Contar usuarios por apto+edificio para detectar aptos compartidos
+  const aptoCount: Record<string, number> = {};
+  usuarios.forEach((u) => {
+    if (!u.apartamento) return;
+    const key = `${u.edificio_id}::${u.apartamento}`;
+    aptoCount[key] = (aptoCount[key] || 0) + 1;
+  });
+  const getAptoCount = (u: UsuarioRow) => aptoCount[`${u.edificio_id}::${u.apartamento}`] || 1;
+
   // Avatar — muestra foto o inicial
   const Avatar = ({ nombre, foto, size = 36 }: { nombre: string; foto?: string; size?: number }) => {
     if (foto) {
@@ -529,7 +538,17 @@ export default function AdminUsuarios() {
                         </div>
                       </td>
                       <td style={styles.td}><span style={{ fontSize: 13 }}>{u.email}</span></td>
-                      <td style={styles.td}>{u.apartamento || '—'}</td>
+                      <td style={styles.td}>
+                        {u.apartamento || '—'}
+                        {u.apartamento && getAptoCount(u) > 1 && (
+                          <span title={`${getAptoCount(u)} usuarios en este apartamento`} style={{
+                            marginLeft: 6, fontSize: 11, padding: '2px 7px', borderRadius: 999,
+                            backgroundColor: '#FEF3C7', color: '#D97706', fontWeight: 600,
+                          }}>
+                            +{getAptoCount(u) - 1}
+                          </span>
+                        )}
+                      </td>
                       <td style={styles.td}>
                         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, backgroundColor: colors.bgBlueLight, color: colors.primary, fontWeight: 500 }}>
                           {edificioNombre(u.edificio_id)}

@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
+// NOTA: un apartamento puede tener varios usuarios (pareja, familia, inquilinos).
+// La facturación va al dueño del apartamento → se agrega por (apartamento + edificio_id),
+// no por usuario_id. Por eso email es unique pero apartamento+edificio NO lo es.
+// En Uso.residente_id guardamos el apartamento para que la agregación sea directa.
 const usuarioSchema = new mongoose.Schema({
   usuario_id:  { type: String, unique: true },
   email:       { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -16,6 +20,9 @@ const usuarioSchema = new mongoose.Schema({
   activo:      { type: Boolean, default: true },
   creado:      { type: Date, default: Date.now }
 });
+
+// Índice no único para búsquedas rápidas de todos los usuarios de un apartamento
+usuarioSchema.index({ edificio_id: 1, apartamento: 1 });
 
 usuarioSchema.pre('validate', function () {
   if (!this.usuario_id) {
