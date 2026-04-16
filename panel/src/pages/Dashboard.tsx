@@ -210,10 +210,9 @@ export default function Dashboard() {
             <table style={styles.table}>
               <thead>
                 <tr>
+                  <th style={styles.th}>Residente</th>
                   <th style={styles.th}>Fecha</th>
                   <th style={styles.th}>Máquina</th>
-                  <th style={styles.th}>Residente</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Duración</th>
                 </tr>
               </thead>
               <tbody>
@@ -222,15 +221,22 @@ export default function Dashboard() {
                   .slice(0, 20)
                   .map((uso) => (
                     <tr key={uso._id}>
+                      <td style={styles.td}>{uso.residente_id || '—'}</td>
                       <td style={styles.td}>
                         {new Date(uso.fecha_inicio || uso.fecha).toLocaleDateString('es-AR', {
                           day: '2-digit', month: '2-digit', year: 'numeric',
                           hour: '2-digit', minute: '2-digit',
                         })}
                       </td>
-                      <td style={styles.td}>{maquinaMap[uso.maquina_id] || uso.maquina_id}</td>
-                      <td style={styles.td}>{uso.residente_id || '—'}</td>
-                      <td style={{ ...styles.td, textAlign: 'right' }}>{uso.duracion_min} min</td>
+                      <td style={styles.td}>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                          backgroundColor: uso.tipo === 'secadora' ? '#FEF3C7' : '#DBEAFE',
+                          color: uso.tipo === 'secadora' ? '#D97706' : '#3B82F6',
+                        }}>
+                          {uso.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}
+                        </span>
+                      </td>
                     </tr>
                   ))}
               </tbody>
