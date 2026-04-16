@@ -30,6 +30,9 @@ export default function Creditos() {
   const [duracionSecado, setDuracionSecado] = useState(30);
   const [configMsg, setConfigMsg] = useState('');
 
+  // Modal apto (lista usuarios del mismo apartamento)
+  const [aptoModal, setAptoModal] = useState<{ apartamento: string; edificio_id: string } | null>(null);
+
   // Modal estado de cuenta
   const [cuentaUsuario, setCuentaUsuario] = useState<{ usuario_id: string; nombre: string; apartamento: string } | null>(null);
   const [cuentaSaldo, setCuentaSaldo] = useState(0);
@@ -279,9 +282,7 @@ export default function Creditos() {
               <thead>
                 <tr>
                   <th style={styles.th}>Apto</th>
-                  <th style={styles.th}>Nombre</th>
                   <th style={styles.th}>Edificio</th>
-                  <th style={styles.th}>Email</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Saldo</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
@@ -289,10 +290,22 @@ export default function Creditos() {
               <tbody>
                 {filtered.map((u) => (
                   <tr key={u.usuario_id}>
-                    <td style={{ ...styles.td, fontWeight: 700 }}>{u.apartamento || '-'}</td>
-                    <td style={styles.td}>{u.nombre}</td>
+                    <td style={styles.td}>
+                      <button
+                        onClick={() => u.apartamento && setAptoModal({ apartamento: u.apartamento, edificio_id: u.edificio_id })}
+                        disabled={!u.apartamento}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8, border: `1px solid ${colors.border}`,
+                          backgroundColor: colors.bgPage, fontWeight: 700, fontSize: 14,
+                          color: colors.textPrimary, cursor: u.apartamento ? 'pointer' : 'default',
+                          fontFamily: 'inherit',
+                        }}
+                        title="Ver usuarios del apto"
+                      >
+                        {u.apartamento || '-'}
+                      </button>
+                    </td>
                     <td style={{ ...styles.td, fontSize: 12, fontFamily: 'monospace' }}>{u.edificio_id}</td>
-                    <td style={styles.td}>{u.email}</td>
                     <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700, color: u.saldo <= 0 ? colors.error : colors.textPrimary }}>
                       {u.saldo}
                     </td>
@@ -348,7 +361,6 @@ export default function Creditos() {
               <thead>
                 <tr>
                   <th style={styles.th}>Apto</th>
-                  <th style={styles.th}>Usuario</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Usados</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Asignados</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Devoluciones</th>
@@ -356,21 +368,76 @@ export default function Creditos() {
                 </tr>
               </thead>
               <tbody>
-                {resumen.map((r) => (
+                {resumen.map((r) => {
+                  const u = usuarios.find((x) => x.usuario_id === r.usuario_id);
+                  const edificio_id = u?.edificio_id || edificioId;
+                  return (
                   <tr key={r.usuario_id}>
-                    <td style={{ ...styles.td, fontWeight: 700 }}>{r.apartamento}</td>
-                    <td style={styles.td}>{r.nombre}</td>
+                    <td style={styles.td}>
+                      <button
+                        onClick={() => r.apartamento && r.apartamento !== '-' && setAptoModal({ apartamento: r.apartamento, edificio_id })}
+                        disabled={!r.apartamento || r.apartamento === '-'}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8, border: `1px solid ${colors.border}`,
+                          backgroundColor: colors.bgPage, fontWeight: 700, fontSize: 14,
+                          color: colors.textPrimary, cursor: r.apartamento && r.apartamento !== '-' ? 'pointer' : 'default',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {r.apartamento}
+                      </button>
+                    </td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{r.creditos_usados}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{r.creditos_asignados}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{r.devoluciones}</td>
                     <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700, color: r.saldo_actual <= 0 ? colors.error : colors.textPrimary }}>{r.saldo_actual}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
         </div>
       </main>
+
+      {/* Modal Apto — lista usuarios del mismo apartamento */}
+      {aptoModal && (() => {
+        const usuariosDelApto = usuarios.filter((x) => x.apartamento === aptoModal.apartamento && x.edificio_id === aptoModal.edificio_id);
+        const ediNombre = edificios.find((e) => e.edificio_id === aptoModal.edificio_id)?.nombre || aptoModal.edificio_id;
+        return (
+          <div style={styles.overlay} onClick={() => setAptoModal(null)}>
+            <div style={{ ...styles.modal, maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: colors.textPrimary }}>
+                Apto {aptoModal.apartamento}
+              </h3>
+              <p style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}>
+                {ediNombre} — {usuariosDelApto.length} usuario{usuariosDelApto.length !== 1 ? 's' : ''}
+              </p>
+
+              {usuariosDelApto.length === 0 ? (
+                <p style={styles.muted}>Sin usuarios registrados en este apto.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  {usuariosDelApto.map((user) => (
+                    <div key={user.usuario_id} style={{
+                      padding: 12, borderRadius: 10, backgroundColor: colors.bgPage,
+                      border: `1px solid ${colors.border}`, textAlign: 'left',
+                    }}>
+                      <div style={{ fontWeight: 600, color: colors.textPrimary, fontSize: 14 }}>{user.nombre}</div>
+                      <div style={{ fontSize: 12, color: colors.textSecondary, wordBreak: 'break-all', marginTop: 2 }}>{user.email}</div>
+                      <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>Saldo: <strong style={{ color: user.saldo <= 0 ? colors.error : colors.success }}>{user.saldo}</strong></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setAptoModal(null)} style={styles.saveBtn}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal agregar créditos a usuario */}
       {modalUsuario && (

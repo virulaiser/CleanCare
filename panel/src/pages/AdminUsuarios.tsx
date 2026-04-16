@@ -72,6 +72,9 @@ export default function AdminUsuarios() {
   const [formFoto, setFormFoto] = useState('');
   const [creando, setCreando] = useState(false);
 
+  // Modal apto (lista de usuarios del mismo apartamento+edificio)
+  const [aptoModal, setAptoModal] = useState<{ apartamento: string; edificio_id: string; usuarios: UsuarioRow[] } | null>(null);
+
   // Modal balance / resumen por usuario
   const now = new Date();
   const [balanceUser, setBalanceUser] = useState<UsuarioRow | null>(null);
@@ -518,8 +521,6 @@ export default function AdminUsuarios() {
                 <thead>
                   <tr>
                     <th style={styles.th}>Apto</th>
-                    <th style={styles.th}>Usuario</th>
-                    <th style={styles.th}>Email</th>
                     <th style={styles.th}>Edificio</th>
                     <th style={styles.th}>Balance</th>
                     <th style={styles.th}>Acciones</th>
@@ -528,27 +529,33 @@ export default function AdminUsuarios() {
                 <tbody>
                   {filtrados.map((u) => (
                     <tr key={u.usuario_id} style={{ transition: 'background 0.15s' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = colors.bgPage)} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}>
-                      <td style={{ ...styles.td, fontWeight: 700, color: colors.textPrimary }}>
-                        {u.apartamento || '—'}
-                        {u.apartamento && getAptoCount(u) > 1 && (
-                          <span title={`${getAptoCount(u)} usuarios en este apartamento`} style={{
-                            marginLeft: 6, fontSize: 11, padding: '2px 7px', borderRadius: 999,
-                            backgroundColor: '#FEF3C7', color: '#D97706', fontWeight: 600,
-                          }}>
-                            +{getAptoCount(u) - 1}
-                          </span>
-                        )}
-                      </td>
                       <td style={styles.td}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Avatar nombre={u.nombre} foto={u.foto} />
-                          <div>
-                            <div style={{ fontWeight: 600, color: colors.textPrimary }}>{u.nombre}</div>
-                            {u.telefono && <div style={{ fontSize: 12, color: colors.textSecondary }}>{u.telefono}</div>}
-                          </div>
-                        </div>
+                        <button
+                          onClick={() => u.apartamento && setAptoModal({
+                            apartamento: u.apartamento,
+                            edificio_id: u.edificio_id,
+                            usuarios: usuarios.filter((x) => x.apartamento === u.apartamento && x.edificio_id === u.edificio_id),
+                          })}
+                          disabled={!u.apartamento}
+                          style={{
+                            padding: '6px 12px', borderRadius: 8, border: `1px solid ${colors.border}`,
+                            backgroundColor: colors.bgPage, fontWeight: 700, fontSize: 14,
+                            color: colors.textPrimary, cursor: u.apartamento ? 'pointer' : 'default',
+                            display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
+                          }}
+                          title={u.apartamento ? 'Ver usuarios del apto' : ''}
+                        >
+                          {u.apartamento || '—'}
+                          {u.apartamento && getAptoCount(u) > 1 && (
+                            <span style={{
+                              fontSize: 11, padding: '1px 6px', borderRadius: 999,
+                              backgroundColor: '#FEF3C7', color: '#D97706', fontWeight: 600,
+                            }}>
+                              +{getAptoCount(u) - 1}
+                            </span>
+                          )}
+                        </button>
                       </td>
-                      <td style={styles.td}><span style={{ fontSize: 13 }}>{u.email}</span></td>
                       <td style={styles.td}>
                         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, backgroundColor: colors.bgBlueLight, color: colors.primary, fontWeight: 500 }}>
                           {edificioNombre(u.edificio_id)}
@@ -622,6 +629,40 @@ export default function AdminUsuarios() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Apto — lista usuarios del mismo apartamento */}
+      {aptoModal && (
+        <div style={styles.overlay} onClick={() => setAptoModal(null)}>
+          <div style={{ ...styles.modal, maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ ...styles.modalTitle, marginBottom: 4 }}>
+              Apto {aptoModal.apartamento}
+            </h3>
+            <p style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}>
+              {edificioNombre(aptoModal.edificio_id)} — {aptoModal.usuarios.length} usuario{aptoModal.usuarios.length !== 1 ? 's' : ''}
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              {aptoModal.usuarios.map((user) => (
+                <div key={user.usuario_id} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: 12,
+                  borderRadius: 10, backgroundColor: colors.bgPage, border: `1px solid ${colors.border}`,
+                }}>
+                  <Avatar nombre={user.nombre} foto={user.foto} size={40} />
+                  <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                    <div style={{ fontWeight: 600, color: colors.textPrimary, fontSize: 14 }}>{user.nombre}</div>
+                    <div style={{ fontSize: 12, color: colors.textSecondary, wordBreak: 'break-all' }}>{user.email}</div>
+                    {user.telefono && <div style={{ fontSize: 11, color: colors.textSecondary }}>📞 {user.telefono}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setAptoModal(null)} style={styles.btnCancel}>Cerrar</button>
+            </div>
           </div>
         </div>
       )}
