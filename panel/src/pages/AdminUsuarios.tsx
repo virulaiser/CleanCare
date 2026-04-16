@@ -213,6 +213,25 @@ export default function AdminUsuarios() {
     if (!balanceUser || !balanceData) return;
     const u = balanceUser;
     const periodo = `${meses[balanceMes - 1]} ${balanceAnio}`;
+    const generado = new Date().toLocaleString('es-UY');
+
+    // Mes anterior
+    const prevDate = new Date(balanceAnio, balanceMes - 2, 1);
+    const prevMes = prevDate.getMonth() + 1;
+    const prevAnio = prevDate.getFullYear();
+    const prevPeriodo = `${meses[prevMes - 1]} ${prevAnio}`;
+    const prevUsos = balanceUsos.filter((x) => {
+      const f = new Date(x.fecha_inicio || x.fecha);
+      return f.getMonth() + 1 === prevMes && f.getFullYear() === prevAnio;
+    });
+    const prevCompletados = prevUsos.filter((x) => x.estado === 'completado' || x.completado);
+    const prevFallas = prevUsos.filter((x) => x.estado === 'averia');
+    const prev = {
+      usos: prevCompletados.length,
+      min: prevCompletados.reduce((s, x) => s + (x.duracion_min || 0), 0),
+      fallas: prevFallas.length,
+    };
+
     const filas = balanceData.mesLista.length === 0
       ? '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:16px">Sin usos en este periodo</td></tr>'
       : balanceData.mesLista.map((x) => `
@@ -265,6 +284,7 @@ export default function AdminUsuarios() {
             <div class="subtitle">Resumen por usuario</div>
           </div>
           <div class="meta">
+            Generado: ${generado}<br/>
             Periodo: <strong>${periodo}</strong>
           </div>
         </div>
@@ -281,11 +301,25 @@ export default function AdminUsuarios() {
           <div class="bal-card bal-extras"><div class="l">Fichas extras</div><div class="v">${u.fichas_extras}</div></div>
         </div>
 
+        <h2>Resumen ${periodo}</h2>
         <div class="kpis">
           <div class="kpi"><div class="label">Usos</div><div class="val">${balanceData.mesUsos}</div></div>
           <div class="kpi"><div class="label">Minutos</div><div class="val">${balanceData.mesMin}</div></div>
           <div class="kpi"><div class="label">Fallas</div><div class="val">${balanceData.mesFallas}</div></div>
           <div class="kpi"><div class="label">Total histórico</div><div class="val">${balanceData.totalUsos}</div></div>
+        </div>
+
+        <h2>Resumen mes anterior — ${prevPeriodo}</h2>
+        <div class="kpis">
+          <div class="kpi"><div class="label">Usos</div><div class="val">${prev.usos}</div></div>
+          <div class="kpi"><div class="label">Minutos</div><div class="val">${prev.min}</div></div>
+          <div class="kpi"><div class="label">Fallas</div><div class="val">${prev.fallas}</div></div>
+          <div class="kpi">
+            <div class="label">Variación</div>
+            <div class="val" style="font-size:18px;color:${balanceData.mesUsos >= prev.usos ? '#16A34A' : '#EF4444'}">
+              ${prev.usos === 0 ? '—' : `${balanceData.mesUsos >= prev.usos ? '+' : ''}${balanceData.mesUsos - prev.usos} usos`}
+            </div>
+          </div>
         </div>
 
         <h2>Detalle del periodo</h2>
