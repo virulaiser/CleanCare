@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   listarUsuariosEdificio, listarEdificios, crearUsuarioAdmin,
-  editarUsuarioAdmin, eliminarUsuarioAdmin, Edificio,
+  editarUsuarioAdmin, eliminarUsuarioAdmin, listarUsos,
+  Edificio, Uso,
 } from '../services/api';
 import { colors } from '../constants/colors';
 
@@ -70,6 +71,14 @@ export default function AdminUsuarios() {
   const [formUnidad, setFormUnidad] = useState('');
   const [formFoto, setFormFoto] = useState('');
   const [creando, setCreando] = useState(false);
+
+  // Modal balance / resumen por usuario
+  const now = new Date();
+  const [balanceUser, setBalanceUser] = useState<UsuarioRow | null>(null);
+  const [balanceMes, setBalanceMes] = useState(now.getMonth() + 1);
+  const [balanceAnio, setBalanceAnio] = useState(now.getFullYear());
+  const [balanceUsos, setBalanceUsos] = useState<Uso[]>([]);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   // Modal editar
   const [editUser, setEditUser] = useState<UsuarioRow | null>(null);
@@ -161,6 +170,139 @@ export default function AdminUsuarios() {
     setEditando(false);
   };
 
+  // Balance modal
+  const openBalance = async (u: UsuarioRow) => {
+    setBalanceUser(u);
+    setBalanceMes(now.getMonth() + 1);
+    setBalanceAnio(now.getFullYear());
+    setBalanceLoading(true);
+    try {
+      const usosData = await listarUsos();
+      const match = (r: string) =>
+        r === u.apartamento || r === u.unidad || r === u.email || r === u.usuario_id;
+      setBalanceUsos(usosData.filter((x) => match(x.residente_id)));
+    } catch {
+      setBalanceUsos([]);
+    }
+    setBalanceLoading(false);
+  };
+
+  const balanceData = React.useMemo(() => {
+    if (!balanceUser) return null;
+    const mesUsos = balanceUsos.filter((x) => {
+      const f = new Date(x.fecha_inicio || x.fecha);
+      return f.getMonth() + 1 === balanceMes && f.getFullYear() === balanceAnio;
+    });
+    const mesCompletados = mesUsos.filter((x) => x.estado === 'completado' || x.completado);
+    const mesFallas = mesUsos.filter((x) => x.estado === 'averia');
+    const totalCompletados = balanceUsos.filter((x) => x.estado === 'completado' || x.completado).length;
+    const totalFallas = balanceUsos.filter((x) => x.estado === 'averia').length;
+    return {
+      mesUsos: mesCompletados.length,
+      mesMin: mesCompletados.reduce((s, x) => s + (x.duracion_min || 0), 0),
+      mesFallas: mesFallas.length,
+      totalUsos: totalCompletados,
+      totalFallas,
+      mesLista: mesUsos.sort((a, b) => new Date(b.fecha_inicio || b.fecha).getTime() - new Date(a.fecha_inicio || a.fecha).getTime()),
+    };
+  }, [balanceUser, balanceUsos, balanceMes, balanceAnio]);
+
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  function exportarUsuarioPDF() {
+    if (!balanceUser || !balanceData) return;
+    const u = balanceUser;
+    const periodo = `${meses[balanceMes - 1]} ${balanceAnio}`;
+    const filas = balanceData.mesLista.length === 0
+      ? '<tr><td colspan="4" style="text-align:center;color:#94A3B8;padding:16px">Sin usos en este periodo</td></tr>'
+      : balanceData.mesLista.map((x) => `
+          <tr>
+            <td>${new Date(x.fecha_inicio || x.fecha).toLocaleDateString('es-UY')}</td>
+            <td>${x.tipo || 'lavarropas'}</td>
+            <td>${x.duracion_min} min</td>
+            <td>${x.estado === 'averia' ? '⚠️ Falla' : x.estado === 'completado' ? '✓ OK' : x.estado || '—'}</td>
+          </tr>
+        `).join('');
+
+    const w = window.open('', '_blank', 'width=900,height=1000');
+    if (!w) return;
+    w.document.write(`
+      <!DOCTYPE html><html><head><title>Resumen ${u.nombre} — ${periodo}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', system-ui, sans-serif; color: #1E293B; padding: 32px; margin: 0; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #3B82F6; padding-bottom: 16px; margin-bottom: 24px; }
+        .logo { font-size: 24px; font-weight: 700; color: #3B82F6; }
+        .subtitle { color: #64748B; font-size: 13px; margin-top: 4px; }
+        .meta { text-align: right; font-size: 13px; color: #64748B; }
+        h1 { font-size: 22px; margin: 0 0 4px; }
+        .info { color: #64748B; font-size: 13px; margin-bottom: 20px; }
+        h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px; margin: 24px 0 12px; }
+        .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+        .kpi { background: #F8FAFC; border: 1px solid #E5E7EB; padding: 12px; border-radius: 8px; text-align: center; }
+        .kpi .label { font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi .val { font-size: 22px; font-weight: 700; margin-top: 4px; }
+        .balance { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+        .bal-card { padding: 16px; border-radius: 10px; text-align: center; }
+        .bal-saldo { background: #DCFCE7; }
+        .bal-saldo .v { color: #16A34A; }
+        .bal-usadas { background: #F1F5F9; }
+        .bal-extras { background: #FEF3C7; }
+        .bal-extras .v { color: #D97706; }
+        .bal-card .l { font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+        .bal-card .v { font-size: 28px; font-weight: 700; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+        th { text-align: left; padding: 8px 12px; background: #F1F5F9; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #E5E7EB; }
+        td { padding: 8px 12px; border-bottom: 1px solid #E5E7EB; }
+        tr:last-child td { border-bottom: none; }
+        .footer { margin-top: 32px; text-align: center; font-size: 11px; color: #94A3B8; border-top: 1px solid #E5E7EB; padding-top: 12px; }
+        @media print { body { padding: 16px; } }
+      </style></head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="logo">CleanCare</div>
+            <div class="subtitle">Resumen por usuario</div>
+          </div>
+          <div class="meta">
+            Generado: ${new Date().toLocaleString('es-UY')}<br/>
+            Periodo: <strong>${periodo}</strong>
+          </div>
+        </div>
+
+        <h1>${u.nombre}</h1>
+        <div class="info">
+          ${u.email} ${u.apartamento ? `• Apto ${u.apartamento}` : ''} • ID ${u.usuario_id}
+        </div>
+
+        <h2>Balance</h2>
+        <div class="balance">
+          <div class="bal-card bal-saldo"><div class="l">Saldo actual</div><div class="v">${u.saldo}</div></div>
+          <div class="bal-card bal-usadas"><div class="l">Fichas usadas</div><div class="v">${u.fichas_usadas}</div></div>
+          <div class="bal-card bal-extras"><div class="l">Fichas extras</div><div class="v">${u.fichas_extras}</div></div>
+        </div>
+
+        <h2>Resumen ${periodo}</h2>
+        <div class="kpis">
+          <div class="kpi"><div class="label">Usos</div><div class="val">${balanceData.mesUsos}</div></div>
+          <div class="kpi"><div class="label">Minutos</div><div class="val">${balanceData.mesMin}</div></div>
+          <div class="kpi"><div class="label">Fallas</div><div class="val">${balanceData.mesFallas}</div></div>
+          <div class="kpi"><div class="label">Total histórico</div><div class="val">${balanceData.totalUsos}</div></div>
+        </div>
+
+        <h2>Detalle del periodo</h2>
+        <table>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Duración</th><th>Estado</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+
+        <div class="footer">CleanCare — sistema de gestión de lavarropas y secadoras • cleancare.uy</div>
+        <script>setTimeout(function(){window.print();}, 400);</script>
+      </body></html>
+    `);
+    w.document.close();
+  }
+
   // Eliminar
   const handleEliminar = async (u: UsuarioRow) => {
     if (!confirm(`¿Desactivar a ${u.nombre} (${u.email})?`)) return;
@@ -249,7 +391,7 @@ export default function AdminUsuarios() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <h1 style={styles.logo}>CleanCare</h1>
+        <h1 style={{ ...styles.logo, display: 'flex', alignItems: 'center', gap: 10 }}><img src="/logo.png" alt="CleanCare" style={{ height: 36, width: 36, objectFit: 'contain' }} />CleanCare</h1>
         <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
@@ -341,9 +483,7 @@ export default function AdminUsuarios() {
                     <th style={styles.th}>Email</th>
                     <th style={styles.th}>Apto</th>
                     <th style={styles.th}>Edificio</th>
-                    <th style={styles.th}>Saldo</th>
-                    <th style={styles.th}>Usadas</th>
-                    <th style={styles.th}>Extras</th>
+                    <th style={styles.th}>Balance</th>
                     <th style={styles.th}>Acciones</th>
                   </tr>
                 </thead>
@@ -366,14 +506,12 @@ export default function AdminUsuarios() {
                           {edificioNombre(u.edificio_id)}
                         </span>
                       </td>
-                      <td style={{ ...styles.td, fontWeight: 700, color: u.saldo <= 0 ? colors.error : colors.success }}>
-                        {u.saldo}
-                      </td>
-                      <td style={{ ...styles.td, color: colors.textSecondary }}>
-                        {u.fichas_usadas || 0}
-                      </td>
-                      <td style={{ ...styles.td, color: u.fichas_extras > 0 ? '#D97706' : colors.textSecondary }}>
-                        {u.fichas_extras > 0 ? `+${u.fichas_extras}` : '0'}
+                      <td style={styles.td}>
+                        <button onClick={() => openBalance(u)} style={styles.btnBalance}>
+                          <span style={{ color: u.saldo <= 0 ? colors.error : colors.success, fontWeight: 700 }}>{u.saldo}</span>
+                          <span style={{ color: colors.textSecondary, fontSize: 11 }}> • {u.fichas_usadas || 0} usadas</span>
+                          {u.fichas_extras > 0 && <span style={{ color: '#D97706', fontSize: 11 }}> • +{u.fichas_extras}</span>}
+                        </button>
                       </td>
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -436,6 +574,108 @@ export default function AdminUsuarios() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Balance */}
+      {balanceUser && (
+        <div style={styles.overlay} onClick={() => setBalanceUser(null)}>
+          <div style={{ ...styles.modal, maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <Avatar nombre={balanceUser.nombre} foto={balanceUser.foto} size={48} />
+              <div style={{ flex: 1 }}>
+                <h3 style={{ ...styles.modalTitle, marginBottom: 2 }}>{balanceUser.nombre}</h3>
+                <span style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {balanceUser.email} {balanceUser.apartamento ? `• Apto ${balanceUser.apartamento}` : ''}
+                </span>
+              </div>
+            </div>
+
+            {/* Balance unificado */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+              <div style={{ ...styles.statBox, backgroundColor: '#DCFCE7' }}>
+                <span style={{ fontSize: 28, fontWeight: 700, color: balanceUser.saldo <= 0 ? colors.error : colors.success }}>{balanceUser.saldo}</span>
+                <span style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Saldo</span>
+              </div>
+              <div style={styles.statBox}>
+                <span style={{ fontSize: 28, fontWeight: 700, color: colors.textPrimary }}>{balanceUser.fichas_usadas}</span>
+                <span style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Usadas</span>
+              </div>
+              <div style={{ ...styles.statBox, backgroundColor: '#FEF3C7' }}>
+                <span style={{ fontSize: 28, fontWeight: 700, color: '#D97706' }}>{balanceUser.fichas_extras}</span>
+                <span style={{ fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Extras</span>
+              </div>
+            </div>
+
+            {/* Selector periodo */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={styles.label}>Mes</label>
+                <select style={styles.input} value={balanceMes} onChange={(e) => setBalanceMes(parseInt(e.target.value))}>
+                  {meses.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={styles.label}>Año</label>
+                <input type="number" style={styles.input} value={balanceAnio} onChange={(e) => setBalanceAnio(parseInt(e.target.value) || now.getFullYear())} />
+              </div>
+            </div>
+
+            {balanceLoading ? <p style={styles.muted}>Cargando...</p> : balanceData && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+                  <div style={styles.statBox}>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{balanceData.mesUsos}</span>
+                    <span style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Usos</span>
+                  </div>
+                  <div style={styles.statBox}>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{balanceData.mesMin}</span>
+                    <span style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Minutos</span>
+                  </div>
+                  <div style={styles.statBox}>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: colors.error }}>{balanceData.mesFallas}</span>
+                    <span style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Fallas</span>
+                  </div>
+                  <div style={styles.statBox}>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: colors.primary }}>{balanceData.totalUsos}</span>
+                    <span style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Total</span>
+                  </div>
+                </div>
+
+                {balanceData.mesLista.length > 0 && (
+                  <div style={{ maxHeight: 200, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 8, marginBottom: 16 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead style={{ position: 'sticky', top: 0, backgroundColor: colors.bgPage }}>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: 8, fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Fecha</th>
+                          <th style={{ textAlign: 'left', padding: 8, fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Tipo</th>
+                          <th style={{ textAlign: 'left', padding: 8, fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Duración</th>
+                          <th style={{ textAlign: 'left', padding: 8, fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase' }}>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {balanceData.mesLista.map((x) => (
+                          <tr key={x._id}>
+                            <td style={{ padding: 8, borderTop: `1px solid ${colors.border}` }}>{new Date(x.fecha_inicio || x.fecha).toLocaleDateString('es-UY')}</td>
+                            <td style={{ padding: 8, borderTop: `1px solid ${colors.border}` }}>{x.tipo || 'lavarropas'}</td>
+                            <td style={{ padding: 8, borderTop: `1px solid ${colors.border}` }}>{x.duracion_min} min</td>
+                            <td style={{ padding: 8, borderTop: `1px solid ${colors.border}` }}>
+                              {x.estado === 'averia' ? <span style={{ color: colors.error }}>⚠️ Falla</span> : x.estado === 'completado' ? <span style={{ color: colors.success }}>✓ OK</span> : x.estado || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setBalanceUser(null)} style={styles.btnCancel}>Cerrar</button>
+              <button type="button" onClick={exportarUsuarioPDF} style={styles.btnPrimary} disabled={balanceLoading}>📄 Exportar PDF</button>
+            </div>
           </div>
         </div>
       )}
@@ -555,6 +795,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '5px 12px', borderRadius: 6, backgroundColor: '#FEF2F2',
     color: colors.error, fontSize: 12, fontWeight: 600, border: 'none',
     cursor: 'pointer', fontFamily: 'inherit',
+  },
+  btnBalance: {
+    padding: '6px 12px', borderRadius: 8, border: `1px solid ${colors.border}`,
+    backgroundColor: colors.bgPage, fontSize: 13, cursor: 'pointer',
+    fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 4,
   },
   btnCancel: {
     padding: '10px 20px', borderRadius: 999, backgroundColor: colors.bgPage,

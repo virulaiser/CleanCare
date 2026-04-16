@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { obtenerResumen, listarMaquinas, listarEdificios, ResumenItem, Maquina, Edificio, Usuario } from '../services/api';
+import { obtenerResumen, listarMaquinas, listarEdificios, listarUsos, ResumenItem, Maquina, Edificio, Uso, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
 function getUsuario(): Usuario | null {
@@ -12,7 +12,6 @@ function getUsuario(): Usuario | null {
 interface Tarifas {
   precio_agua_m3: number;
   litros_lavado: number;
-  litros_secado: number;
   precio_kwh: number;
   kwh_lavado: number;
   kwh_secado: number;
@@ -23,7 +22,6 @@ interface Tarifas {
 const TARIFAS_DEFAULT: Tarifas = {
   precio_agua_m3: 45,
   litros_lavado: 55,
-  litros_secado: 0,
   precio_kwh: 8.5,
   kwh_lavado: 1.2,
   kwh_secado: 3,
@@ -60,6 +58,7 @@ export default function Liquidacion() {
   const [anio, setAnio] = useState(now.getFullYear());
   const [resumen, setResumen] = useState<ResumenItem[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
+  const [usos, setUsos] = useState<Uso[]>([]);
   const [tarifas, setTarifas] = useState<Tarifas>(TARIFAS_DEFAULT);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -84,12 +83,14 @@ export default function Liquidacion() {
     setLoading(true);
     setError('');
     try {
-      const [resumenData, maquinasData] = await Promise.all([
+      const [resumenData, maquinasData, usosData] = await Promise.all([
         obtenerResumen(edificioId, mes, anio),
         listarMaquinas(edificioId),
+        listarUsos(),
       ]);
       setResumen(resumenData);
       setMaquinas(maquinasData);
+      setUsos(usosData);
     } catch {
       setError('Error al cargar datos');
     } finally {
@@ -108,7 +109,15 @@ export default function Liquidacion() {
       else { usosLav += r.total_usos; minLav += r.minutos_totales; }
     });
 
-    const litrosTotal = usosLav * tarifas.litros_lavado + usosSec * tarifas.litros_secado;
+    // Fallas del edificio en el mes seleccionado
+    const fallas = usos.filter((u) => {
+      if (u.edificio_id !== edificioId) return false;
+      if (u.estado !== 'averia') return false;
+      const f = new Date(u.fecha_inicio || u.fecha);
+      return f.getMonth() + 1 === mes && f.getFullYear() === anio;
+    });
+
+    const litrosTotal = usosLav * tarifas.litros_lavado;
     const m3Total = litrosTotal / 1000;
     const costoAgua = m3Total * tarifas.precio_agua_m3;
 
@@ -123,8 +132,9 @@ export default function Liquidacion() {
       litrosTotal, m3Total, costoAgua,
       kwhTotal, costoElectricidad,
       costoOtros, totalGeneral,
+      fallas,
     };
-  }, [resumen, maquinas, tarifas]);
+  }, [resumen, maquinas, tarifas, usos, edificioId, mes, anio]);
 
   function actualizarTarifa<K extends keyof Tarifas>(k: K, v: Tarifas[K]) {
     setTarifas((prev) => {
@@ -134,6 +144,105 @@ export default function Liquidacion() {
     });
     setSavedMsg('✓ Guardado');
     setTimeout(() => setSavedMsg(''), 1500);
+  }
+
+  function exportarPDF() {
+    const edi = edificios.find((e) => e.edificio_id === edificioId);
+    const edificioNombre = edi?.nombre || edificioId;
+    const periodo = `${meses[mes - 1]} ${anio}`;
+    const nombreMaquina = (id: string) => maquinas.find((m) => m.maquina_id === id)?.nombre || id;
+
+    const fallasHtml = calculo.fallas.length === 0
+      ? '<tr><td colspan="3" style="text-align:center;color:#94A3B8;padding:16px">Sin reportes de falla este mes</td></tr>'
+      : calculo.fallas.map((f) => `
+          <tr>
+            <td>${new Date(f.fecha_inicio || f.fecha).toLocaleDateString('es-UY')}</td>
+            <td>${nombreMaquina(f.maquina_id)}</td>
+            <td>${f.residente_id || '—'}</td>
+          </tr>
+        `).join('');
+
+    const w = window.open('', '_blank', 'width=900,height=1000');
+    if (!w) return;
+    w.document.write(`
+      <!DOCTYPE html><html><head><title>Liquidación ${edificioNombre} — ${periodo}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', system-ui, sans-serif; color: #1E293B; padding: 32px; margin: 0; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #3B82F6; padding-bottom: 16px; margin-bottom: 24px; }
+        .logo { font-size: 24px; font-weight: 700; color: #3B82F6; }
+        .subtitle { color: #64748B; font-size: 13px; margin-top: 4px; }
+        .meta { text-align: right; font-size: 13px; color: #64748B; }
+        h1 { font-size: 22px; margin: 0 0 4px; color: #1E293B; }
+        h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; border-bottom: 1px solid #E5E7EB; padding-bottom: 6px; margin: 24px 0 12px; }
+        .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+        .kpi { background: #F8FAFC; border: 1px solid #E5E7EB; padding: 12px; border-radius: 8px; text-align: center; }
+        .kpi .label { font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi .val { font-size: 22px; font-weight: 700; color: #1E293B; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+        th { text-align: left; padding: 8px 12px; background: #F1F5F9; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #E5E7EB; }
+        td { padding: 8px 12px; border-bottom: 1px solid #E5E7EB; }
+        tr:last-child td { border-bottom: none; }
+        .total { background: #3B82F6; color: white; padding: 20px; border-radius: 12px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .total .tlabel { font-size: 13px; opacity: 0.85; }
+        .total .tval { font-size: 32px; font-weight: 700; }
+        .breakdown { font-size: 12px; opacity: 0.9; text-align: right; line-height: 1.6; }
+        .footer { margin-top: 32px; text-align: center; font-size: 11px; color: #94A3B8; border-top: 1px solid #E5E7EB; padding-top: 12px; }
+        @media print { body { padding: 16px; } }
+      </style></head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="logo">CleanCare</div>
+            <div class="subtitle">Liquidación mensual por edificio</div>
+          </div>
+          <div class="meta">
+            Generado: ${new Date().toLocaleString('es-UY')}<br/>
+            Periodo: <strong>${periodo}</strong>
+          </div>
+        </div>
+
+        <h1>${edificioNombre}</h1>
+
+        <h2>Resumen de uso</h2>
+        <div class="kpis">
+          <div class="kpi"><div class="label">Fichas gastadas</div><div class="val">${calculo.usosLav + calculo.usosSec}</div></div>
+          <div class="kpi"><div class="label">Lavados</div><div class="val">${calculo.usosLav}</div></div>
+          <div class="kpi"><div class="label">Secados</div><div class="val">${calculo.usosSec}</div></div>
+          <div class="kpi"><div class="label">Reportes falla</div><div class="val">${calculo.fallas.length}</div></div>
+        </div>
+
+        <h2>Consumo de recursos</h2>
+        <table>
+          <tr><th>Recurso</th><th>Consumo</th><th>Tarifa</th><th style="text-align:right">Costo</th></tr>
+          <tr><td>💧 Agua</td><td>${Math.round(calculo.litrosTotal).toLocaleString()} L (${calculo.m3Total.toFixed(2)} m³)</td><td>$ ${tarifas.precio_agua_m3} / m³</td><td style="text-align:right"><strong>$ ${calculo.costoAgua.toFixed(2)}</strong></td></tr>
+          <tr><td>⚡ Electricidad</td><td>${calculo.kwhTotal.toFixed(1)} kWh</td><td>$ ${tarifas.precio_kwh} / kWh</td><td style="text-align:right"><strong>$ ${calculo.costoElectricidad.toFixed(2)}</strong></td></tr>
+          ${calculo.costoOtros > 0 ? `<tr><td>🛠 ${tarifas.otros_gastos_desc}</td><td>—</td><td>—</td><td style="text-align:right"><strong>$ ${calculo.costoOtros.toFixed(2)}</strong></td></tr>` : ''}
+        </table>
+
+        <h2>Reportes de falla (${calculo.fallas.length})</h2>
+        <table>
+          <thead><tr><th>Fecha</th><th>Máquina</th><th>Residente</th></tr></thead>
+          <tbody>${fallasHtml}</tbody>
+        </table>
+
+        <div class="total">
+          <div>
+            <div class="tlabel">Total a liquidar</div>
+            <div class="tval">$ ${calculo.totalGeneral.toFixed(2)}</div>
+          </div>
+          <div class="breakdown">
+            Agua: $ ${calculo.costoAgua.toFixed(2)}<br/>
+            Electricidad: $ ${calculo.costoElectricidad.toFixed(2)}<br/>
+            Otros: $ ${calculo.costoOtros.toFixed(2)}
+          </div>
+        </div>
+
+        <div class="footer">CleanCare — sistema de gestión de lavarropas y secadoras • cleancare.uy</div>
+        <script>setTimeout(function(){window.print();}, 400);</script>
+      </body></html>
+    `);
+    w.document.close();
   }
 
   function exportarExcel() {
@@ -149,7 +258,6 @@ export default function Liquidacion() {
       [],
       ['Agua'],
       ['Litros por lavado', tarifas.litros_lavado],
-      ['Litros por secado', tarifas.litros_secado],
       ['Total litros', Math.round(calculo.litrosTotal)],
       ['Total m³', calculo.m3Total.toFixed(3)],
       ['Precio m³', tarifas.precio_agua_m3],
@@ -182,7 +290,7 @@ export default function Liquidacion() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <h1 style={styles.logo}>CleanCare</h1>
+        <h1 style={{ ...styles.logo, display: 'flex', alignItems: 'center', gap: 10 }}><img src="/logo.png" alt="CleanCare" style={{ height: 36, width: 36, objectFit: 'contain' }} />CleanCare</h1>
         <nav style={styles.navLinks}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
@@ -198,7 +306,10 @@ export default function Liquidacion() {
       <main style={styles.main}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
           <h2 style={{ ...styles.pageTitle, marginBottom: 0 }}>Liquidación mensual</h2>
-          <button style={styles.btnOutline} onClick={exportarExcel} disabled={loading || !edificioId}>📄 Exportar Excel</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button style={styles.btnPrimary} onClick={exportarPDF} disabled={loading || !edificioId}>📄 Exportar PDF</button>
+            <button style={styles.btnOutline} onClick={exportarExcel} disabled={loading || !edificioId}>📊 Excel</button>
+          </div>
         </div>
 
         <div style={styles.card}>
@@ -262,11 +373,6 @@ export default function Liquidacion() {
               <input type="number" style={styles.input} value={tarifas.litros_lavado}
                 onChange={(e) => actualizarTarifa('litros_lavado', parseFloat(e.target.value) || 0)} />
             </div>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Litros por secado</label>
-              <input type="number" style={styles.input} value={tarifas.litros_secado}
-                onChange={(e) => actualizarTarifa('litros_secado', parseFloat(e.target.value) || 0)} />
-            </div>
           </div>
           <div style={styles.resumenRow}>
             <span>Total consumo: <strong>{Math.round(calculo.litrosTotal).toLocaleString()} L</strong> ({calculo.m3Total.toFixed(2)} m³)</span>
@@ -313,6 +419,34 @@ export default function Liquidacion() {
                 onChange={(e) => actualizarTarifa('otros_gastos', parseFloat(e.target.value) || 0)} />
             </div>
           </div>
+        </div>
+
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>⚠️ Reportes de falla ({calculo.fallas.length})</h3>
+          {calculo.fallas.length === 0 ? (
+            <p style={styles.muted}>Sin reportes de falla en {meses[mes - 1]} {anio}.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: '8px 12px', fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: `2px solid ${colors.border}` }}>Fecha</th>
+                    <th style={{ textAlign: 'left', padding: '8px 12px', fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: `2px solid ${colors.border}` }}>Máquina</th>
+                    <th style={{ textAlign: 'left', padding: '8px 12px', fontSize: 11, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: `2px solid ${colors.border}` }}>Residente</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calculo.fallas.map((f) => (
+                    <tr key={f._id}>
+                      <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{new Date(f.fecha_inicio || f.fecha).toLocaleDateString('es-UY')}</td>
+                      <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{maquinas.find((m) => m.maquina_id === f.maquina_id)?.nombre || f.maquina_id}</td>
+                      <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{f.residente_id || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div style={{ ...styles.card, backgroundColor: colors.primary, color: colors.white }}>
@@ -371,6 +505,11 @@ const styles: Record<string, React.CSSProperties> = {
   btnOutline: {
     padding: '10px 24px', borderRadius: 999, border: `1px solid ${colors.border}`,
     backgroundColor: colors.white, color: colors.textPrimary, fontSize: 14,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  btnPrimary: {
+    padding: '10px 24px', borderRadius: 999, backgroundColor: colors.primary,
+    color: colors.white, fontSize: 14, fontWeight: 600, border: 'none',
     cursor: 'pointer', fontFamily: 'inherit',
   },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 },

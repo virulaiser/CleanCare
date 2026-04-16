@@ -186,7 +186,7 @@ export default function Maquinas() {
     <div style={styles.page}>
       {/* Header */}
       <header style={styles.header}>
-        <h1 style={styles.logo}>CleanCare</h1>
+        <h1 style={{ ...styles.logo, display: 'flex', alignItems: 'center', gap: 10 }}><img src="/logo.png" alt="CleanCare" style={{ height: 36, width: 36, objectFit: 'contain' }} />CleanCare</h1>
         <nav style={styles.navLinks}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtnActive}>Máquinas</button>

@@ -85,7 +85,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <h1 style={styles.logo}>CleanCare</h1>
+        <h1 style={{ ...styles.logo, display: 'flex', alignItems: 'center', gap: 10 }}><img src="/logo.png" alt="CleanCare" style={{ height: 36, width: 36, objectFit: 'contain' }} />CleanCare</h1>
         <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
