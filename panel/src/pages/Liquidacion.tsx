@@ -51,6 +51,43 @@ function guardarTarifas(edificioId: string, t: Tarifas) {
 
 const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+function NumericInput({ value, onChange, style, placeholder }: {
+  value: number; onChange: (n: number) => void; style?: React.CSSProperties; placeholder?: string;
+}) {
+  const [text, setText] = React.useState<string>(value ? String(value) : '');
+  const lastEmitted = React.useRef<number>(value);
+
+  React.useEffect(() => {
+    if (value !== lastEmitted.current) {
+      setText(value ? String(value) : '');
+      lastEmitted.current = value;
+    }
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      style={style}
+      value={text}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const v = e.target.value.replace(',', '.');
+        if (v !== '' && !/^-?\d*\.?\d*$/.test(v)) return;
+        setText(v);
+        const n = v === '' || v === '.' || v === '-' ? 0 : parseFloat(v);
+        if (!isNaN(n)) { lastEmitted.current = n; onChange(n); }
+      }}
+      onBlur={() => {
+        if (text === '' || text === '.' || text === '-') { setText(''); return; }
+        const n = parseFloat(text);
+        if (!isNaN(n)) setText(String(n));
+      }}
+      onFocus={(e) => e.target.select()}
+    />
+  );
+}
+
 export default function Liquidacion() {
   const navigate = useNavigate();
   const usuario = getUsuario();
@@ -389,13 +426,13 @@ export default function Liquidacion() {
           <div style={styles.tarifaGrid}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Precio por m³ ($)</label>
-              <input type="number" step="0.01" style={styles.input} value={tarifas.precio_agua_m3}
-                onChange={(e) => actualizarTarifa('precio_agua_m3', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.precio_agua_m3}
+                onChange={(n) => actualizarTarifa('precio_agua_m3', n)} />
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>Litros por lavado</label>
-              <input type="number" style={styles.input} value={tarifas.litros_lavado}
-                onChange={(e) => actualizarTarifa('litros_lavado', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.litros_lavado}
+                onChange={(n) => actualizarTarifa('litros_lavado', n)} />
             </div>
           </div>
           <div style={styles.resumenRow}>
@@ -409,18 +446,18 @@ export default function Liquidacion() {
           <div style={styles.tarifaGrid}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Precio por kWh ($)</label>
-              <input type="number" step="0.01" style={styles.input} value={tarifas.precio_kwh}
-                onChange={(e) => actualizarTarifa('precio_kwh', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.precio_kwh}
+                onChange={(n) => actualizarTarifa('precio_kwh', n)} />
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>kWh por lavado</label>
-              <input type="number" step="0.1" style={styles.input} value={tarifas.kwh_lavado}
-                onChange={(e) => actualizarTarifa('kwh_lavado', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.kwh_lavado}
+                onChange={(n) => actualizarTarifa('kwh_lavado', n)} />
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>kWh por secado</label>
-              <input type="number" step="0.1" style={styles.input} value={tarifas.kwh_secado}
-                onChange={(e) => actualizarTarifa('kwh_secado', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.kwh_secado}
+                onChange={(n) => actualizarTarifa('kwh_secado', n)} />
             </div>
           </div>
           <div style={styles.resumenRow}>
@@ -439,8 +476,8 @@ export default function Liquidacion() {
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>Monto ($)</label>
-              <input type="number" step="0.01" style={styles.input} value={tarifas.otros_gastos}
-                onChange={(e) => actualizarTarifa('otros_gastos', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.otros_gastos}
+                onChange={(n) => actualizarTarifa('otros_gastos', n)} />
             </div>
           </div>
         </div>
@@ -451,22 +488,22 @@ export default function Liquidacion() {
           <div style={styles.tarifaGrid}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Valor ficha lavado ($)</label>
-              <input type="number" step="0.01" style={styles.input} value={tarifas.valor_ficha_lavado}
-                onChange={(e) => actualizarTarifa('valor_ficha_lavado', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.valor_ficha_lavado}
+                onChange={(n) => actualizarTarifa('valor_ficha_lavado', n)} />
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>Valor ficha secado ($)</label>
-              <input type="number" step="0.01" style={styles.input} value={tarifas.valor_ficha_secado}
-                onChange={(e) => actualizarTarifa('valor_ficha_secado', parseFloat(e.target.value) || 0)} />
+              <NumericInput style={styles.input} value={tarifas.valor_ficha_secado}
+                onChange={(n) => actualizarTarifa('valor_ficha_secado', n)} />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
             <div style={styles.resumenRow}>
-              <span>🧺 <strong>{calculo.usosLav}</strong> fichas × ${tarifas.valor_ficha_lavado}</span>
+              <span>🧺 <strong>{calculo.usosLav}</strong> fichas × ${tarifas.valor_ficha_lavado.toFixed(2)}</span>
               <span style={styles.costoPill}>$ {calculo.ingresoLavado.toFixed(2)}</span>
             </div>
             <div style={styles.resumenRow}>
-              <span>🌀 <strong>{calculo.usosSec}</strong> fichas × ${tarifas.valor_ficha_secado}</span>
+              <span>🌀 <strong>{calculo.usosSec}</strong> fichas × ${tarifas.valor_ficha_secado.toFixed(2)}</span>
               <span style={styles.costoPill}>$ {calculo.ingresoSecado.toFixed(2)}</span>
             </div>
           </div>
