@@ -85,13 +85,12 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <h1 style={{ ...styles.logo, display: 'flex', alignItems: 'center', gap: 10 }}><img src="/logo.png" alt="CleanCare" style={{ height: 36, width: 36, objectFit: 'contain' }} />CleanCare</h1>
+        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
         <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
           <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
           <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
-          <button onClick={() => navigate('/tips')} style={styles.navBtn}>Tips</button>
           <button onClick={() => navigate('/dispositivos')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Dispositivos</button>
           <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
           <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
@@ -99,6 +98,16 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
       </header>
 
       <main style={styles.main}>
+        {/* Subtabs */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: `1px solid ${colors.border}`, paddingBottom: 0 }}>
+          <button style={{ padding: '10px 20px', border: 'none', borderBottom: `3px solid ${colors.primary}`, backgroundColor: 'transparent', color: colors.primary, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Dispositivos
+          </button>
+          <button onClick={() => navigate('/tips')} style={{ padding: '10px 20px', border: 'none', borderBottom: '3px solid transparent', backgroundColor: 'transparent', color: colors.textSecondary, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Tips
+          </button>
+        </div>
+
         <h2 style={styles.pageTitle}>Dispositivos (ESP32 / Pico)</h2>
         <p style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 24 }}>
           Cada placa tiene UUIDs únicas generadas acá. Copiá el código al firmware antes de flashear.

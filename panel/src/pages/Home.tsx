@@ -12,7 +12,7 @@ export default function Home() {
       {/* NAVBAR */}
       <nav style={styles.nav}>
         <div style={styles.navInner}>
-          <span style={{ ...styles.logo, display: 'flex', alignItems: 'center', gap: 10 }}><img src="/logo.png" alt="CleanCare" style={{ height: 36, width: 36, objectFit: 'contain' }} />CleanCare</span>
+          <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
           <div className="nav-links" style={styles.navLinks}>
             <a href="#nosotros" style={styles.navLink}>Nosotros</a>
             <a href="#servicios" style={styles.navLink}>Servicios</a>

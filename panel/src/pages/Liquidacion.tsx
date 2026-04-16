@@ -17,6 +17,8 @@ interface Tarifas {
   kwh_secado: number;
   otros_gastos: number;
   otros_gastos_desc: string;
+  valor_ficha_lavado: number;
+  valor_ficha_secado: number;
 }
 
 const TARIFAS_DEFAULT: Tarifas = {
@@ -27,6 +29,8 @@ const TARIFAS_DEFAULT: Tarifas = {
   kwh_secado: 3,
   otros_gastos: 0,
   otros_gastos_desc: 'Mantenimiento',
+  valor_ficha_lavado: 150,
+  valor_ficha_secado: 100,
 };
 
 function tarifasKey(edificioId: string) {
@@ -125,13 +129,19 @@ export default function Liquidacion() {
     const costoElectricidad = kwhTotal * tarifas.precio_kwh;
 
     const costoOtros = Number(tarifas.otros_gastos) || 0;
-    const totalGeneral = costoAgua + costoElectricidad + costoOtros;
+    const totalGasto = costoAgua + costoElectricidad + costoOtros;
+
+    const ingresoLavado = usosLav * tarifas.valor_ficha_lavado;
+    const ingresoSecado = usosSec * tarifas.valor_ficha_secado;
+    const ingresoTotal = ingresoLavado + ingresoSecado;
+    const utilidad = ingresoTotal - totalGasto;
 
     return {
       usosLav, minLav, usosSec, minSec,
       litrosTotal, m3Total, costoAgua,
       kwhTotal, costoElectricidad,
-      costoOtros, totalGeneral,
+      costoOtros, totalGasto,
+      ingresoLavado, ingresoSecado, ingresoTotal, utilidad,
       fallas,
     };
   }, [resumen, maquinas, tarifas, usos, edificioId, mes, anio]);
@@ -212,12 +222,21 @@ export default function Liquidacion() {
           <div class="kpi"><div class="label">Reportes falla</div><div class="val">${calculo.fallas.length}</div></div>
         </div>
 
-        <h2>Consumo de recursos</h2>
+        <h2>Ingresos por fichas</h2>
+        <table>
+          <tr><th>Concepto</th><th>Cantidad</th><th>Valor unitario</th><th style="text-align:right">Ingreso</th></tr>
+          <tr><td>🧺 Lavados</td><td>${calculo.usosLav} fichas</td><td>$ ${tarifas.valor_ficha_lavado.toFixed(2)}</td><td style="text-align:right"><strong>$ ${calculo.ingresoLavado.toFixed(2)}</strong></td></tr>
+          <tr><td>🌀 Secados</td><td>${calculo.usosSec} fichas</td><td>$ ${tarifas.valor_ficha_secado.toFixed(2)}</td><td style="text-align:right"><strong>$ ${calculo.ingresoSecado.toFixed(2)}</strong></td></tr>
+          <tr><td colspan="3" style="text-align:right"><strong>Total ingresos</strong></td><td style="text-align:right"><strong>$ ${calculo.ingresoTotal.toFixed(2)}</strong></td></tr>
+        </table>
+
+        <h2>Gastos</h2>
         <table>
           <tr><th>Recurso</th><th>Consumo</th><th>Tarifa</th><th style="text-align:right">Costo</th></tr>
           <tr><td>💧 Agua</td><td>${Math.round(calculo.litrosTotal).toLocaleString()} L (${calculo.m3Total.toFixed(2)} m³)</td><td>$ ${tarifas.precio_agua_m3} / m³</td><td style="text-align:right"><strong>$ ${calculo.costoAgua.toFixed(2)}</strong></td></tr>
           <tr><td>⚡ Electricidad</td><td>${calculo.kwhTotal.toFixed(1)} kWh</td><td>$ ${tarifas.precio_kwh} / kWh</td><td style="text-align:right"><strong>$ ${calculo.costoElectricidad.toFixed(2)}</strong></td></tr>
           ${calculo.costoOtros > 0 ? `<tr><td>🛠 ${tarifas.otros_gastos_desc}</td><td>—</td><td>—</td><td style="text-align:right"><strong>$ ${calculo.costoOtros.toFixed(2)}</strong></td></tr>` : ''}
+          <tr><td colspan="3" style="text-align:right"><strong>Total gastos</strong></td><td style="text-align:right"><strong>$ ${calculo.totalGasto.toFixed(2)}</strong></td></tr>
         </table>
 
         <h2>Reportes de falla (${calculo.fallas.length})</h2>
@@ -226,15 +245,15 @@ export default function Liquidacion() {
           <tbody>${fallasHtml}</tbody>
         </table>
 
-        <div class="total">
+        <div class="total" style="background:${calculo.utilidad >= 0 ? '#16A34A' : '#EF4444'}">
           <div>
-            <div class="tlabel">Total a liquidar</div>
-            <div class="tval">$ ${calculo.totalGeneral.toFixed(2)}</div>
+            <div class="tlabel">Utilidad del periodo</div>
+            <div class="tval">$ ${calculo.utilidad.toFixed(2)}</div>
           </div>
           <div class="breakdown">
-            Agua: $ ${calculo.costoAgua.toFixed(2)}<br/>
-            Electricidad: $ ${calculo.costoElectricidad.toFixed(2)}<br/>
-            Otros: $ ${calculo.costoOtros.toFixed(2)}
+            Ingresos: $ ${calculo.ingresoTotal.toFixed(2)}<br/>
+            Gastos: $ ${calculo.totalGasto.toFixed(2)}<br/>
+            ${calculo.utilidad >= 0 ? 'Ganancia' : 'Pérdida'}: $ ${Math.abs(calculo.utilidad).toFixed(2)}
           </div>
         </div>
 
@@ -273,7 +292,14 @@ export default function Liquidacion() {
       ['Otros'],
       [tarifas.otros_gastos_desc, `$ ${calculo.costoOtros.toFixed(2)}`],
       [],
-      ['TOTAL', `$ ${calculo.totalGeneral.toFixed(2)}`],
+      ['TOTAL GASTOS', `$ ${calculo.totalGasto.toFixed(2)}`],
+      [],
+      ['Ingresos por fichas'],
+      ['Fichas lavado', calculo.usosLav, `$ ${tarifas.valor_ficha_lavado}`, `$ ${calculo.ingresoLavado.toFixed(2)}`],
+      ['Fichas secado', calculo.usosSec, `$ ${tarifas.valor_ficha_secado}`, `$ ${calculo.ingresoSecado.toFixed(2)}`],
+      ['TOTAL INGRESOS', `$ ${calculo.ingresoTotal.toFixed(2)}`],
+      [],
+      ['UTILIDAD', `$ ${calculo.utilidad.toFixed(2)}`],
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -290,13 +316,12 @@ export default function Liquidacion() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <h1 style={{ ...styles.logo, display: 'flex', alignItems: 'center', gap: 10 }}><img src="/logo.png" alt="CleanCare" style={{ height: 36, width: 36, objectFit: 'contain' }} />CleanCare</h1>
+        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
         <nav style={styles.navLinks}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
           <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
           <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
           <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
-          <button onClick={() => navigate('/tips')} style={styles.navBtn}>Tips</button>
           <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
           <button onClick={() => navigate('/liquidacion')} style={styles.navBtnActive}>Liquidación</button>
           <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
@@ -421,6 +446,37 @@ export default function Liquidacion() {
           </div>
         </div>
 
+        {/* Ingresos por fichas */}
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>💰 Ingresos por fichas</h3>
+          <div style={styles.tarifaGrid}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Valor ficha lavado ($)</label>
+              <input type="number" step="0.01" style={styles.input} value={tarifas.valor_ficha_lavado}
+                onChange={(e) => actualizarTarifa('valor_ficha_lavado', parseFloat(e.target.value) || 0)} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Valor ficha secado ($)</label>
+              <input type="number" step="0.01" style={styles.input} value={tarifas.valor_ficha_secado}
+                onChange={(e) => actualizarTarifa('valor_ficha_secado', parseFloat(e.target.value) || 0)} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
+            <div style={styles.resumenRow}>
+              <span>🧺 <strong>{calculo.usosLav}</strong> fichas × ${tarifas.valor_ficha_lavado}</span>
+              <span style={styles.costoPill}>$ {calculo.ingresoLavado.toFixed(2)}</span>
+            </div>
+            <div style={styles.resumenRow}>
+              <span>🌀 <strong>{calculo.usosSec}</strong> fichas × ${tarifas.valor_ficha_secado}</span>
+              <span style={styles.costoPill}>$ {calculo.ingresoSecado.toFixed(2)}</span>
+            </div>
+          </div>
+          <div style={{ ...styles.resumenRow, marginTop: 12, backgroundColor: '#DCFCE7' }}>
+            <span><strong>Total ingresos</strong> ({calculo.usosLav + calculo.usosSec} fichas)</span>
+            <span style={{ ...styles.costoPill, backgroundColor: colors.success, color: colors.white }}>$ {calculo.ingresoTotal.toFixed(2)}</span>
+          </div>
+        </div>
+
         <div style={styles.card}>
           <h3 style={styles.cardTitle}>⚠️ Reportes de falla ({calculo.fallas.length})</h3>
           {calculo.fallas.length === 0 ? (
@@ -449,17 +505,23 @@ export default function Liquidacion() {
           )}
         </div>
 
-        <div style={{ ...styles.card, backgroundColor: colors.primary, color: colors.white }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 4 }}>Total a liquidar</div>
-              <div style={{ fontSize: 36, fontWeight: 700 }}>$ {calculo.totalGeneral.toFixed(2)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 24 }}>
+          <div style={{ ...styles.card, backgroundColor: '#DCFCE7', marginBottom: 0 }}>
+            <div style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Ingresos</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: colors.success }}>$ {calculo.ingresoTotal.toFixed(2)}</div>
+            <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>{calculo.usosLav + calculo.usosSec} fichas vendidas</div>
+          </div>
+          <div style={{ ...styles.card, backgroundColor: '#FEF2F2', marginBottom: 0 }}>
+            <div style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Gastos</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: colors.error }}>$ {calculo.totalGasto.toFixed(2)}</div>
+            <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>Agua + electricidad + otros</div>
+          </div>
+          <div style={{ ...styles.card, backgroundColor: calculo.utilidad >= 0 ? colors.primary : colors.error, color: colors.white, marginBottom: 0 }}>
+            <div style={{ fontSize: 12, opacity: 0.85, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+              {calculo.utilidad >= 0 ? 'Utilidad' : 'Pérdida'}
             </div>
-            <div style={{ fontSize: 13, opacity: 0.85, textAlign: 'right' }}>
-              Agua: $ {calculo.costoAgua.toFixed(2)}<br />
-              Electricidad: $ {calculo.costoElectricidad.toFixed(2)}<br />
-              Otros: $ {calculo.costoOtros.toFixed(2)}
-            </div>
+            <div style={{ fontSize: 32, fontWeight: 700 }}>$ {calculo.utilidad.toFixed(2)}</div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>Ingresos − Gastos</div>
           </div>
         </div>
 
