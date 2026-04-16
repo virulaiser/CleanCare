@@ -62,6 +62,10 @@ export default function Login() {
         <button type="submit" style={{ ...styles.button, opacity: loading ? 0.6 : 1 }} disabled={loading}>
           {loading ? 'Ingresando...' : 'Ingresar'}
         </button>
+
+        <button type="button" onClick={() => navigate('/')} style={styles.backButton}>
+          ← Volver al inicio
+        </button>
       </form>
     </div>
   );
@@ -127,6 +131,19 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: 'inherit',
     marginTop: 8,
+  },
+  backButton: {
+    width: '100%',
+    padding: '10px 0',
+    borderRadius: 999,
+    backgroundColor: 'transparent',
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: 500,
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    marginTop: 12,
   },
   error: {
     backgroundColor: '#FEF2F2',
