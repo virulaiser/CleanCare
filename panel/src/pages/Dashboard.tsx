@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [resumen, setResumen] = useState<ResumenItem[]>([]);
   const [usos, setUsos] = useState<Uso[]>([]);
   const [maquinaMap, setMaquinaMap] = useState<Record<string, string>>({});
+  const [maquinaInfo, setMaquinaInfo] = useState<Record<string, { tipo: string; numero: number; totalMismoTipo: number }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -45,8 +46,18 @@ export default function Dashboard() {
         listarMaquinas(edificioId),
       ]);
       const map: Record<string, string> = {};
-      maquinasData.forEach((m) => { map[m.maquina_id] = m.nombre; });
+      const info: Record<string, { tipo: string; numero: number; totalMismoTipo: number }> = {};
+      const counts: Record<string, number> = {};
+      const sorted = [...maquinasData].sort((a, b) => a.maquina_id.localeCompare(b.maquina_id));
+      sorted.forEach((m) => {
+        map[m.maquina_id] = m.nombre;
+        counts[m.tipo] = (counts[m.tipo] || 0) + 1;
+        info[m.maquina_id] = { tipo: m.tipo, numero: counts[m.tipo], totalMismoTipo: 0 };
+      });
+      // Fijar totalMismoTipo en todos
+      Object.values(info).forEach((i) => { i.totalMismoTipo = counts[i.tipo]; });
       setMaquinaMap(map);
+      setMaquinaInfo(info);
       setResumen(resumenData);
       setUsos(usosData);
     } catch {
@@ -187,13 +198,27 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {resumen.map((item) => (
-                  <tr key={item._id}>
-                    <td style={styles.td}>{maquinaMap[item._id] || item._id}</td>
-                    <td style={{ ...styles.td, textAlign: 'right' }}>{item.total_usos}</td>
-                    <td style={{ ...styles.td, textAlign: 'right' }}>{item.minutos_totales}</td>
-                  </tr>
-                ))}
+                {resumen.map((item) => {
+                  const info = maquinaInfo[item._id];
+                  const tipo = info?.tipo || 'lavarropas';
+                  const label = tipo === 'secadora' ? 'Secadora' : 'Lavarropas';
+                  const suffix = info && info.totalMismoTipo > 1 ? ` #${info.numero}` : '';
+                  return (
+                    <tr key={item._id}>
+                      <td style={styles.td}>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                          backgroundColor: tipo === 'secadora' ? '#FEF3C7' : '#DBEAFE',
+                          color: tipo === 'secadora' ? '#D97706' : '#3B82F6',
+                        }}>
+                          {label}{suffix}
+                        </span>
+                      </td>
+                      <td style={{ ...styles.td, textAlign: 'right' }}>{item.total_usos}</td>
+                      <td style={{ ...styles.td, textAlign: 'right' }}>{item.minutos_totales}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
