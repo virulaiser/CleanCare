@@ -35,6 +35,12 @@ async function crear(req, res) {
     return res.status(400).json({ ok: false, error: 'Faltan campos requeridos: maquina_id, edificio_id, duracion_min' });
   }
 
+  // Verificar que la máquina no tenga otro ciclo activo
+  const activoEnMaquina = await Uso.findOne({ maquina_id, estado: 'activo' }).lean();
+  if (activoEnMaquina) {
+    return res.status(409).json({ ok: false, error: 'La máquina ya está en uso', uso_activo: activoEnMaquina });
+  }
+
   // Verificar saldo
   const costo = await obtenerCosto(edificio_id, tipoMaquina);
   const saldo = await obtenerSaldo(usuario_id);

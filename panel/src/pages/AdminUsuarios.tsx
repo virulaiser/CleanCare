@@ -394,7 +394,6 @@ export default function AdminUsuarios() {
         <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
         <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
           <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
           <button onClick={() => navigate('/admin-usuarios')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Usuarios</button>
           <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>

@@ -7,7 +7,8 @@ const dispositivoSchema = new mongoose.Schema({
   service_uuid:       { type: String, required: true },
   control_uuid:       { type: String, required: true },
   status_uuid:        { type: String, required: true },
-  maquina_asignada:   { type: String, default: null },  // maquina_id o null
+  maquina_asignada:   { type: String, default: null },  // maquina_id o null (legacy)
+  maquinas:           { type: [String], default: [] },   // array de maquina_id (nuevo)
   edificio_id:        { type: String, default: null },
   ubicacion:          { type: String, default: '' },
   activo:             { type: Boolean, default: true },

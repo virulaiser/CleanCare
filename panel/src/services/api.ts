@@ -63,6 +63,8 @@ export interface Maquina {
   tipo: string;
   nombre: string;
   activa: boolean;
+  dispositivo_id?: string | null;
+  relay_pin?: number | null;
 }
 
 export async function login(email: string, password: string): Promise<{ token: string; usuario: Usuario }> {
@@ -268,6 +270,7 @@ export interface Dispositivo {
   control_uuid: string;
   status_uuid: string;
   maquina_asignada: string | null;
+  maquinas: string[];
   edificio_id: string | null;
   ubicacion: string;
   activo: boolean;
@@ -281,10 +284,11 @@ export async function listarDispositivos(): Promise<Dispositivo[]> {
 
 export async function crearDispositivo(campos: {
   tipo_hw?: string; ble_name?: string; ubicacion?: string;
-  maquina_asignada?: string | null; edificio_id?: string | null;
-}): Promise<Dispositivo> {
+  edificio_id?: string | null;
+  maquinas?: Array<{ tipo: 'lavarropas' | 'secadora' }>;
+}): Promise<{ dispositivo: Dispositivo; maquinas: Maquina[] }> {
   const { data } = await api.post('/api/dispositivos', campos);
-  return data.dispositivo;
+  return { dispositivo: data.dispositivo, maquinas: data.maquinas || [] };
 }
 
 export async function actualizarDispositivo(id: string, campos: Partial<Dispositivo>): Promise<Dispositivo> {

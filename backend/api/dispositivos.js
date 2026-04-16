@@ -1,5 +1,12 @@
 const connectDB = require('../lib/mongodb');
 const Dispositivo = require('../models/Dispositivo');
+const Maquina = require('../models/Maquina');
+
+function generarMaquinaId(tipo) {
+  const prefix = tipo === 'secadora' ? 'SEC' : 'LAV';
+  const rand = Math.random().toString(16).slice(2, 8).toUpperCase();
+  return `${prefix}-${rand}`;
+}
 
 module.exports = async (req, res) => {
   try {
@@ -26,9 +33,10 @@ async function listar(req, res) {
   res.json({ ok: true, dispositivos });
 }
 
-// POST /api/dispositivos — crea con UUIDs autogeneradas
+// POST /api/dispositivos — crea con UUIDs autogeneradas + N máquinas (opcional)
+// body: { tipo_hw, ble_name, ubicacion, edificio_id, maquinas: [{tipo: 'lavarropas'|'secadora'}] }
 async function crear(req, res) {
-  const { tipo_hw, ble_name, ubicacion, maquina_asignada, edificio_id } = req.body;
+  const { tipo_hw, ble_name, ubicacion, edificio_id, maquinas = [] } = req.body;
   const suffix = 'bb73-4e02-8f1d-a0b0c0d0e0f';
 
   // Reintenta ante colisión de esp32_id (unique index en el modelo gatilla E11000)
@@ -37,7 +45,25 @@ async function crear(req, res) {
     const n = (ultimo ? parseInt(ultimo.esp32_id, 10) + 1 : 1) + intento;
     const esp32_id = String(n).padStart(3, '0');
     const prefix = `cc7a5${esp32_id}`;
+
     try {
+      // Crear N máquinas enlazadas si viene el array
+      const maquinasCreadas = [];
+      if (Array.isArray(maquinas) && maquinas.length > 0 && edificio_id) {
+        let lavCount = 0, secCount = 0;
+        for (let i = 0; i < maquinas.length; i++) {
+          const tipo = maquinas[i].tipo === 'secadora' ? 'secadora' : 'lavarropas';
+          const idx = tipo === 'secadora' ? ++secCount : ++lavCount;
+          const maquina_id = generarMaquinaId(tipo);
+          const nombre = `${tipo === 'secadora' ? 'Secadora' : 'Lavarropas'} ${idx} — ${ubicacion || esp32_id}`;
+          const m = await Maquina.create({
+            maquina_id, edificio_id, tipo, nombre,
+            dispositivo_id: esp32_id, relay_pin: i,
+          });
+          maquinasCreadas.push(m.toObject());
+        }
+      }
+
       const dispositivo = await Dispositivo.create({
         esp32_id,
         tipo_hw: tipo_hw || 'esp32',
@@ -46,10 +72,12 @@ async function crear(req, res) {
         control_uuid: `${prefix}-${suffix}2`,
         status_uuid:  `${prefix}-${suffix}3`,
         ubicacion: ubicacion || '',
-        maquina_asignada: maquina_asignada || null,
+        maquinas: maquinasCreadas.map((m) => m.maquina_id),
+        maquina_asignada: maquinasCreadas[0]?.maquina_id || null,  // legacy
         edificio_id: edificio_id || null,
       });
-      return res.status(201).json({ ok: true, dispositivo });
+
+      return res.status(201).json({ ok: true, dispositivo, maquinas: maquinasCreadas });
     } catch (err) {
       if (err.code !== 11000) throw err;
     }

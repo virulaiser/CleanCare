@@ -319,7 +319,6 @@ export default function Liquidacion() {
         <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
         <nav style={styles.navLinks}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
           <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
           <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
           <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>

@@ -261,7 +261,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
           const usuario = await getUsuarioGuardado();
           const userId = usuario?.usuario_id || 'desconocido';
-          const cmd = `ON:${secsToSend}:${userId}:${tipo}`;
+          const cmd = `ON:${secsToSend}:${userId}:${tipo}:${maquina_id}`;
           await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
 
           cycleStartedRef.current = true;
@@ -381,7 +381,7 @@ export default function CycleScreen({ navigation, route }: Props) {
             setBleLog(resumingRef.current ? '🔄 Resincronizando máquina...' : '⚡ Activando máquina...');
             const usuario = await getUsuarioGuardado();
             const userId = usuario?.usuario_id || 'desconocido';
-            const cmd = `ON:${secsToSend}:${userId}:${tipo}`;
+            const cmd = `ON:${secsToSend}:${userId}:${tipo}:${maquina_id}`;
             const encoded = btoa(cmd);
             await connected.writeCharacteristicWithResponseForService(
               SERVICE_UUID,
@@ -552,7 +552,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         const remaining = Math.max(1, cycleDurationSeconds - elapsed);
         await connected.writeCharacteristicWithResponseForService(
-          SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}`)
+          SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}::${tipo}:${maquina_id}`)
         );
         connected.onDisconnected(() => {
           setBleState('disconnected');
@@ -690,7 +690,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           if (cycleStartedRef.current) {
             const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
             const remaining = Math.max(1, cycleDurationSeconds - elapsed);
-            const encoded = btoa(`ON:${remaining}`);
+            const encoded = btoa(`ON:${remaining}::${tipo}:${maquina_id}`);
             await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, encoded);
             setBleLog(`Reenviado ON:${remaining}s`);
           }

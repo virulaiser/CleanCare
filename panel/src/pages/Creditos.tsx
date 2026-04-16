@@ -185,7 +185,6 @@ export default function Creditos() {
         <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
         <nav style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/maquinas')} style={styles.navBtn}>Máquinas</button>
           <button onClick={() => navigate('/creditos')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Créditos</button>
           <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
           <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>

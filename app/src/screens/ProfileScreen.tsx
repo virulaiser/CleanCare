@@ -82,12 +82,6 @@ export default function ProfileScreen({ navigation }: Props) {
         <Text style={styles.actionArrow}>›</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.actionBtn, { marginBottom: 24 }]} onPress={() => navigation.navigate('BleTest')}>
-        <Text style={styles.actionIcon}>📡</Text>
-        <Text style={styles.actionText}>Test BLE</Text>
-        <Text style={styles.actionArrow}>›</Text>
-      </TouchableOpacity>
-
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
