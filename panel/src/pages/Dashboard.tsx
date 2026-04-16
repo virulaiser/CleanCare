@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { obtenerResumen, listarUsos, listarMaquinas, ResumenItem, Uso, Maquina, Usuario } from '../services/api';
+import { obtenerResumen, listarUsos, listarMaquinas, listarEdificios, ResumenItem, Uso, Maquina, Edificio, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
 function getUsuario(): Usuario | null {
@@ -12,8 +12,9 @@ function getUsuario(): Usuario | null {
 export default function Dashboard() {
   const navigate = useNavigate();
   const usuario = getUsuario();
-  const edificioId = usuario?.edificio_id || 'edificio-central';
   const now = new Date();
+  const [edificios, setEdificios] = useState<Edificio[]>([]);
+  const [edificioId, setEdificioId] = useState(usuario?.edificio_id || '');
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [anio, setAnio] = useState(now.getFullYear());
   const [resumen, setResumen] = useState<ResumenItem[]>([]);
@@ -23,14 +24,16 @@ export default function Dashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!localStorage.getItem('cleancare_token')) {
-      navigate('/login');
-    }
-  }, [navigate]);
+    if (!localStorage.getItem('cleancare_token')) navigate('/login');
+    listarEdificios().then((eds) => {
+      setEdificios(eds);
+      if (!edificioId && eds[0]) setEdificioId(eds[0].edificio_id);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [mes, anio]);
+    if (edificioId) fetchData();
+  }, [mes, anio, edificioId]);
 
   async function fetchData() {
     setLoading(true);
@@ -52,6 +55,13 @@ export default function Dashboard() {
       setLoading(false);
     }
   }
+
+  // Últimos usos filtrados por edificio + mes/año
+  const usosFiltrados = usos.filter((u) => {
+    if (u.edificio_id !== edificioId) return false;
+    const f = new Date(u.fecha_inicio || u.fecha || '');
+    return f.getMonth() + 1 === mes && f.getFullYear() === anio;
+  });
 
   const totalUsos = resumen.reduce((sum, r) => sum + r.total_usos, 0);
   const totalMinutos = resumen.reduce((sum, r) => sum + r.minutos_totales, 0);
@@ -102,6 +112,15 @@ export default function Dashboard() {
         <div style={styles.titleRow}>
           <h2 style={styles.pageTitle}>Resumen de facturación</h2>
           <div style={styles.filters}>
+            <select
+              value={edificioId}
+              onChange={(e) => setEdificioId(e.target.value)}
+              style={styles.select}
+            >
+              {edificios.map((ed) => (
+                <option key={ed.edificio_id} value={ed.edificio_id}>{ed.nombre}</option>
+              ))}
+            </select>
             <select
               value={mes}
               onChange={(e) => setMes(Number(e.target.value))}
@@ -180,13 +199,13 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Últimos usos */}
+        {/* Últimos usos — filtrados por edificio + mes */}
         <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Últimos usos registrados</h3>
+          <h3 style={styles.cardTitle}>Últimos usos — {meses[mes - 1]} {anio} ({usosFiltrados.length})</h3>
           {loading ? (
             <p style={styles.loadingText}>Cargando...</p>
-          ) : usos.length === 0 ? (
-            <p style={styles.emptyText}>No hay usos registrados.</p>
+          ) : usosFiltrados.length === 0 ? (
+            <p style={styles.emptyText}>No hay usos registrados en este período.</p>
           ) : (
             <table style={styles.table}>
               <thead>
@@ -198,19 +217,22 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {usos.slice(0, 20).map((uso) => (
-                  <tr key={uso._id}>
-                    <td style={styles.td}>
-                      {new Date(uso.fecha).toLocaleDateString('es-AR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </td>
-                    <td style={styles.td}>{maquinaMap[uso.maquina_id] || uso.maquina_id}</td>
-                    <td style={styles.td}>{uso.residente_id || '—'}</td>
-                    <td style={{ ...styles.td, textAlign: 'right' }}>{uso.duracion_min} min</td>
-                  </tr>
-                ))}
+                {usosFiltrados
+                  .sort((a, b) => new Date(b.fecha_inicio || b.fecha).getTime() - new Date(a.fecha_inicio || a.fecha).getTime())
+                  .slice(0, 20)
+                  .map((uso) => (
+                    <tr key={uso._id}>
+                      <td style={styles.td}>
+                        {new Date(uso.fecha_inicio || uso.fecha).toLocaleDateString('es-AR', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </td>
+                      <td style={styles.td}>{maquinaMap[uso.maquina_id] || uso.maquina_id}</td>
+                      <td style={styles.td}>{uso.residente_id || '—'}</td>
+                      <td style={{ ...styles.td, textAlign: 'right' }}>{uso.duracion_min} min</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           )}
