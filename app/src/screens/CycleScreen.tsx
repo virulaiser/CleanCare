@@ -552,12 +552,22 @@ export default function CycleScreen({ navigation, route }: Props) {
           }
         });
 
-        // Re-sincronizar estado: enviar tiempo restante al ESP32
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        const remaining = Math.max(1, cycleDurationSeconds - elapsed);
-        await connected.writeCharacteristicWithResponseForService(
-          SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}::${tipo}:${maquina_id}`)
-        );
+        // Leer STATUS: si el ESP32 ya tiene el ciclo activo, sincronizar.
+        // Solo reenviar ON si el ESP32 se reinició (OFF).
+        try {
+          const statusChar = await connected.readCharacteristicForService(SERVICE_UUID, STATUS_UUID);
+          const s = parseBleStatus(statusChar);
+          if (s && s.state === 'ON' && s.secs > 0 && (!s.maquina_id || s.maquina_id === maquina_id)) {
+            setSecondsRemaining(s.secs);
+            setBleLog(`Sincronizado — ${Math.ceil(s.secs / 60)} min restantes`);
+          } else {
+            const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+            const remaining = Math.max(1, cycleDurationSeconds - elapsed);
+            await connected.writeCharacteristicWithResponseForService(
+              SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}::${tipo}:${maquina_id}`)
+            );
+          }
+        } catch {}
         connected.onDisconnected(() => {
           setBleState('disconnected');
           deviceRef.current = null;
@@ -691,13 +701,21 @@ export default function CycleScreen({ navigation, route }: Props) {
             deviceRef.current = null;
           });
 
-          // Si el ciclo ya habia empezado, enviar ON con el tiempo restante
+          // Leer STATUS: si ESP32 tiene ciclo activo, sincronizar. Solo reenviar si OFF.
           if (cycleStartedRef.current) {
-            const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-            const remaining = Math.max(1, cycleDurationSeconds - elapsed);
-            const encoded = btoa(`ON:${remaining}::${tipo}:${maquina_id}`);
-            await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, encoded);
-            setBleLog(`Reenviado ON:${remaining}s`);
+            try {
+              const statusChar = await connected.readCharacteristicForService(SERVICE_UUID, STATUS_UUID);
+              const st = parseBleStatus(statusChar);
+              if (st && st.state === 'ON' && st.secs > 0 && (!st.maquina_id || st.maquina_id === maquina_id)) {
+                setSecondsRemaining(st.secs);
+                setBleLog(`Sincronizado — ${Math.ceil(st.secs / 60)} min`);
+              } else {
+                const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+                const remaining = Math.max(1, cycleDurationSeconds - elapsed);
+                await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(`ON:${remaining}::${tipo}:${maquina_id}`));
+                setBleLog(`Reenviado ON:${remaining}s`);
+              }
+            } catch { }
           }
         } catch (err: any) {
           setBleState('error');

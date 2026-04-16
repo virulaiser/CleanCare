@@ -623,15 +623,34 @@ void loop() {
     }
   }
 
-  // Status periódico
+  // Status periódico + log serial de progreso
   static unsigned long lastNotify = 0;
   if (deviceCount > 0 && anyActive() && (millis() - lastNotify > 2000)) {
     sendStatusAll();
     lastNotify = millis();
   }
 
+  static unsigned long lastProgress = 0;
+  if (anyActive() && (millis() - lastProgress > 10000)) {
+    lastProgress = millis();
+    for (int i = 0; i < MAX_MAQUINAS; i++) {
+      if (!slots[i].activa) continue;
+      int rem = (int)((slots[i].offTime - millis()) / 1000);
+      if (rem < 0) rem = 0;
+      Serial.print("[PROG] Slot ");
+      Serial.print(i);
+      Serial.print(" (");
+      Serial.print(slots[i].maquina_id);
+      Serial.print(") — ");
+      Serial.print(rem);
+      Serial.print("s (");
+      Serial.print(rem / 60);
+      Serial.println(" min)");
+    }
+  }
+
   static unsigned long lastHeartbeat = 0;
-  if (deviceCount == 0 && (millis() - lastHeartbeat > 30000)) {
+  if (deviceCount == 0 && !anyActive() && (millis() - lastHeartbeat > 30000)) {
     Serial.print("[HB] uptime ");
     Serial.print(millis() / 1000);
     Serial.print("s — ");
