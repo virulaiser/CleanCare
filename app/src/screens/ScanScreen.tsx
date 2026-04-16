@@ -309,14 +309,8 @@ export default function ScanScreen({ navigation }: Props) {
 
   const handleConfirmCycle = () => {
     if (!parsedQR) return;
-    if (esp32Running) {
-      Alert.alert(
-        'Máquina en uso',
-        `Hay un ciclo activo (${Math.ceil(esp32Remaining / 60)} min restantes). Esperá a que termine.`,
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+    // Nota: permitimos iniciar otro ciclo aunque el ESP32 tenga algún slot activo.
+    // El backend valida por maquina_id y rechaza si ESA máquina ya tiene ciclo abierto.
     if (saldo !== null && saldo <= 0) {
       Alert.alert('Sin fichas', 'No tenés fichas suficientes. Contactá al administrador.', [{ text: 'OK' }]);
       return;
@@ -326,7 +320,9 @@ export default function ScanScreen({ navigation }: Props) {
     const nombre = getNombreMaquina(parsedQR.maquina_id);
     setParsedQR(null);
     setScanned(false);
-    navigation.navigate('Cycle', {
+    // push en vez de navigate: así cada ciclo es instancia independiente en el stack
+    // (permite multi-máquina: lavando y secando a la vez)
+    navigation.push('Cycle', {
       maquina_id: parsedQR.maquina_id,
       edificio_id: parsedQR.edificio_id,
       tipo,

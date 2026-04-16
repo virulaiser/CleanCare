@@ -882,6 +882,12 @@ export default function CycleScreen({ navigation, route }: Props) {
         </Text>
 
         <View style={styles.bottomButtons}>
+          <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('Scan')}>
+            <Text style={styles.addButtonText}>+ Sumar máquina</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.bottomButtons}>
           <TouchableOpacity style={styles.reportButton} onPress={handleReportarAveria}>
             <Text style={styles.reportButtonText}>⚠ Reportar averia</Text>
           </TouchableOpacity>
@@ -974,7 +980,12 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 13, color: colors.textSecondary, marginBottom: 24 },
 
   // Bottom buttons
-  bottomButtons: { alignItems: 'center', gap: 12 },
+  bottomButtons: { alignItems: 'center', gap: 12, marginBottom: 12 },
+  addButton: {
+    paddingHorizontal: 28, paddingVertical: 14, borderRadius: 999,
+    backgroundColor: colors.primary,
+  },
+  addButtonText: { fontSize: 15, fontWeight: '700', color: colors.white },
   reportButton: {
     paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999,
     backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA',
