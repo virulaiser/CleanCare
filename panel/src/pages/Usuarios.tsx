@@ -41,14 +41,14 @@ export default function Usuarios() {
     <div style={styles.page}>
       <nav style={styles.nav}>
         <div style={styles.navInner}>
-          <span style={styles.logo} onClick={() => navigate('/')}>CleanCare</span>
+          <img src="/logo.png" alt="CleanCare" onClick={() => navigate('/')} style={{ height: 56, width: 'auto', objectFit: 'contain', cursor: 'pointer' }} />
           <button onClick={() => navigate('/')} style={styles.navBtn}>Volver</button>
         </div>
       </nav>
 
       <div style={styles.container}>
         <form onSubmit={handleSubmit} style={styles.card}>
-          <h1 style={styles.title}>CleanCare</h1>
+          <img src="/logo.png" alt="CleanCare" style={{ display: 'block', margin: '0 auto 8px', height: 72, width: 'auto', objectFit: 'contain' }} />
           <p style={styles.subtitle}>Ingresá a tu cuenta de residente</p>
 
           {error && <div style={styles.error}>{error}</div>}

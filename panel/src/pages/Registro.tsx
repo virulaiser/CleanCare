@@ -67,7 +67,7 @@ export default function Registro() {
       {/* Header */}
       <nav style={styles.nav}>
         <div style={styles.navInner}>
-          <span style={styles.logo} onClick={() => navigate('/')}>CleanCare</span>
+          <img src="/logo.png" alt="CleanCare" onClick={() => navigate('/')} style={{ height: 56, width: 'auto', objectFit: 'contain', cursor: 'pointer' }} />
           <div style={styles.navActions}>
             <button onClick={() => navigate('/usuarios')} style={styles.navBtnOutline}>Volver</button>
           </div>

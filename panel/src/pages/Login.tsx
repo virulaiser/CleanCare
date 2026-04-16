@@ -34,7 +34,7 @@ export default function Login() {
   return (
     <div style={styles.container}>
       <form onSubmit={handleSubmit} style={styles.card}>
-        <h1 style={styles.title}>CleanCare</h1>
+        <img src="/logo.png" alt="CleanCare" style={{ display: 'block', margin: '0 auto 8px', height: 72, width: 'auto', objectFit: 'contain' }} />
         <p style={styles.subtitle}>Panel de Administración</p>
 
         {error && <div style={styles.error}>{error}</div>}

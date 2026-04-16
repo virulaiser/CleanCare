@@ -45,21 +45,16 @@ export default function MiCuenta() {
   async function fetchUsos() {
     setLoading(true);
     setError('');
-    try {
-      const edificio = usuario?.edificio_id || '';
-      const [data, billetera, maqData] = await Promise.all([
-        listarMisUsos(),
-        obtenerBilletera(),
-        edificio ? listarMaquinas(edificio) : Promise.resolve([]),
-      ]);
-      setUsos(data);
-      setSaldo(billetera.saldo);
-      setMaquinasDisp(maqData as (Maquina & { ocupada?: boolean })[]);
-    } catch {
-      setError('Error al cargar tus usos.');
-    } finally {
-      setLoading(false);
-    }
+    const edificio = usuario?.edificio_id || '';
+    const [data, billetera, maqData] = await Promise.all([
+      listarMisUsos().catch(() => [] as Uso[]),
+      obtenerBilletera().catch(() => ({ saldo: 0, transacciones: [] as Transaccion[] })),
+      edificio ? listarMaquinas(edificio).catch(() => [] as Maquina[]) : Promise.resolve([] as Maquina[]),
+    ]);
+    setUsos(data || []);
+    setSaldo(billetera.saldo ?? 0);
+    setMaquinasDisp((maqData || []) as (Maquina & { ocupada?: boolean })[]);
+    setLoading(false);
   }
 
   // Filtrar por mes/año seleccionado
@@ -82,7 +77,7 @@ export default function MiCuenta() {
     <div style={styles.page}>
       <nav style={styles.nav}>
         <div style={styles.navInner}>
-          <span style={styles.logo} onClick={() => navigate('/')}>CleanCare</span>
+          <img src="/logo.png" alt="CleanCare" onClick={() => navigate('/')} style={{ height: 56, width: 'auto', objectFit: 'contain', cursor: 'pointer' }} />
           <div style={styles.navActions}>
             <span style={styles.userName}>{usuario?.nombre || usuario?.email}</span>
             <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
