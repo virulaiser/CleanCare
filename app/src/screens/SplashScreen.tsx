@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: colors.primary,
     alignItems: 'center', justifyContent: 'center', padding: 32,
   },
-  logo: { width: 140, height: 140, marginBottom: 16 },
-  title: { fontSize: 28, fontWeight: '700', color: colors.white, letterSpacing: 1 },
+  logo: { width: 240, height: 240, marginBottom: 8 },
+  title: { fontSize: 32, fontWeight: '700', color: colors.white, letterSpacing: 1 },
   status: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 12, textAlign: 'center' },
 });
