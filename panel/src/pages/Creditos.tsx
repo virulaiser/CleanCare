@@ -190,6 +190,7 @@ export default function Creditos() {
           <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
           <button onClick={() => navigate('/tips')} style={styles.navBtn}>Tips</button>
           <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
+          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
           <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
         </nav>
       </header>

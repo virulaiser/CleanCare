@@ -78,6 +78,7 @@ export default function Tips() {
           <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
           <button onClick={() => navigate('/tips')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Tips</button>
           <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
+          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
           <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
         </nav>
       </header>

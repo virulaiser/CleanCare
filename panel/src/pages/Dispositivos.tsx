@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listarDispositivos, crearDispositivo, eliminarDispositivo, Dispositivo } from '../services/api';
+import { listarDispositivos, crearDispositivo, eliminarDispositivo, listarEdificios, Dispositivo, Edificio } from '../services/api';
 import { colors } from '../constants/colors';
 
 export default function Dispositivos() {
   const navigate = useNavigate();
   const [lista, setLista] = useState<Dispositivo[]>([]);
+  const [edificios, setEdificios] = useState<Edificio[]>([]);
   const [loading, setLoading] = useState(true);
   const [creando, setCreando] = useState(false);
-  const [ubicacion, setUbicacion] = useState('');
+  const [edificioId, setEdificioId] = useState('');
   const [maquinaAsignada, setMaquinaAsignada] = useState('');
   const [tipoHw, setTipoHw] = useState<'esp32' | 'pico'>('esp32');
   const [ultimoCreado, setUltimoCreado] = useState<Dispositivo | null>(null);
@@ -16,6 +17,7 @@ export default function Dispositivos() {
   useEffect(() => {
     if (!localStorage.getItem('cleancare_token')) navigate('/login');
     fetch();
+    listarEdificios().then(setEdificios).catch(() => {});
   }, []);
 
   async function fetch() {
@@ -29,15 +31,18 @@ export default function Dispositivos() {
 
   async function handleCrear(e: React.FormEvent) {
     e.preventDefault();
+    if (!edificioId) { alert('Seleccioná un edificio'); return; }
     setCreando(true);
     try {
+      const edi = edificios.find((x) => x.edificio_id === edificioId);
       const nuevo = await crearDispositivo({
         tipo_hw: tipoHw,
-        ubicacion: ubicacion.trim(),
+        edificio_id: edificioId,
+        ubicacion: edi ? edi.nombre : edificioId,
         maquina_asignada: maquinaAsignada.trim() || null,
       });
       setUltimoCreado(nuevo);
-      setUbicacion('');
+      setEdificioId('');
       setMaquinaAsignada('');
       await fetch();
     } catch {
@@ -88,6 +93,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
           <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
           <button onClick={() => navigate('/tips')} style={styles.navBtn}>Tips</button>
           <button onClick={() => navigate('/dispositivos')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Dispositivos</button>
+          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
           <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
         </nav>
       </header>
@@ -109,8 +115,13 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
               </select>
             </div>
             <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={styles.label}>Ubicación</label>
-              <input style={styles.input} placeholder="Ej: Torre Norte - Piso 1" value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} />
+              <label style={styles.label}>Edificio</label>
+              <select style={styles.input} value={edificioId} onChange={(e) => setEdificioId(e.target.value)} required>
+                <option value="">Seleccioná edificio</option>
+                {edificios.map((ed) => (
+                  <option key={ed.edificio_id} value={ed.edificio_id}>{ed.nombre} ({ed.edificio_id})</option>
+                ))}
+              </select>
             </div>
             <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label style={styles.label}>Máquina asignada</label>

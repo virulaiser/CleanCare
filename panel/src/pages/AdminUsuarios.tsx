@@ -257,6 +257,7 @@ export default function AdminUsuarios() {
           <button onClick={() => navigate('/admin-usuarios')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Usuarios</button>
           <button onClick={() => navigate('/tips')} style={styles.navBtn}>Tips</button>
           <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
+          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
           <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
         </nav>
       </header>
