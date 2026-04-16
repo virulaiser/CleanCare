@@ -156,64 +156,74 @@ async function seed() {
   );
   console.log(`  OK — ${edificiosData.length} configs`);
 
-  // 7. Usos random distribuidos en los últimos 90 días
-  const TOTAL_USOS = 45;
-  const DIAS_RANGO = 90;
-  console.log(`Creando ${TOTAL_USOS} usos random (últimos ${DIAS_RANGO} días)...`);
+  // 7. Usos random distribuidos — concentrados en marzo y abril 2026
   const allUsers = await Usuario.find({ rol: 'residente' }).lean();
   const estados = ['completado', 'completado', 'completado', 'completado', 'cancelado', 'averia'];
   const usosData = [];
 
-  for (let i = 0; i < TOTAL_USOS; i++) {
-    const user = allUsers[Math.floor(Math.random() * allUsers.length)];
-    const maqsEdi = todasMaquinas.filter((m) => m.edificio_id === user.edificio_id);
-    const machine = maqsEdi[Math.floor(Math.random() * maqsEdi.length)];
-    const duracion = machine.tipo === 'secadora' ? 30 : 45;
-    const estado = estados[Math.floor(Math.random() * estados.length)];
-    const daysAgo = Math.floor(Math.random() * DIAS_RANGO);
-    const hoursOffset = Math.floor(Math.random() * 14) + 7;
-    const fecha_inicio = new Date(Date.now() - daysAgo * 86400000);
-    fecha_inicio.setHours(hoursOffset, Math.floor(Math.random() * 60), 0, 0);
-    const fecha_fin = new Date(fecha_inicio.getTime() + duracion * 60000);
+  // Cada bloque: { inicio, fin, cantidad } — fechas inclusive
+  const bloques = [
+    { inicio: new Date('2026-01-05'), fin: new Date('2026-01-31'), cantidad: 25 },
+    { inicio: new Date('2026-02-01'), fin: new Date('2026-02-28'), cantidad: 35 },
+    { inicio: new Date('2026-03-01'), fin: new Date('2026-03-31'), cantidad: 80 },  // marzo — alto consumo
+    { inicio: new Date('2026-04-01'), fin: new Date('2026-04-15'), cantidad: 50 },  // abril actual
+  ];
+  const totalUsos = bloques.reduce((s, b) => s + b.cantidad, 0);
+  console.log(`Creando ${totalUsos} usos random (distribuidos en 4 bloques mensuales)...`);
 
-    usosData.push({
-      maquina_id: machine.maquina_id,
-      edificio_id: user.edificio_id,
-      tipo: machine.tipo,
-      duracion_min: duracion,
-      residente_id: user.apartamento,
-      estado,
-      completado: estado === 'completado',
-      fecha_inicio,
-      fecha_fin,
-      fecha: fecha_inicio,
-    });
+  for (const bloque of bloques) {
+    const span = bloque.fin.getTime() - bloque.inicio.getTime();
+    for (let i = 0; i < bloque.cantidad; i++) {
+      const user = allUsers[Math.floor(Math.random() * allUsers.length)];
+      const maqsEdi = todasMaquinas.filter((m) => m.edificio_id === user.edificio_id);
+      const machine = maqsEdi[Math.floor(Math.random() * maqsEdi.length)];
+      const duracion = machine.tipo === 'secadora' ? 30 : 45;
+      const estado = estados[Math.floor(Math.random() * estados.length)];
+      const randMs = Math.floor(Math.random() * span);
+      const fecha_inicio = new Date(bloque.inicio.getTime() + randMs);
+      fecha_inicio.setHours(7 + Math.floor(Math.random() * 14), Math.floor(Math.random() * 60), 0, 0);
+      const fecha_fin = new Date(fecha_inicio.getTime() + duracion * 60000);
 
-    await Transaccion.create({
-      usuario_id: user.usuario_id,
-      edificio_id: user.edificio_id,
-      tipo: 'uso_maquina',
-      cantidad: -1,
-      descripcion: `Uso ${machine.nombre} (${machine.tipo})`,
-      creado_por: 'sistema',
-      fecha: fecha_inicio,
-    });
+      usosData.push({
+        maquina_id: machine.maquina_id,
+        edificio_id: user.edificio_id,
+        tipo: machine.tipo,
+        duracion_min: duracion,
+        residente_id: user.apartamento,
+        estado,
+        completado: estado === 'completado',
+        fecha_inicio,
+        fecha_fin,
+        fecha: fecha_inicio,
+      });
 
-    if (estado === 'cancelado' || estado === 'averia') {
       await Transaccion.create({
         usuario_id: user.usuario_id,
         edificio_id: user.edificio_id,
-        tipo: 'devolucion',
-        cantidad: 1,
-        descripcion: `Devolución por ${estado}: ${machine.nombre}`,
+        tipo: 'uso_maquina',
+        cantidad: -1,
+        descripcion: `Uso ${machine.nombre} (${machine.tipo})`,
         creado_por: 'sistema',
-        fecha: fecha_fin,
+        fecha: fecha_inicio,
       });
+
+      if (estado === 'cancelado' || estado === 'averia') {
+        await Transaccion.create({
+          usuario_id: user.usuario_id,
+          edificio_id: user.edificio_id,
+          tipo: 'devolucion',
+          cantidad: 1,
+          descripcion: `Devolución por ${estado}: ${machine.nombre}`,
+          creado_por: 'sistema',
+          fecha: fecha_fin,
+        });
+      }
     }
+    console.log(`  ${bloque.cantidad} usos en ${bloque.inicio.toISOString().slice(0,7)}`);
   }
 
   await Uso.insertMany(usosData);
-  console.log(`  OK — ${TOTAL_USOS} usos creados`);
+  console.log(`  OK — ${totalUsos} usos totales creados`);
 
   // 8. Tips
   console.log('Creando tips...');
@@ -237,7 +247,7 @@ async function seed() {
   console.log('  6 máquinas (2 por edificio: 1 lavarropas + 1 secadora)');
   console.log('  1 admin: admin@cleancare.uy / admin123');
   console.log('  6 residentes: 123456 (2 por edificio, 10 créditos c/u)');
-  console.log(`  ${TOTAL_USOS} usos random (últimos 90 días)`);
+  console.log(`  ${totalUsos} usos random (enero-abril 2026, concentrados en marzo)`);
   console.log('  3 configs de créditos (10/mes, costo 1, lavado 45min, secado 30min)');
   console.log('  10 tips');
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { obtenerResumen, listarMaquinas, listarEdificios, listarUsos, ResumenItem, Maquina, Edificio, Uso, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
+import NumericInput from '../components/NumericInput';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -60,43 +61,6 @@ function guardarTarifas(edificioId: string, t: Tarifas) {
 }
 
 const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-function NumericInput({ value, onChange, style, placeholder }: {
-  value: number; onChange: (n: number) => void; style?: React.CSSProperties; placeholder?: string;
-}) {
-  const [text, setText] = React.useState<string>(value ? String(value) : '');
-  const lastEmitted = React.useRef<number>(value);
-
-  React.useEffect(() => {
-    if (value !== lastEmitted.current) {
-      setText(value ? String(value) : '');
-      lastEmitted.current = value;
-    }
-  }, [value]);
-
-  return (
-    <input
-      type="text"
-      inputMode="decimal"
-      style={style}
-      value={text}
-      placeholder={placeholder}
-      onChange={(e) => {
-        const v = e.target.value.replace(',', '.');
-        if (v !== '' && !/^-?\d*\.?\d*$/.test(v)) return;
-        setText(v);
-        const n = v === '' || v === '.' || v === '-' ? 0 : parseFloat(v);
-        if (!isNaN(n)) { lastEmitted.current = n; onChange(n); }
-      }}
-      onBlur={() => {
-        if (text === '' || text === '.' || text === '-') { setText(''); return; }
-        const n = parseFloat(text);
-        if (!isNaN(n)) setText(String(n));
-      }}
-      onFocus={(e) => e.target.select()}
-    />
-  );
-}
 
 export default function Liquidacion() {
   const navigate = useNavigate();

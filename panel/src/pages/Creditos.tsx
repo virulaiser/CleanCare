@@ -8,6 +8,7 @@ import {
   ResumenCreditoItem, ConfigEdificio, Transaccion, Edificio, Usuario,
 } from '../services/api';
 import { colors } from '../constants/colors';
+import NumericInput from '../components/NumericInput';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -204,23 +205,23 @@ export default function Creditos() {
           <div style={styles.configRow}>
             <label style={styles.configLabel}>
               Créditos mensuales por usuario
-              <input type="number" min={0} value={creditosMensuales} onChange={(e) => setCreditosMensuales(Number(e.target.value))} style={styles.input} />
+              <NumericInput min={0} value={creditosMensuales} onChange={setCreditosMensuales} style={styles.input} />
             </label>
             <label style={styles.configLabel}>
               Costo por lavado
-              <input type="number" min={1} value={costoLavado} onChange={(e) => setCostoLavado(Number(e.target.value))} style={styles.input} />
+              <NumericInput min={1} value={costoLavado} onChange={setCostoLavado} style={styles.input} />
             </label>
             <label style={styles.configLabel}>
               Costo por secado
-              <input type="number" min={1} value={costoSecado} onChange={(e) => setCostoSecado(Number(e.target.value))} style={styles.input} />
+              <NumericInput min={1} value={costoSecado} onChange={setCostoSecado} style={styles.input} />
             </label>
             <label style={styles.configLabel}>
               Duración lavado (min)
-              <input type="number" min={1} value={duracionLavado} onChange={(e) => setDuracionLavado(Number(e.target.value))} style={styles.input} />
+              <NumericInput min={1} value={duracionLavado} onChange={setDuracionLavado} style={styles.input} />
             </label>
             <label style={styles.configLabel}>
               Duración secado (min)
-              <input type="number" min={1} value={duracionSecado} onChange={(e) => setDuracionSecado(Number(e.target.value))} style={styles.input} />
+              <NumericInput min={1} value={duracionSecado} onChange={setDuracionSecado} style={styles.input} />
             </label>
             <button onClick={guardarConfig} style={styles.saveBtn}>Guardar</button>
           </div>
@@ -254,7 +255,9 @@ export default function Creditos() {
 
           {/* Masivo */}
           <div style={styles.masivoRow}>
-            <input type="number" placeholder="Cantidad" value={masivoCantidad} onChange={(e) => setMasivoCantidad(e.target.value)} style={{ ...styles.input, width: 100 }} />
+            <input type="text" inputMode="decimal" placeholder="Cantidad" value={masivoCantidad}
+              onChange={(e) => { const v = e.target.value.replace(',', '.'); if (v === '' || /^\d*\.?\d*$/.test(v)) setMasivoCantidad(v); }}
+              onFocus={(e) => e.target.select()} style={{ ...styles.input, width: 100 }} />
             <input type="text" placeholder="Descripción (opcional)" value={masivoDesc} onChange={(e) => setMasivoDesc(e.target.value)} style={{ ...styles.input, flex: 1 }} />
             <button onClick={handleMasivo} disabled={!masivoCantidad} style={{ ...styles.saveBtn, opacity: masivoCantidad ? 1 : 0.5 }}>Agregar a todos</button>
           </div>
@@ -379,7 +382,9 @@ export default function Creditos() {
             </p>
             <label style={styles.configLabel}>
               Cantidad
-              <input type="number" value={modalCantidad} onChange={(e) => setModalCantidad(e.target.value)} style={styles.input} placeholder="Ej: 10" autoFocus />
+              <input type="text" inputMode="decimal" value={modalCantidad}
+                onChange={(e) => { const v = e.target.value.replace(',', '.'); if (v === '' || /^\d*\.?\d*$/.test(v)) setModalCantidad(v); }}
+                onFocus={(e) => e.target.select()} style={styles.input} placeholder="Ej: 10" autoFocus />
             </label>
             <label style={{ ...styles.configLabel, marginTop: 12 }}>
               Descripción (opcional)
