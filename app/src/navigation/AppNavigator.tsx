@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import SplashScreen from '../screens/SplashScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegistroScreen from '../screens/RegistroScreen';
@@ -13,6 +14,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import { colors } from '../constants/colors';
 
 export type RootStackParamList = {
+  Splash: undefined;
   Onboarding: undefined;
   Login: undefined;
   Registro: undefined;
@@ -36,7 +38,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Onboarding"
+        initialRouteName="Splash"
         screenOptions={{
           headerStyle: { backgroundColor: colors.primary },
           headerTintColor: colors.white,
@@ -44,6 +46,11 @@ export default function AppNavigator() {
           contentStyle: { backgroundColor: colors.bgPage },
         }}
       >
+        <Stack.Screen
+          name="Splash"
+          component={SplashScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="Onboarding"
           component={OnboardingScreen}
