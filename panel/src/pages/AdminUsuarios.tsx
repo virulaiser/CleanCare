@@ -265,14 +265,13 @@ export default function AdminUsuarios() {
             <div class="subtitle">Resumen por usuario</div>
           </div>
           <div class="meta">
-            Generado: ${new Date().toLocaleString('es-UY')}<br/>
             Periodo: <strong>${periodo}</strong>
           </div>
         </div>
 
         <h1>${u.nombre}</h1>
         <div class="info">
-          ${u.email} ${u.apartamento ? `• Apto ${u.apartamento}` : ''} • ID ${u.usuario_id}
+          ${u.email} ${u.apartamento ? `• Apto ${u.apartamento}` : ''}
         </div>
 
         <h2>Balance</h2>
@@ -282,7 +281,6 @@ export default function AdminUsuarios() {
           <div class="bal-card bal-extras"><div class="l">Fichas extras</div><div class="v">${u.fichas_extras}</div></div>
         </div>
 
-        <h2>Resumen ${periodo}</h2>
         <div class="kpis">
           <div class="kpi"><div class="label">Usos</div><div class="val">${balanceData.mesUsos}</div></div>
           <div class="kpi"><div class="label">Minutos</div><div class="val">${balanceData.mesMin}</div></div>
@@ -296,7 +294,6 @@ export default function AdminUsuarios() {
           <tbody>${filas}</tbody>
         </table>
 
-        <div class="footer">CleanCare — sistema de gestión de lavarropas y secadoras • cleancare.uy</div>
         <script>setTimeout(function(){window.print();}, 400);</script>
       </body></html>
     `);
