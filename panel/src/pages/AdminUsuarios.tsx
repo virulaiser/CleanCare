@@ -517,9 +517,9 @@ export default function AdminUsuarios() {
               <table style={styles.table}>
                 <thead>
                   <tr>
+                    <th style={styles.th}>Apto</th>
                     <th style={styles.th}>Usuario</th>
                     <th style={styles.th}>Email</th>
-                    <th style={styles.th}>Apto</th>
                     <th style={styles.th}>Edificio</th>
                     <th style={styles.th}>Balance</th>
                     <th style={styles.th}>Acciones</th>
@@ -528,17 +528,7 @@ export default function AdminUsuarios() {
                 <tbody>
                   {filtrados.map((u) => (
                     <tr key={u.usuario_id} style={{ transition: 'background 0.15s' }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = colors.bgPage)} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}>
-                      <td style={styles.td}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Avatar nombre={u.nombre} foto={u.foto} />
-                          <div>
-                            <div style={{ fontWeight: 600, color: colors.textPrimary }}>{u.nombre}</div>
-                            {u.telefono && <div style={{ fontSize: 12, color: colors.textSecondary }}>{u.telefono}</div>}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={styles.td}><span style={{ fontSize: 13 }}>{u.email}</span></td>
-                      <td style={styles.td}>
+                      <td style={{ ...styles.td, fontWeight: 700, color: colors.textPrimary }}>
                         {u.apartamento || '—'}
                         {u.apartamento && getAptoCount(u) > 1 && (
                           <span title={`${getAptoCount(u)} usuarios en este apartamento`} style={{
@@ -549,6 +539,16 @@ export default function AdminUsuarios() {
                           </span>
                         )}
                       </td>
+                      <td style={styles.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar nombre={u.nombre} foto={u.foto} />
+                          <div>
+                            <div style={{ fontWeight: 600, color: colors.textPrimary }}>{u.nombre}</div>
+                            {u.telefono && <div style={{ fontSize: 12, color: colors.textSecondary }}>{u.telefono}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={styles.td}><span style={{ fontSize: 13 }}>{u.email}</span></td>
                       <td style={styles.td}>
                         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, backgroundColor: colors.bgBlueLight, color: colors.primary, fontWeight: 500 }}>
                           {edificioNombre(u.edificio_id)}

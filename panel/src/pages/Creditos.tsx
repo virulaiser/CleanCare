@@ -278,8 +278,8 @@ export default function Creditos() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Nombre</th>
                   <th style={styles.th}>Apto</th>
+                  <th style={styles.th}>Nombre</th>
                   <th style={styles.th}>Edificio</th>
                   <th style={styles.th}>Email</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Saldo</th>
@@ -289,8 +289,8 @@ export default function Creditos() {
               <tbody>
                 {filtered.map((u) => (
                   <tr key={u.usuario_id}>
+                    <td style={{ ...styles.td, fontWeight: 700 }}>{u.apartamento || '-'}</td>
                     <td style={styles.td}>{u.nombre}</td>
-                    <td style={styles.td}>{u.apartamento || '-'}</td>
                     <td style={{ ...styles.td, fontSize: 12, fontFamily: 'monospace' }}>{u.edificio_id}</td>
                     <td style={styles.td}>{u.email}</td>
                     <td style={{ ...styles.td, textAlign: 'right', fontWeight: 700, color: u.saldo <= 0 ? colors.error : colors.textPrimary }}>
@@ -347,8 +347,8 @@ export default function Creditos() {
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={styles.th}>Usuario</th>
                   <th style={styles.th}>Apto</th>
+                  <th style={styles.th}>Usuario</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Usados</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Asignados</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Devoluciones</th>
@@ -358,8 +358,8 @@ export default function Creditos() {
               <tbody>
                 {resumen.map((r) => (
                   <tr key={r.usuario_id}>
+                    <td style={{ ...styles.td, fontWeight: 700 }}>{r.apartamento}</td>
                     <td style={styles.td}>{r.nombre}</td>
-                    <td style={styles.td}>{r.apartamento}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{r.creditos_usados}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{r.creditos_asignados}</td>
                     <td style={{ ...styles.td, textAlign: 'right' }}>{r.devoluciones}</td>

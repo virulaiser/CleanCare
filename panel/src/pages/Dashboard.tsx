@@ -194,7 +194,6 @@ export default function Dashboard() {
                 <tr>
                   <th style={styles.th}>Máquina</th>
                   <th style={{ ...styles.th, textAlign: 'right' }}>Usos</th>
-                  <th style={{ ...styles.th, textAlign: 'right' }}>Minutos</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,7 +214,6 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td style={{ ...styles.td, textAlign: 'right' }}>{item.total_usos}</td>
-                      <td style={{ ...styles.td, textAlign: 'right' }}>{item.minutos_totales}</td>
                     </tr>
                   );
                 })}
