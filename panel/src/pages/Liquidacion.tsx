@@ -174,14 +174,31 @@ export default function Liquidacion() {
     const edi = edificios.find((e) => e.edificio_id === edificioId);
     const edificioNombre = edi?.nombre || edificioId;
     const periodo = `${meses[mes - 1]} ${anio}`;
-    const nombreMaquina = (id: string) => maquinas.find((m) => m.maquina_id === id)?.nombre || id;
+
+    // Etiqueta de tipo por máquina (Lavarropas/Secadora #N si hay varias del mismo tipo)
+    const maquinasEdi = [...maquinas]
+      .filter((m) => m.edificio_id === edificioId)
+      .sort((a, b) => a.maquina_id.localeCompare(b.maquina_id));
+    const tipoInfo: Record<string, { tipo: string; numero: number; totalMismoTipo: number }> = {};
+    const counts: Record<string, number> = {};
+    maquinasEdi.forEach((m) => {
+      counts[m.tipo] = (counts[m.tipo] || 0) + 1;
+      tipoInfo[m.maquina_id] = { tipo: m.tipo, numero: counts[m.tipo], totalMismoTipo: 0 };
+    });
+    Object.values(tipoInfo).forEach((i) => { i.totalMismoTipo = counts[i.tipo]; });
+    const etiquetaMaquina = (id: string) => {
+      const i = tipoInfo[id];
+      if (!i) return id;
+      const label = i.tipo === 'secadora' ? 'Secadora' : 'Lavarropas';
+      return i.totalMismoTipo > 1 ? `${label} #${i.numero}` : label;
+    };
 
     const fallasHtml = calculo.fallas.length === 0
       ? '<tr><td colspan="3" style="text-align:center;color:#94A3B8;padding:16px">Sin reportes de falla este mes</td></tr>'
       : calculo.fallas.map((f) => `
           <tr>
             <td>${new Date(f.fecha_inicio || f.fecha).toLocaleDateString('es-UY')}</td>
-            <td>${nombreMaquina(f.maquina_id)}</td>
+            <td>${etiquetaMaquina(f.maquina_id)}</td>
             <td>${f.residente_id || '—'}</td>
           </tr>
         `).join('');
@@ -547,13 +564,30 @@ export default function Liquidacion() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calculo.fallas.map((f) => (
-                    <tr key={f._id}>
-                      <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{new Date(f.fecha_inicio || f.fecha).toLocaleDateString('es-UY')}</td>
-                      <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{maquinas.find((m) => m.maquina_id === f.maquina_id)?.nombre || f.maquina_id}</td>
-                      <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{f.residente_id || '—'}</td>
-                    </tr>
-                  ))}
+                  {calculo.fallas.map((f) => {
+                    const m = maquinas.find((x) => x.maquina_id === f.maquina_id);
+                    const tipo = m?.tipo || 'lavarropas';
+                    // Numero entre máquinas del mismo tipo+edificio
+                    const mismasDelTipo = maquinas
+                      .filter((x) => x.edificio_id === edificioId && x.tipo === tipo)
+                      .sort((a, b) => a.maquina_id.localeCompare(b.maquina_id));
+                    const numero = mismasDelTipo.findIndex((x) => x.maquina_id === f.maquina_id) + 1;
+                    const label = tipo === 'secadora' ? 'Secadora' : 'Lavarropas';
+                    const suffix = mismasDelTipo.length > 1 ? ` #${numero}` : '';
+                    return (
+                      <tr key={f._id}>
+                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{new Date(f.fecha_inicio || f.fecha).toLocaleDateString('es-UY')}</td>
+                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                            backgroundColor: tipo === 'secadora' ? '#FEF3C7' : '#DBEAFE',
+                            color: tipo === 'secadora' ? '#D97706' : '#3B82F6',
+                          }}>{label}{suffix}</span>
+                        </td>
+                        <td style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}` }}>{f.residente_id || '—'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
