@@ -309,8 +309,17 @@ export default function ScanScreen({ navigation }: Props) {
 
   const handleConfirmCycle = () => {
     if (!parsedQR) return;
-    // Nota: permitimos iniciar otro ciclo aunque el ESP32 tenga algún slot activo.
-    // El backend valida por maquina_id y rechaza si ESA máquina ya tiene ciclo abierto.
+    // Si la máquina escaneada ya tiene un ciclo activo (por este user o por otro),
+    // backend reporta ocupada=true en listarMaquinas.
+    const maq = maquinas.find((m) => m.maquina_id === parsedQR.maquina_id);
+    if (maq?.ocupada) {
+      Alert.alert(
+        'Máquina ocupada',
+        `${maq.nombre || 'Esta máquina'} ya está en uso. Esperá a que termine o elegí otra.`,
+        [{ text: 'OK', onPress: () => { setParsedQR(null); setScanned(false); } }]
+      );
+      return;
+    }
     if (saldo !== null && saldo <= 0) {
       Alert.alert('Sin fichas', 'No tenés fichas suficientes. Contactá al administrador.', [{ text: 'OK' }]);
       return;
