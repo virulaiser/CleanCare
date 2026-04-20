@@ -40,10 +40,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16.2 (RN 0.81 exige ≥ 16.1)
+      - name: Select Xcode 16.1 (plataforma iOS 18.1 ya pre-instalada en macos-15)
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.2"
+          xcode-version: "16.1"
 
       - name: Print Xcode version
         run: xcodebuild -version
@@ -72,14 +72,6 @@ jobs:
         run: |
           gem install cocoapods
           pod install --repo-update
-
-      - name: Install iOS platform artifacts
-        # Xcode 16.2 en los runners trae el SDK pero a veces no la 'Platform'
-        # completa; el compilador de storyboards (ibtool) la necesita.
-        # 'xcodebuild -downloadPlatform iOS' baja los componentes que faltan.
-        run: |
-          xcodebuild -runFirstLaunch || true
-          sudo xcodebuild -downloadPlatform iOS || true
 
       - name: Archive (unsigned)
         working-directory: app/ios
