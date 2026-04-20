@@ -30,8 +30,8 @@ type TipoMaquina = 'lavarropas' | 'secadora';
 export default function SelectScreen({ navigation }: Props) {
   const [saldo, setSaldo] = useState<number | null>(null);
   const [maquinas, setMaquinas] = useState<(Maquina & { ocupada?: boolean })[]>([]);
-  const [duracionLavado, setDuracionLavado] = useState(45);
-  const [duracionSecado, setDuracionSecado] = useState(30);
+  const [duracionLavado, setDuracionLavado] = useState<number | null>(null);
+  const [duracionSecado, setDuracionSecado] = useState<number | null>(null);
 
   const [selectingTipo, setSelectingTipo] = useState<TipoMaquina | null>(null);
   const [loadingMaquinas, setLoadingMaquinas] = useState(false);
@@ -250,8 +250,11 @@ export default function SelectScreen({ navigation }: Props) {
         ]).then(([m, config]) => {
           setMaquinas(m as any);
           if (config) {
-            setDuracionLavado(config.duracion_lavado || 45);
-            setDuracionSecado(config.duracion_secado || 30);
+            setDuracionLavado(config.duracion_lavado ?? null);
+            setDuracionSecado(config.duracion_secado ?? null);
+            logEvent(`⚙ Config: lav=${config.duracion_lavado}min, sec=${config.duracion_secado}min`);
+          } else {
+            logEvent(`⚠ Config edificio no disponible`);
           }
         });
       });
@@ -303,14 +306,35 @@ export default function SelectScreen({ navigation }: Props) {
     }
 
     const tipo = maq.tipo as TipoMaquina;
-    const duracion = tipo === 'lavarropas' ? duracionLavado : duracionSecado;
-    const segs = duracion * 60;
     const usuario = await getUsuarioGuardado();
     const userId = usuario?.usuario_id || 'desconocido';
 
     setActivating(true);
+    setActivatingLog('⚙ Verificando configuración...');
+
+    // Refrescar config del edificio justo antes de enviar — así usamos la duracion real
+    let duracion: number | null = tipo === 'lavarropas' ? duracionLavado : duracionSecado;
+    if (usuario?.edificio_id) {
+      try {
+        const cfg = await obtenerConfigEdificio(usuario.edificio_id);
+        if (cfg) {
+          setDuracionLavado(cfg.duracion_lavado ?? null);
+          setDuracionSecado(cfg.duracion_secado ?? null);
+          duracion = tipo === 'lavarropas' ? (cfg.duracion_lavado ?? null) : (cfg.duracion_secado ?? null);
+        }
+      } catch {}
+    }
+
+    if (!duracion || duracion <= 0) {
+      setActivating(false);
+      logEvent(`❌ Duración inválida (${duracion})`);
+      Alert.alert('Configuración faltante', 'No se pudo obtener la duración del ciclo desde el servidor. Volvé a intentar.');
+      return;
+    }
+
+    const segs = duracion * 60;
     setActivatingLog('⚡ Preparando comando...');
-    logEvent(`⚡ Preparando comando (user=${userId}, ${segs}s)`);
+    logEvent(`⚡ Preparando comando (user=${userId}, ${segs}s = ${duracion}min)`);
 
     // Monitor temporal dedicado a la confirmación
     let confirmed = false;
@@ -423,7 +447,6 @@ export default function SelectScreen({ navigation }: Props) {
         >
           <Text style={styles.typeIcon}>🫧</Text>
           <Text style={styles.typeTitle}>Lavarropas</Text>
-          <Text style={styles.typeSubtitle}>{duracionLavado} min</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -433,7 +456,6 @@ export default function SelectScreen({ navigation }: Props) {
         >
           <Text style={styles.typeIcon}>🌀</Text>
           <Text style={styles.typeTitle}>Secadora</Text>
-          <Text style={styles.typeSubtitle}>{duracionSecado} min</Text>
         </TouchableOpacity>
 
         {bleStatus !== 'connected' && (
@@ -480,11 +502,8 @@ export default function SelectScreen({ navigation }: Props) {
       <Modal visible={!!selectingTipo} transparent animationType="fade" onRequestClose={() => !activating && setSelectingTipo(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
+            <Text style={[styles.modalTitle, { marginBottom: 16 }]}>
               {selectingTipo === 'lavarropas' ? '🫧 Elegí lavarropas' : '🌀 Elegí secadora'}
-            </Text>
-            <Text style={styles.modalSubtitle}>
-              {selectingTipo === 'lavarropas' ? `${duracionLavado} min` : `${duracionSecado} min`}
             </Text>
 
             {activating ? (

@@ -21,13 +21,13 @@ export default function Creditos() {
   const edificioId = usuario?.edificio_id || 'edificio-central';
   const now = new Date();
 
-  // Config
+  // Config — arrancan en 0 para no mostrar defaults falsos antes de cargar
   const [config, setConfig] = useState<ConfigEdificio | null>(null);
-  const [creditosMensuales, setCreditosMensuales] = useState(10);
-  const [costoLavado, setCostoLavado] = useState(1);
-  const [costoSecado, setCostoSecado] = useState(1);
-  const [duracionLavado, setDuracionLavado] = useState(45);
-  const [duracionSecado, setDuracionSecado] = useState(30);
+  const [creditosMensuales, setCreditosMensuales] = useState(0);
+  const [costoLavado, setCostoLavado] = useState(0);
+  const [costoSecado, setCostoSecado] = useState(0);
+  const [duracionLavado, setDuracionLavado] = useState(0);
+  const [duracionSecado, setDuracionSecado] = useState(0);
   const [configMsg, setConfigMsg] = useState('');
 
   // Modal apto (lista usuarios del mismo apartamento)
@@ -90,8 +90,8 @@ export default function Creditos() {
       setCreditosMensuales(configData.creditos_mensuales);
       setCostoLavado(configData.costo_lavado);
       setCostoSecado(configData.costo_secado);
-      setDuracionLavado(configData.duracion_lavado ?? 45);
-      setDuracionSecado(configData.duracion_secado ?? 30);
+      setDuracionLavado(configData.duracion_lavado ?? 0);
+      setDuracionSecado(configData.duracion_secado ?? 0);
       setUsuarios(usuariosData);
       await fetchResumen();
     } catch {
@@ -205,30 +205,36 @@ export default function Creditos() {
         {/* Config edificio */}
         <div style={styles.card}>
           <h3 style={styles.cardTitle}>Configuración del edificio</h3>
-          <div style={styles.configRow}>
-            <label style={styles.configLabel}>
-              Créditos mensuales por usuario
-              <NumericInput min={0} value={creditosMensuales} onChange={setCreditosMensuales} style={styles.input} />
-            </label>
-            <label style={styles.configLabel}>
-              Costo por lavado
-              <NumericInput min={1} value={costoLavado} onChange={setCostoLavado} style={styles.input} />
-            </label>
-            <label style={styles.configLabel}>
-              Costo por secado
-              <NumericInput min={1} value={costoSecado} onChange={setCostoSecado} style={styles.input} />
-            </label>
-            <label style={styles.configLabel}>
-              Duración lavado (min)
-              <NumericInput min={1} value={duracionLavado} onChange={setDuracionLavado} style={styles.input} />
-            </label>
-            <label style={styles.configLabel}>
-              Duración secado (min)
-              <NumericInput min={1} value={duracionSecado} onChange={setDuracionSecado} style={styles.input} />
-            </label>
-            <button onClick={guardarConfig} style={styles.saveBtn}>Guardar</button>
-          </div>
-          {configMsg && <p style={{ fontSize: 13, color: configMsg.includes('Error') ? colors.error : colors.success, marginTop: 8 }}>{configMsg}</p>}
+          {!config ? (
+            <p style={{ color: colors.textSecondary, fontSize: 14 }}>Cargando configuración…</p>
+          ) : (
+            <>
+              <div style={styles.configRow}>
+                <label style={styles.configLabel}>
+                  Créditos mensuales por usuario
+                  <NumericInput min={0} value={creditosMensuales} onChange={setCreditosMensuales} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Costo por lavado
+                  <NumericInput min={1} value={costoLavado} onChange={setCostoLavado} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Costo por secado
+                  <NumericInput min={1} value={costoSecado} onChange={setCostoSecado} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Duración lavado (min)
+                  <NumericInput min={1} value={duracionLavado} onChange={setDuracionLavado} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Duración secado (min)
+                  <NumericInput min={1} value={duracionSecado} onChange={setDuracionSecado} style={styles.input} />
+                </label>
+                <button onClick={guardarConfig} style={styles.saveBtn}>Guardar</button>
+              </div>
+              {configMsg && <p style={{ fontSize: 13, color: configMsg.includes('Error') ? colors.error : colors.success, marginTop: 8 }}>{configMsg}</p>}
+            </>
+          )}
         </div>
 
         {/* Usuarios + saldos */}
