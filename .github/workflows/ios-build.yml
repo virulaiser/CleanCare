@@ -70,17 +70,17 @@ jobs:
       - name: Prebuild (expo -> ios/)
         run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: Fix storyboard and deployment target
-        # 1) expo prebuild pone targetRuntime="AppleCocoa" que ibtool 16.x rechaza.
-        #    Cambiamos a "AppleMobile" que es el valor correcto para iOS device.
+      - name: Fix storyboard targetRuntime and deployment target
+        # 1) expo prebuild puede generar targetRuntime="AppleCocoa" (macOS) o
+        #    "AppleSimulator". Lo cambiamos a "AppleMobile" (iOS device).
         # 2) Bajamos IPHONEOS_DEPLOYMENT_TARGET de 18.1 a 15.1 en el .xcodeproj
         #    para que xcodebuild no exija la platform iOS 18.x instalada.
         run: |
-          sed -i '' 's/targetRuntime="AppleCocoa"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard
-          sed -i '' 's/targetRuntime="AppleSimulator"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard
-          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || echo "no targetRuntime found"
+          sed -i '' 's/targetRuntime="AppleCocoa"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard || true
+          sed -i '' 's/targetRuntime="AppleSimulator"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard || true
+          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || echo "no targetRuntime"
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 18.1/IPHONEOS_DEPLOYMENT_TARGET = 15.1/g' ios/CleanCare.xcodeproj/project.pbxproj
-          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -5 || true
+          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -3
 
       - name: Install CocoaPods
         working-directory: app/ios
@@ -89,6 +89,8 @@ jobs:
           pod install --repo-update
 
       - name: Archive (unsigned)
+        # Sin -destination, xcodebuild usa el SDK (-sdk iphoneos) directamente
+        # sin necesitar la platform iOS runtime instalada en el sistema.
         working-directory: app/ios
         run: |
           xcodebuild \
@@ -96,7 +98,6 @@ jobs:
             -scheme CleanCare \
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
             -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
             -archivePath $PWD/build/CleanCare.xcarchive \
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO \
