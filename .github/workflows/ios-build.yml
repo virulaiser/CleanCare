@@ -73,6 +73,14 @@ jobs:
           gem install cocoapods
           pod install --repo-update
 
+      - name: Install iOS platform artifacts
+        # Xcode 16.2 en los runners trae el SDK pero a veces no la 'Platform'
+        # completa; el compilador de storyboards (ibtool) la necesita.
+        # 'xcodebuild -downloadPlatform iOS' baja los componentes que faltan.
+        run: |
+          xcodebuild -runFirstLaunch || true
+          sudo xcodebuild -downloadPlatform iOS || true
+
       - name: Archive (unsigned)
         working-directory: app/ios
         run: |
