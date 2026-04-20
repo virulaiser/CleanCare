@@ -1,0 +1,97 @@
+name: iOS build (unsigned IPA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: "Build configuration"
+        required: true
+        default: "Release"
+        type: choice
+        options:
+          - Debug
+          - Release
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - ".github/workflows/ios-build.yml"
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build unsigned IPA for iOS
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        working-directory: app
+
+    env:
+      # La app usa este env en runtime para saber a qué backend pegarle
+      EXPO_PUBLIC_API_URL: https://backend-one-tau-21.vercel.app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - name: Setup Ruby (CocoaPods)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: false
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Prebuild (expo → ios/)
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        working-directory: app/ios
+        run: |
+          gem install cocoapods
+          pod install --repo-update
+
+      - name: Archive (unsigned)
+        working-directory: app/ios
+        run: |
+          xcodebuild \
+            -workspace CleanCare.xcworkspace \
+            -scheme CleanCare \
+            -configuration ${{ github.event.inputs.configuration || 'Release' }} \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath $PWD/build/CleanCare.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean archive
+
+      - name: Package unsigned IPA
+        working-directory: app/ios/build/CleanCare.xcarchive/Products/Applications
+        run: |
+          mkdir -p Payload
+          mv CleanCare.app Payload/
+          zip -qr "$GITHUB_WORKSPACE/CleanCare-unsigned.ipa" Payload
+          ls -lh "$GITHUB_WORKSPACE/CleanCare-unsigned.ipa"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CleanCare-unsigned-ipa
+          path: CleanCare-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error
