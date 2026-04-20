@@ -925,7 +925,7 @@ export default function CycleScreen({ navigation, route }: Props) {
 
         <View style={styles.bottomButtons}>
           <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('Select')}>
-            <Text style={styles.addButtonText}>+ Sumar máquina</Text>
+            <Text style={styles.addButtonText}>← Volver al menú</Text>
           </TouchableOpacity>
         </View>
 
