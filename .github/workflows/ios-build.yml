@@ -77,9 +77,10 @@ jobs:
           gem install cocoapods
           pod install --repo-update
 
-      - name: Archive (unsigned)
-        # Sin -destination: xcodebuild usa solo -sdk iphoneos y no exige
-        # la Platform iOS completa instalada.
+      - name: Build (unsigned, sin archive)
+        # 'archive' exige destino con platform iOS instalada. 'build' basta
+        # con -sdk iphoneos y produce el .app en DerivedData, que luego
+        # empaquetamos como IPA manualmente.
         working-directory: app/ios
         run: |
           xcodebuild \
@@ -87,17 +88,24 @@ jobs:
             -scheme CleanCare \
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
             -sdk iphoneos \
-            -archivePath $PWD/build/CleanCare.xcarchive \
+            -derivedDataPath $PWD/build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            clean archive
+            clean build
 
-      - name: Package unsigned IPA
-        working-directory: app/ios/build/CleanCare.xcarchive/Products/Applications
+      - name: Package unsigned IPA from built .app
+        working-directory: app/ios
         run: |
+          APP_PATH=$(find $PWD/build -type d -name "CleanCare.app" | head -n1)
+          echo "Encontrado: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No se encontró CleanCare.app en DerivedData"
+            exit 1
+          fi
+          cd "$(dirname "$APP_PATH")"
           mkdir -p Payload
-          mv CleanCare.app Payload/
+          cp -R CleanCare.app Payload/
           zip -qr "$GITHUB_WORKSPACE/CleanCare-unsigned.ipa" Payload
           ls -lh "$GITHUB_WORKSPACE/CleanCare-unsigned.ipa"
 
