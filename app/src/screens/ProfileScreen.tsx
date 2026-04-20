@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -82,11 +83,23 @@ export default function ProfileScreen({ navigation }: Props) {
         <Text style={styles.actionArrow}>›</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.actionBtn}
+        onPress={async () => {
+          await SecureStore.deleteItemAsync('cleancare_onboarded').catch(() => {});
+          navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+        }}
+      >
+        <Text style={styles.actionIcon}>🎬</Text>
+        <Text style={styles.actionText}>Ver tutorial otra vez</Text>
+        <Text style={styles.actionArrow}>›</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>CleanCare v1.0.0</Text>
+      <Text style={styles.version}>CleanCare v1.1.0</Text>
       <SignatureBadge />
     </ScrollView>
   );
