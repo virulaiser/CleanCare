@@ -623,19 +623,16 @@ export default function CycleScreen({ navigation, route }: Props) {
 
   async function sendBleOff() {
     const device = deviceRef.current;
-    if (device) {
-      try {
-        const encoded = btoa('OFF');
-        await device.writeCharacteristicWithResponseForService(
-          SERVICE_UUID,
-          CONTROL_UUID,
-          encoded
-        );
-      } catch {}
-      try {
-        await device.cancelConnection();
-      } catch {}
-    }
+    if (!device) return;
+    try {
+      const cmd = `OFF:${maquina_id}`;
+      await device.writeCharacteristicWithResponseForService(
+        SERVICE_UUID,
+        CONTROL_UUID,
+        btoa(cmd)
+      );
+    } catch {}
+    // NO desconectar — la conexión BLE queda viva para otros ciclos.
   }
 
   const handleCancel = () => {
