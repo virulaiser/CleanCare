@@ -133,7 +133,7 @@ function MachineAnimation({ tipo, active }: { tipo: 'lavarropas' | 'secadora'; a
 }
 
 export default function CycleScreen({ navigation, route }: Props) {
-  const { maquina_id, edificio_id, tipo, duracion_min, nombre_maquina } = route.params;
+  const { maquina_id, edificio_id, tipo, duracion_min, nombre_maquina, preArmed } = route.params;
   const cycleDurationSeconds = (duracion_min || DEFAULT_DURATION_MIN) * 60;
   const [secondsRemaining, setSecondsRemaining] = useState(cycleDurationSeconds);
   const [isComplete, setIsComplete] = useState(false);
@@ -218,7 +218,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     let devicesFound: string[] = [];
 
     async function connectBle() {
-      // Si ya hay device conectado desde ScanScreen, usarlo
+      // Si ya hay device conectado desde SelectScreen, usarlo
       const existing = getConnectedDevice();
       if (existing) {
         try {
@@ -275,16 +275,18 @@ export default function CycleScreen({ navigation, route }: Props) {
             cycleStartedRef.current = true;
             setCycleStarted(true);
           } else {
-            // Primer inicio: enviar ON con duración completa + registrar uso
-            setBleLog('⚡ Activando máquina...');
-            const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}:${maquina_id}`;
-            await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
+            // Primer inicio: si NO es preArmed, enviar ON. Si es preArmed, el ON ya lo envió SelectScreen.
+            if (!preArmed) {
+              setBleLog('⚡ Activando máquina...');
+              const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}:${maquina_id}`;
+              await existing.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
+            }
 
             cycleStartedRef.current = true;
             setCycleStarted(true);
             startTimeRef.current = Date.now();
             const mins = Math.ceil(cycleDurationSeconds / 60);
-            setBleLog(`✅ Máquina activada — ${mins} min`);
+            setBleLog(preArmed ? `🔄 Ciclo iniciado — ${mins} min` : `✅ Máquina activada — ${mins} min`);
 
             guardarCicloActivo({
               maquina_id, edificio_id, tipo, duracion_min: mins, nombre_maquina,
@@ -410,15 +412,17 @@ export default function CycleScreen({ navigation, route }: Props) {
               cycleStartedRef.current = true;
               setCycleStarted(true);
             } else {
-              setBleLog('⚡ Activando máquina...');
-              const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}:${maquina_id}`;
-              await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
+              if (!preArmed) {
+                setBleLog('⚡ Activando máquina...');
+                const cmd = `ON:${cycleDurationSeconds}:${userId}:${tipo}:${maquina_id}`;
+                await connected.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
+              }
 
               cycleStartedRef.current = true;
               setCycleStarted(true);
               startTimeRef.current = Date.now();
               const mins = Math.ceil(cycleDurationSeconds / 60);
-              setBleLog(`✅ Máquina activada — ${mins} min`);
+              setBleLog(preArmed ? `🔄 Ciclo iniciado — ${mins} min` : `✅ Máquina activada — ${mins} min`);
 
               guardarCicloActivo({
                 maquina_id, edificio_id, tipo, duracion_min: mins, nombre_maquina,
@@ -476,7 +480,7 @@ export default function CycleScreen({ navigation, route }: Props) {
       userExitedRef.current = true;
       clearTimeout(scanTimeout);
       try { manager.stopDeviceScan(); } catch {}
-      // NO destruir el manager compartido — sigue vivo para ScanScreen
+      // NO destruir el manager compartido — sigue vivo para SelectScreen
     };
   }, []);
 
@@ -648,7 +652,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           if (usoIdRef.current) {
             actualizarUso(usoIdRef.current, 'cancelado').catch(() => {});
           }
-          navigation.navigate('Scan');
+          navigation.navigate('Select');
         },
       },
     ]);
@@ -671,7 +675,7 @@ export default function CycleScreen({ navigation, route }: Props) {
               actualizarUso(usoIdRef.current, 'averia').catch(() => {});
             }
             Alert.alert('Reporte enviado', 'El administrador fue notificado del problema.');
-            navigation.navigate('Scan');
+            navigation.navigate('Select');
           },
         },
       ]
@@ -771,7 +775,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           </Text>
           <Text style={styles.bleLogText}>{bleLog}</Text>
           <Text style={styles.bleMachineId}>{nombre_maquina}</Text>
-          <TouchableOpacity style={styles.bleCancelBtn} onPress={() => navigation.navigate('Scan')}>
+          <TouchableOpacity style={styles.bleCancelBtn} onPress={() => navigation.navigate('Select')}>
             <Text style={styles.bleCancelText}>Cancelar</Text>
           </TouchableOpacity>
         </View>
@@ -833,8 +837,8 @@ export default function CycleScreen({ navigation, route }: Props) {
           <Text style={styles.simInfo}>
             El ciclo correrá con timer local y se registrará en el sistema, pero no activará la máquina físicamente.
           </Text>
-          <TouchableOpacity style={styles.bleCancelBtn} onPress={() => navigation.navigate('Scan')}>
-            <Text style={styles.bleCancelText}>Volver al escáner</Text>
+          <TouchableOpacity style={styles.bleCancelBtn} onPress={() => navigation.navigate('Select')}>
+            <Text style={styles.bleCancelText}>Volver al inicio</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -857,9 +861,9 @@ export default function CycleScreen({ navigation, route }: Props) {
           </Text>
           <TouchableOpacity
             style={[styles.primaryButton, { backgroundColor: accentColor }]}
-            onPress={() => navigation.navigate('Scan')}
+            onPress={() => navigation.navigate('Select')}
           >
-            <Text style={styles.primaryButtonText}>Volver al escaner</Text>
+            <Text style={styles.primaryButtonText}>Volver al inicio</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.secondaryButton}
@@ -925,7 +929,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         </Text>
 
         <View style={styles.bottomButtons}>
-          <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('Scan')}>
+          <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('Select')}>
             <Text style={styles.addButtonText}>+ Sumar máquina</Text>
           </TouchableOpacity>
         </View>

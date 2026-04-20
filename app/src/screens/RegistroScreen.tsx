@@ -52,7 +52,7 @@ export default function RegistroScreen({ navigation }: Props) {
         telefono: telefono || undefined,
         apartamento: apartamento || undefined,
       });
-      navigation.replace('Scan');
+      navigation.replace('Select');
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo registrar');
     } finally {

@@ -86,7 +86,7 @@ export default function SplashScreen({ navigation }: Props) {
       } else if (!token) {
         navigation.replace('Login');
       } else {
-        navigation.replace('Scan');
+        navigation.replace('Select');
       }
     })();
 

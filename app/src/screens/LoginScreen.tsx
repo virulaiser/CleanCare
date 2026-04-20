@@ -29,7 +29,7 @@ export default function LoginScreen({ navigation }: Props) {
           nombre_maquina: ciclo.nombre_maquina,
         });
       } else {
-        navigation.replace('Scan');
+        navigation.replace('Select');
       }
     })();
   }, [navigation]);
@@ -42,7 +42,7 @@ export default function LoginScreen({ navigation }: Props) {
     setLoading(true);
     try {
       await loginUsuario(email.trim().toLowerCase(), password);
-      navigation.replace('Scan');
+      navigation.replace('Select');
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo conectar con el servidor');
     } finally {

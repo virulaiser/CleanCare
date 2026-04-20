@@ -5,7 +5,7 @@ import SplashScreen from '../screens/SplashScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegistroScreen from '../screens/RegistroScreen';
-import ScanScreen from '../screens/ScanScreen';
+import SelectScreen from '../screens/SelectScreen';
 import CycleScreen from '../screens/CycleScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import BleTestScreen from '../screens/BleTestScreen';
@@ -18,13 +18,14 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
   Registro: undefined;
-  Scan: undefined;
+  Select: undefined;
   Cycle: {
     maquina_id: string;
     edificio_id: string;
     tipo: 'lavarropas' | 'secadora';
     duracion_min: number;
     nombre_maquina: string;
+    preArmed?: boolean;
   };
   History: undefined;
   Wallet: undefined;
@@ -67,9 +68,9 @@ export default function AppNavigator() {
           options={{ title: 'Crear cuenta' }}
         />
         <Stack.Screen
-          name="Scan"
-          component={ScanScreen}
-          options={{ title: 'Escanear QR', headerShown: false }}
+          name="Select"
+          component={SelectScreen}
+          options={{ title: 'Elegir máquina', headerShown: false }}
         />
         <Stack.Screen
           name="Cycle"

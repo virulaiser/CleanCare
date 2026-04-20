@@ -17,7 +17,6 @@
       "bundleIdentifier": "uy.cleancare.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "CleanCare necesita la cámara para escanear los códigos QR de las máquinas",
         "NSBluetoothAlwaysUsageDescription": "CleanCare usa Bluetooth para activar las máquinas de lavado y secado",
         "NSBluetoothPeripheralUsageDescription": "CleanCare usa Bluetooth para activar las máquinas de lavado y secado",
         "NSLocationWhenInUseUsageDescription": "Algunas versiones de iOS requieren permiso de ubicación para escanear dispositivos Bluetooth cercanos",
@@ -31,7 +30,6 @@
       },
       "package": "uy.cleancare.app",
       "permissions": [
-        "CAMERA",
         "ACCESS_FINE_LOCATION",
         "BLUETOOTH_SCAN",
         "BLUETOOTH_CONNECT",
@@ -40,7 +38,6 @@
     },
     "plugins": [
       "expo-router",
-      "expo-camera",
       "expo-notifications",
       [
         "react-native-ble-plx",
