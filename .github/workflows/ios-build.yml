@@ -33,7 +33,6 @@ jobs:
         working-directory: app
 
     env:
-      # La app usa este env en runtime para saber a qué backend pegarle
       EXPO_PUBLIC_API_URL: https://backend-one-tau-21.vercel.app
 
     steps:
@@ -48,6 +47,13 @@ jobs:
       - name: Print Xcode version
         run: xcodebuild -version
 
+      - name: Ensure iOS platform runtime installed
+        run: |
+          xcodebuild -runFirstLaunch || true
+          sudo xcodebuild -downloadPlatform iOS 2>&1 | tail -20 || true
+          echo "---"
+          xcrun simctl list runtimes 2>&1 | head -10 || true
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
@@ -61,15 +67,20 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Prebuild (expo → ios/)
+      - name: Prebuild (expo -> ios/)
         run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: Fix SplashScreen.storyboard targetRuntime
-        # expo prebuild genera targetRuntime="AppleSimulator" pero ibtool
-        # necesita "AppleMobile" para compilar con -sdk iphoneos.
+      - name: Fix storyboard and deployment target
+        # 1) expo prebuild pone targetRuntime="AppleCocoa" que ibtool 16.x rechaza.
+        #    Cambiamos a "AppleMobile" que es el valor correcto para iOS device.
+        # 2) Bajamos IPHONEOS_DEPLOYMENT_TARGET de 18.1 a 15.1 en el .xcodeproj
+        #    para que xcodebuild no exija la platform iOS 18.x instalada.
         run: |
+          sed -i '' 's/targetRuntime="AppleCocoa"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard
           sed -i '' 's/targetRuntime="AppleSimulator"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard
-          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || true
+          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || echo "no targetRuntime found"
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 18.1/IPHONEOS_DEPLOYMENT_TARGET = 15.1/g' ios/CleanCare.xcodeproj/project.pbxproj
+          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -5 || true
 
       - name: Install CocoaPods
         working-directory: app/ios
@@ -78,8 +89,6 @@ jobs:
           pod install --repo-update
 
       - name: Archive (unsigned)
-        # IPHONEOS_DEPLOYMENT_TARGET=16.0 hace que ibtool no busque la
-        # platform iOS 18.x (que no está instalada en macos-15 runner).
         working-directory: app/ios
         run: |
           xcodebuild \
@@ -93,7 +102,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             clean archive
 
       - name: Package unsigned IPA
