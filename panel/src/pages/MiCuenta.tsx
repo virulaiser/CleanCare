@@ -79,7 +79,9 @@ export default function MiCuenta() {
         <div style={styles.navInner}>
           <img src="/logo.png" alt="CleanCare" onClick={() => navigate('/')} style={{ height: 56, width: 'auto', objectFit: 'contain', cursor: 'pointer' }} />
           <div style={styles.navActions}>
-            <span style={styles.userName}>{usuario?.nombre || usuario?.email}</span>
+            {usuario?.rol !== 'admin' && (
+              <span style={styles.userName}>{usuario?.nombre || usuario?.email}</span>
+            )}
             <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
           </div>
         </div>
