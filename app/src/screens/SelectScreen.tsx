@@ -278,9 +278,22 @@ export default function SelectScreen({ navigation }: Props) {
     logEvent(`🔍 Cargando ${tipo}s disponibles...`);
     const u = await getUsuarioGuardado();
     if (u?.edificio_id) {
+      // Si aún no tenemos la config en state, cargarla bloqueante ahora
+      const yaHayDuracion = tipo === 'lavarropas' ? duracionLavado : duracionSecado;
+      const promesasBase: Promise<any>[] = [
+        listarMaquinas(u.edificio_id).catch(() => [] as any[]),
+      ];
+      if (!yaHayDuracion) {
+        promesasBase.push(obtenerConfigEdificio(u.edificio_id).catch(() => null));
+      }
       try {
-        const m = await listarMaquinas(u.edificio_id);
+        const [m, cfg] = await Promise.all(promesasBase);
         setMaquinas(m as any);
+        if (cfg) {
+          setDuracionLavado(cfg.duracion_lavado ?? null);
+          setDuracionSecado(cfg.duracion_secado ?? null);
+          logEvent(`⚙ Config cargada on-demand: lav=${cfg.duracion_lavado}, sec=${cfg.duracion_secado}`);
+        }
         const cantTipo = (m as any[]).filter((x) => x.tipo === tipo).length;
         const libres = (m as any[]).filter((x) => x.tipo === tipo && !x.ocupada).length;
         logEvent(`📋 ${cantTipo} ${tipo}(s) en total, ${libres} libre(s)`);
@@ -312,23 +325,34 @@ export default function SelectScreen({ navigation }: Props) {
     setActivating(true);
     setActivatingLog('⚙ Verificando configuración...');
 
-    // Refrescar config del edificio justo antes de enviar — así usamos la duracion real
+    // Fuente primaria: la config que ya cargó el focus effect al abrir la pantalla.
     let duracion: number | null = tipo === 'lavarropas' ? duracionLavado : duracionSecado;
+
+    // Best-effort refresh — si funciona sobreescribimos, si falla mantenemos la cacheada.
     if (usuario?.edificio_id) {
       try {
         const cfg = await obtenerConfigEdificio(usuario.edificio_id);
         if (cfg) {
-          setDuracionLavado(cfg.duracion_lavado ?? null);
-          setDuracionSecado(cfg.duracion_secado ?? null);
-          duracion = tipo === 'lavarropas' ? (cfg.duracion_lavado ?? null) : (cfg.duracion_secado ?? null);
+          const nueva = tipo === 'lavarropas' ? cfg.duracion_lavado : cfg.duracion_secado;
+          if (nueva && nueva > 0) {
+            duracion = nueva;
+            setDuracionLavado(cfg.duracion_lavado ?? null);
+            setDuracionSecado(cfg.duracion_secado ?? null);
+            logEvent(`🔄 Config refrescada: ${nueva}min`);
+          }
         }
-      } catch {}
+      } catch (err: any) {
+        logEvent(`⚠ No pudo refrescar config, uso la cacheada (${duracion}min)`);
+      }
     }
 
     if (!duracion || duracion <= 0) {
       setActivating(false);
-      logEvent(`❌ Duración inválida (${duracion})`);
-      Alert.alert('Configuración faltante', 'No se pudo obtener la duración del ciclo desde el servidor. Volvé a intentar.');
+      logEvent(`❌ Sin duración: state=${tipo === 'lavarropas' ? duracionLavado : duracionSecado}`);
+      Alert.alert(
+        'Configuración faltante',
+        'La app aún no pudo obtener la duración del ciclo. Verificá tu conexión a internet y volvé a entrar a la pantalla.'
+      );
       return;
     }
 
