@@ -70,17 +70,21 @@ jobs:
       - name: Prebuild (expo -> ios/)
         run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: Fix storyboard targetRuntime and deployment target
-        # 1) expo prebuild puede generar targetRuntime="AppleCocoa" (macOS) o
-        #    "AppleSimulator". Lo cambiamos a "AppleMobile" (iOS device).
-        # 2) Bajamos IPHONEOS_DEPLOYMENT_TARGET de 18.1 a 15.1 en el .xcodeproj
-        #    para que xcodebuild no exija la platform iOS 18.x instalada.
+      - name: Fix storyboard and deployment target
+        # Corrige 2 problemas que genera expo prebuild:
+        # 1) targetRuntime="AppleCocoa" en el storyboard -> "AppleMobile"
+        # 2) IPHONEOS_DEPLOYMENT_TARGET=18.1 en el xcodeproj -> 15.1
+        #    Usando regex para capturar cualquier version (18.x, 18.0, 18.1...)
         run: |
+          # Fix storyboard targetRuntime
           sed -i '' 's/targetRuntime="AppleCocoa"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard || true
           sed -i '' 's/targetRuntime="AppleSimulator"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard || true
-          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || echo "no targetRuntime"
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 18.1/IPHONEOS_DEPLOYMENT_TARGET = 15.1/g' ios/CleanCare.xcodeproj/project.pbxproj
-          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -3
+          echo "=== storyboard targetRuntime ==="
+          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || echo "no targetRuntime found"
+          # Fix deployment target (cualquier version 18.x)
+          LC_ALL=C sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 1[0-9][.][0-9]*/IPHONEOS_DEPLOYMENT_TARGET = 15.1/g' ios/CleanCare.xcodeproj/project.pbxproj
+          echo "=== deployment targets after fix ==="
+          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -5
 
       - name: Install CocoaPods
         working-directory: app/ios
@@ -89,8 +93,6 @@ jobs:
           pod install --repo-update
 
       - name: Archive (unsigned)
-        # Sin -destination, xcodebuild usa el SDK (-sdk iphoneos) directamente
-        # sin necesitar la platform iOS runtime instalada en el sistema.
         working-directory: app/ios
         run: |
           xcodebuild \
@@ -98,6 +100,7 @@ jobs:
             -scheme CleanCare \
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -archivePath $PWD/build/CleanCare.xcarchive \
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO \
