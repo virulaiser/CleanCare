@@ -52,14 +52,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: app/package-lock.json
 
       - name: Setup Ruby (CocoaPods)
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.2"
-          bundler-cache: false
+          ruby-version: "3.3"
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
@@ -78,9 +75,9 @@ jobs:
           gem install cocoapods
           pod install --repo-update
 
-            - name: Archive (unsigned)
-        # Sin -destination: así xcodebuild usa sólo -sdk iphoneos y no exige
-        # la Platform iOS completa instalada (sólo el SDK basta para archive).
+      - name: Archive (unsigned)
+        # Sin -destination: xcodebuild usa solo -sdk iphoneos y no exige
+        # la Platform iOS completa instalada.
         working-directory: app/ios
         run: |
           xcodebuild \
