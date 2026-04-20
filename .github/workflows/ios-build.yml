@@ -40,11 +40,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.app || sudo xcode-select -s /Applications/Xcode_16.1.app
-
-      - name: Print Xcode version
-        run: xcodebuild -version
+      - name: Select newest Xcode 16.x (≥16.1)
+        run: |
+          echo "Xcode disponibles:"
+          ls -d /Applications/Xcode_*.app 2>/dev/null || true
+          # Preferir 16.1+ (React Native 0.81 lo exige)
+          LATEST=$(ls -d /Applications/Xcode_16.[1-9]*.app 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$LATEST" ]; then
+            LATEST=$(ls -d /Applications/Xcode_1[7-9]*.app /Applications/Xcode_2*.app 2>/dev/null | sort -V | tail -n1)
+          fi
+          if [ -z "$LATEST" ]; then
+            echo "::error::No se encontró Xcode >= 16.1 en el runner"
+            exit 1
+          fi
+          echo "Seleccionando: $LATEST"
+          sudo xcode-select -s "$LATEST/Contents/Developer"
+          xcodebuild -version
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
