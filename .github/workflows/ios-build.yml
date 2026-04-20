@@ -47,6 +47,13 @@ jobs:
       - name: Print Xcode version
         run: xcodebuild -version
 
+      - name: Ensure iOS platform runtime installed
+        run: |
+          xcodebuild -runFirstLaunch || true
+          sudo xcodebuild -downloadPlatform iOS 2>&1 | tail -20 || true
+          echo "---"
+          xcrun simctl list runtimes 2>&1 | head -10 || true
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
@@ -60,34 +67,25 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Prebuild (expo → ios/)
+      - name: Prebuild (expo -> ios/)
         run: npx expo prebuild --platform ios --clean --no-install
-
-      - name: Lower deployment target to iOS 16.0
-        # expo prebuild fija IPHONEOS_DEPLOYMENT_TARGET a 18.x en el pbxproj
-        # y platform :ios, '18.x' en el Podfile.
-        # Bajamos ambos a 16.0 para que xcodebuild y CocoaPods no requieran iOS 18.
-        run: |
-          python3 - <<'PYEOF'
-          import re
-          path = 'ios/CleanCare.xcodeproj/project.pbxproj'
-          with open(path, 'r') as f:
-              c = f.read()
-          new = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [0-9]+\.[0-9]+', 'IPHONEOS_DEPLOYMENT_TARGET = 16.0', c)
-          with open(path, 'w') as f:
-              f.write(new)
-          print('pbxproj: patched', new.count('IPHONEOS_DEPLOYMENT_TARGET = 16.0'), 'targets')
-          PYEOF
-          sed -i "" "s/platform :ios, '[0-9][0-9.]*'/platform :ios, '16.0'/g" ios/Podfile
-          sed -i "" "s/targetRuntime=\"AppleSimulator\"/targetRuntime=\"AppleMobile\"/g" ios/CleanCare/SplashScreen.storyboard
-          echo "Podfile platform: $(grep 'platform :ios' ios/Podfile || echo 'not found')"
-          echo "Storyboard: $(grep -o 'targetRuntime=\"[^\"]*\"' ios/CleanCare/SplashScreen.storyboard || echo 'not found')"
 
       - name: Install CocoaPods
         working-directory: app/ios
         run: |
           gem install cocoapods
           pod install --repo-update
+
+      - name: Lower deployment target to 15.1
+        # expo prebuild genera IPHONEOS_DEPLOYMENT_TARGET=18.1 en el pbxproj.
+        # Lo bajamos DESPUES del pod install para evitar que CocoaPods lo regenere.
+        # Esto permite archivar sin la platform iOS 18.x instalada en el runner.
+        run: |
+          echo "=== Before fix ==="
+          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -3
+          LC_ALL=C sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 1[89][.][0-9]*/IPHONEOS_DEPLOYMENT_TARGET = 15.1/g' ios/CleanCare.xcodeproj/project.pbxproj
+          echo "=== After fix ==="
+          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -3
 
       - name: Archive (unsigned)
         working-directory: app/ios
@@ -100,6 +98,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath $PWD/build/CleanCare.xcarchive \
             ONLY_ACTIVE_ARCH=NO \
+            IPHONEOS_DEPLOYMENT_TARGET=15.1 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
