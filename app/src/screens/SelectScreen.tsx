@@ -47,10 +47,8 @@ export default function SelectScreen({ navigation }: Props) {
   const [ciclosActivos, setCiclosActivos] = useState<CicloActivo[]>([]);
   const [now, setNow] = useState(Date.now());
 
-  const [eventLog, setEventLog] = useState<string[]>([]);
+  // logEvent se mantiene para console.log (diagnóstico adb logcat) pero ya no se muestra en UI.
   const logEvent = useCallback((msg: string) => {
-    const ts = new Date().toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setEventLog(prev => [`[${ts}] ${msg}`, ...prev].slice(0, 30));
     console.log('[SelectScreen]', msg);
   }, []);
 
@@ -536,25 +534,6 @@ export default function SelectScreen({ navigation }: Props) {
         {bleStatus !== 'connected' && (
           <Text style={styles.warnText}>Conectá el ESP32 para activar una máquina</Text>
         )}
-
-        {/* Panel de eventos — diagnóstico en tiempo real */}
-        <View style={styles.logPanel}>
-          <View style={styles.logHeader}>
-            <Text style={styles.logTitle}>📜 Qué está haciendo la app</Text>
-            <TouchableOpacity onPress={() => setEventLog([])}>
-              <Text style={styles.logClear}>limpiar</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.logBody}>
-            {eventLog.length === 0 ? (
-              <Text style={styles.logEmpty}>Sin eventos todavía…</Text>
-            ) : (
-              eventLog.slice(0, 6).map((line, i) => (
-                <Text key={i} style={styles.logLine} numberOfLines={1} ellipsizeMode="tail">{line}</Text>
-              ))
-            )}
-          </View>
-        </View>
       </View>
 
       {/* Bottom nav */}
@@ -582,16 +561,11 @@ export default function SelectScreen({ navigation }: Props) {
             </Text>
 
             {activating ? (
-              <View style={{ padding: 16, alignItems: 'stretch', alignSelf: 'stretch' }}>
+              <View style={{ padding: 24, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ marginTop: 12, fontSize: 14, color: colors.textPrimary, textAlign: 'center', fontWeight: '600' }}>
+                <Text style={{ marginTop: 16, fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}>
                   {activatingLog}
                 </Text>
-                <View style={styles.logBody}>
-                  {eventLog.slice(0, 5).map((line, i) => (
-                    <Text key={i} style={styles.logLine} numberOfLines={1} ellipsizeMode="tail">{line}</Text>
-                  ))}
-                </View>
               </View>
             ) : loadingMaquinas ? (
               <ActivityIndicator size="large" color={colors.primary} style={{ padding: 20 }} />
@@ -693,13 +667,4 @@ const styles = StyleSheet.create({
   activeName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   activeSub: { fontSize: 12, color: colors.textSecondary, fontWeight: '600', marginTop: 2 },
   activeArrow: { fontSize: 22, color: colors.textSecondary },
-  logPanel: {
-    marginTop: 20, backgroundColor: '#0F172A', borderRadius: 12, padding: 10,
-  },
-  logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  logTitle: { color: '#93C5FD', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  logClear: { color: '#FCA5A5', fontSize: 10, fontWeight: '700', textDecorationLine: 'underline' },
-  logBody: { minHeight: 60, marginTop: 4 },
-  logEmpty: { color: '#64748B', fontSize: 11, fontStyle: 'italic' },
-  logLine: { color: '#E2E8F0', fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', lineHeight: 14 },
 });
