@@ -95,7 +95,7 @@ export default function Home() {
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>&#x1F4F1;</div>
               <h3 style={styles.featureTitle}>Control desde el celular</h3>
-              <p style={styles.featureText}>Los residentes activan las máquinas escaneando un QR. Rápido, seguro y sin monedas.</p>
+              <p style={styles.featureText}>Los residentes activan las máquinas con un toque en la app, por Bluetooth. Rápido, seguro y sin monedas.</p>
             </div>
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>&#x1F527;</div>
@@ -130,8 +130,8 @@ export default function Home() {
                 <h3 style={styles.serviceTitle}>Para residentes</h3>
               </div>
               <ul style={styles.serviceList}>
-                <li>Activación por QR desde el celular</li>
-                <li>Elegí duración: 30, 45 o 60 minutos</li>
+                <li>Activación por Bluetooth desde la app</li>
+                <li>Duración de ciclo configurada por la administración</li>
                 <li>Estado en tiempo real de la máquina</li>
                 <li>Historial de usos en la app</li>
               </ul>
@@ -148,18 +148,18 @@ export default function Home() {
           <div className="grid-3" style={styles.grid3}>
             <div style={styles.stepCard}>
               <div style={styles.stepNumber}>1</div>
-              <h3 style={styles.stepTitle}>Escaneá el QR</h3>
-              <p style={styles.stepText}>Cada máquina tiene un código QR. Abrí la app y escanealo con la cámara.</p>
+              <h3 style={styles.stepTitle}>Abrí la app</h3>
+              <p style={styles.stepText}>Acercate a la lavandería. La app se conecta por Bluetooth a la máquina automáticamente.</p>
             </div>
             <div style={styles.stepCard}>
               <div style={styles.stepNumber}>2</div>
-              <h3 style={styles.stepTitle}>Elegí la duración</h3>
-              <p style={styles.stepText}>Seleccioná 30, 45 o 60 minutos según el tipo de lavado que necesites.</p>
+              <h3 style={styles.stepTitle}>Elegí lavar o secar</h3>
+              <p style={styles.stepText}>Tocá el botón "Lavarropas" o "Secadora" y seleccioná la máquina libre que quieras usar.</p>
             </div>
             <div style={styles.stepCard}>
               <div style={styles.stepNumber}>3</div>
               <h3 style={styles.stepTitle}>Listo, a lavar</h3>
-              <p style={styles.stepText}>La máquina se activa automáticamente. Seguí el estado en tiempo real desde tu celular.</p>
+              <p style={styles.stepText}>La máquina se activa sola con la duración que fija la administración. Seguí el tiempo restante en tu celular.</p>
             </div>
           </div>
         </div>

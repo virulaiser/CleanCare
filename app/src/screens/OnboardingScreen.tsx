@@ -10,18 +10,18 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 const steps = [
   {
     icon: '📱',
-    title: 'Escaneá el QR',
-    description: 'Cada máquina tiene un código QR. Escanealo con tu celular para conectarte.',
+    title: 'Abrí la app cerca de la máquina',
+    description: 'La app se conecta sola por Bluetooth al equipo de la lavandería. No hace falta escanear nada.',
   },
   {
     icon: '🚀',
-    title: 'Activá la máquina',
-    description: 'Elegí lavar o secar, seleccioná la duración y listo. Así de simple.',
+    title: 'Elegí lavar o secar',
+    description: 'Tocá Lavarropas o Secadora, seleccioná la máquina libre y listo. La duración la fija la administración.',
   },
   {
     icon: '📊',
     title: 'Controlá tus usos',
-    description: 'Revisá tu historial de lavados y secados cuando quieras.',
+    description: 'Volvé a la app en cualquier momento para ver el tiempo restante, cancelar, o revisar tu historial.',
   },
 ];
 
