@@ -57,19 +57,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Patch app.json iOS deployment target
-        run: |
-          node -e "
-            const fs = require('fs');
-            const p = 'app.json';
-            const j = JSON.parse(fs.readFileSync(p, 'utf8'));
-            j.expo = j.expo || {};
-            j.expo.ios = j.expo.ios || {};
-            j.expo.ios.deploymentTarget = '16.0';
-            fs.writeFileSync(p, JSON.stringify(j, null, 2));
-            console.log('deploymentTarget set to', j.expo.ios.deploymentTarget);
-          "
-
       - name: Prebuild (expo -> ios/)
         run: npx expo prebuild --platform ios --clean --no-install
 
@@ -86,13 +73,14 @@ jobs:
             -workspace CleanCare.xcworkspace \
             -scheme CleanCare \
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
-            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -archivePath $PWD/build/CleanCare.xcarchive \
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            SDKROOT=iphoneos \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             clean archive
 
       - name: Package unsigned IPA
