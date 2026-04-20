@@ -74,6 +74,8 @@ jobs:
           pod install --repo-update
 
       - name: Archive (unsigned)
+        # Sin -destination: así xcodebuild usa sólo -sdk iphoneos y no exige
+        # la Platform iOS completa instalada (sólo el SDK basta para archive).
         working-directory: app/ios
         run: |
           xcodebuild \
@@ -81,7 +83,6 @@ jobs:
             -scheme CleanCare \
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
             -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
             -archivePath $PWD/build/CleanCare.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
