@@ -44,6 +44,13 @@ export default function SelectScreen({ navigation }: Props) {
   const [esp32Remaining, setEsp32Remaining] = useState(0);
   const [bleLog, setBleLog] = useState('');
 
+  const [eventLog, setEventLog] = useState<string[]>([]);
+  const logEvent = useCallback((msg: string) => {
+    const ts = new Date().toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setEventLog(prev => [`[${ts}] ${msg}`, ...prev].slice(0, 30));
+    console.log('[SelectScreen]', msg);
+  }, []);
+
   const managerRef = useRef<BleManager | null>(null);
   const deviceRef = useRef<Device | null>(null);
   const wasConnectedRef = useRef(false);
@@ -53,6 +60,7 @@ export default function SelectScreen({ navigation }: Props) {
 
   useEffect(() => {
     unmountedRef.current = false;
+    logEvent('🚀 Pantalla Select abierta');
     const manager = getBleManager();
     managerRef.current = manager;
 
@@ -63,6 +71,7 @@ export default function SelectScreen({ navigation }: Props) {
       setBleDeviceName(existing.name || ESP32_BLE_NAME);
       wasConnectedRef.current = true;
       setBleLog('Conectado al ESP32');
+      logEvent('✅ Reutilizando conexión BLE existente');
       attachStatusMonitor(existing);
     } else {
       const sub = manager.onStateChange((state) => {
@@ -103,17 +112,22 @@ export default function SelectScreen({ navigation }: Props) {
           setEsp32Remaining(0);
         }
       });
-    } catch {}
+      logEvent('👁 Monitor de status BLE activo');
+    } catch (err: any) {
+      logEvent(`⚠ Monitor no se pudo crear: ${err?.message || err}`);
+    }
   }
 
   async function scanForESP32(manager: BleManager) {
     setBleStatus('scanning');
     setBleLog('Pidiendo permisos...');
+    logEvent('🔐 Pidiendo permisos BLE...');
 
     const granted = await requestBlePermissions();
     if (!granted) {
       setBleStatus('off');
       setBleLog('Permisos BLE denegados. Habilitá Bluetooth y Ubicación en Ajustes.');
+      logEvent('❌ Permisos BLE denegados');
       return;
     }
 
@@ -121,16 +135,19 @@ export default function SelectScreen({ navigation }: Props) {
     if (btState !== 'PoweredOn') {
       setBleStatus('off');
       setBleLog('Bluetooth apagado. Activalo en Ajustes.');
+      logEvent(`❌ Bluetooth no encendido (${btState})`);
       return;
     }
 
     const foundNames: string[] = [];
     setBleLog('Escaneando...');
+    logEvent('📡 Escaneando dispositivos BLE...');
 
     manager.startDeviceScan(null, { allowDuplicates: false }, async (error, device) => {
       if (error) {
         setBleLog(`Error: ${error.message}`);
         setBleStatus('off');
+        logEvent(`❌ Scan error: ${error.message}`);
         return;
       }
       if (device?.name && !foundNames.includes(device.name)) {
@@ -140,6 +157,7 @@ export default function SelectScreen({ navigation }: Props) {
       const isCleanCare = (n?: string | null) => n === ESP32_BLE_NAME;
       if (device && (isCleanCare(device.name) || isCleanCare(device.localName))) {
         manager.stopDeviceScan();
+        logEvent(`🎯 ESP32 encontrado (${device.id}), conectando...`);
         try {
           setBleStatus('scanning');
           const connected = await device.connect({ timeout: 10000 });
@@ -149,6 +167,7 @@ export default function SelectScreen({ navigation }: Props) {
           setBleStatus('connected');
           setBleDeviceName(connected.name || connected.localName || ESP32_BLE_NAME);
           wasConnectedRef.current = true;
+          logEvent('✅ Conectado al ESP32');
 
           try {
             const statusChar = await connected.readCharacteristicForService(SERVICE_UUID, STATUS_UUID);
@@ -167,6 +186,7 @@ export default function SelectScreen({ navigation }: Props) {
             setConnectedDevice(null);
             if (unmountedRef.current) return;
             setBleStatus('disconnected');
+            logEvent('🔌 Desconectado');
             if (wasConnectedRef.current) {
               Vibration.vibrate(200);
               setBleLog('Se perdió la conexión, reintentando en 1s...');
@@ -177,6 +197,7 @@ export default function SelectScreen({ navigation }: Props) {
           });
         } catch (err: any) {
           console.log('BLE connect error:', err.message);
+          logEvent(`❌ Error al conectar: ${err?.message || err}`);
           setBleStatus('off');
         }
       }
@@ -238,33 +259,45 @@ export default function SelectScreen({ navigation }: Props) {
   );
 
   async function handleTipoPress(tipo: TipoMaquina) {
+    logEvent(`👆 Botón ${tipo} presionado`);
     if (bleStatus !== 'connected') {
+      logEvent(`⛔ Cancelado: BLE no conectado (${bleStatus})`);
       Alert.alert('Sin conexión con ESP32', 'Esperá a que se conecte la máquina o tocá la barra de estado para reintentar.');
       return;
     }
     if (saldo !== null && saldo <= 0) {
+      logEvent(`⛔ Cancelado: saldo ${saldo}`);
       Alert.alert('Sin fichas', 'No tenés fichas suficientes. Contactá al administrador.');
       return;
     }
     setLoadingMaquinas(true);
     setSelectingTipo(tipo);
+    logEvent(`🔍 Cargando ${tipo}s disponibles...`);
     const u = await getUsuarioGuardado();
     if (u?.edificio_id) {
       try {
         const m = await listarMaquinas(u.edificio_id);
         setMaquinas(m as any);
-      } catch {}
+        const cantTipo = (m as any[]).filter((x) => x.tipo === tipo).length;
+        const libres = (m as any[]).filter((x) => x.tipo === tipo && !x.ocupada).length;
+        logEvent(`📋 ${cantTipo} ${tipo}(s) en total, ${libres} libre(s)`);
+      } catch (err: any) {
+        logEvent(`❌ Error listar máquinas: ${err?.message || err}`);
+      }
     }
     setLoadingMaquinas(false);
   }
 
   async function handleActivate(maq: Maquina & { ocupada?: boolean }) {
+    logEvent(`🎯 Seleccionó ${maq.maquina_id} (${maq.nombre})`);
     const device = deviceRef.current;
     if (bleStatus !== 'connected' || !device) {
+      logEvent(`⛔ Sin device BLE (status=${bleStatus}, device=${!!device})`);
       Alert.alert('Sin conexión', 'No hay conexión BLE con el ESP32.');
       return;
     }
     if (maq.ocupada) {
+      logEvent(`⛔ Máquina ${maq.maquina_id} marcada ocupada`);
       Alert.alert('Máquina ocupada', `${maq.nombre} ya está en uso.`);
       return;
     }
@@ -276,26 +309,37 @@ export default function SelectScreen({ navigation }: Props) {
     const userId = usuario?.usuario_id || 'desconocido';
 
     setActivating(true);
-    setActivatingLog('Enviando comando al ESP32...');
+    setActivatingLog('⚡ Preparando comando...');
+    logEvent(`⚡ Preparando comando (user=${userId}, ${segs}s)`);
 
     // Monitor temporal dedicado a la confirmación
     let confirmed = false;
     const sub = device.monitorCharacteristicForService(SERVICE_UUID, STATUS_UUID, (err, char) => {
-      if (err || !char?.value) return;
+      if (err) {
+        logEvent(`⚠ Monitor error: ${err.message || err}`);
+        return;
+      }
+      if (!char?.value) return;
       const s = parseBleStatus(char);
       if (!s) return;
+      logEvent(`📥 ESP32→app: ${s.state}:${s.secs}${s.maquina_id ? ':' + s.maquina_id : ''}`);
       if (s.state === 'ON' && s.secs > 0 && (!s.maquina_id || s.maquina_id === maq.maquina_id)) {
         confirmed = true;
+        logEvent(`✅ Confirmación recibida para ${maq.maquina_id}`);
       }
     });
 
+    const cmd = `ON:${segs}:${userId}:${tipo}:${maq.maquina_id}`;
     try {
-      const cmd = `ON:${segs}:${userId}:${tipo}:${maq.maquina_id}`;
+      setActivatingLog(`📡 Enviando: ${cmd}`);
+      logEvent(`📤 app→ESP32: ${cmd}`);
       await device.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
-      setActivatingLog('Esperando confirmación del ESP32...');
+      setActivatingLog('⏳ Esperando confirmación del ESP32...');
+      logEvent(`✉ Write OK, esperando Notify (8s)`);
     } catch (err: any) {
       sub.remove();
       setActivating(false);
+      logEvent(`❌ Write falló: ${err?.message || err}`);
       Alert.alert('Error al enviar', err?.message || 'No se pudo enviar el comando.');
       return;
     }
@@ -309,6 +353,7 @@ export default function SelectScreen({ navigation }: Props) {
 
     if (!confirmed) {
       setActivating(false);
+      logEvent(`⏱ Timeout 8s sin confirmación`);
       Alert.alert(
         'ESP32 no confirmó activación',
         'La máquina no respondió. Verificá que el ESP32 esté cerca y volvé a intentar.'
@@ -319,6 +364,7 @@ export default function SelectScreen({ navigation }: Props) {
     Vibration.vibrate(100);
     setActivating(false);
     setSelectingTipo(null);
+    logEvent(`🧺 Navegando al ciclo`);
     navigation.push('Cycle', {
       maquina_id: maq.maquina_id,
       edificio_id: maq.edificio_id,
@@ -393,6 +439,25 @@ export default function SelectScreen({ navigation }: Props) {
         {bleStatus !== 'connected' && (
           <Text style={styles.warnText}>Conectá el ESP32 para activar una máquina</Text>
         )}
+
+        {/* Panel de eventos — diagnóstico en tiempo real */}
+        <View style={styles.logPanel}>
+          <View style={styles.logHeader}>
+            <Text style={styles.logTitle}>📜 Qué está haciendo la app</Text>
+            <TouchableOpacity onPress={() => setEventLog([])}>
+              <Text style={styles.logClear}>limpiar</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.logBody}>
+            {eventLog.length === 0 ? (
+              <Text style={styles.logEmpty}>Sin eventos todavía…</Text>
+            ) : (
+              eventLog.slice(0, 6).map((line, i) => (
+                <Text key={i} style={styles.logLine} numberOfLines={1} ellipsizeMode="tail">{line}</Text>
+              ))
+            )}
+          </View>
+        </View>
       </View>
 
       {/* Bottom nav */}
@@ -423,11 +488,16 @@ export default function SelectScreen({ navigation }: Props) {
             </Text>
 
             {activating ? (
-              <View style={{ padding: 24, alignItems: 'center' }}>
+              <View style={{ padding: 16, alignItems: 'stretch', alignSelf: 'stretch' }}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ marginTop: 16, fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}>
+                <Text style={{ marginTop: 12, fontSize: 14, color: colors.textPrimary, textAlign: 'center', fontWeight: '600' }}>
                   {activatingLog}
                 </Text>
+                <View style={styles.logBody}>
+                  {eventLog.slice(0, 5).map((line, i) => (
+                    <Text key={i} style={styles.logLine} numberOfLines={1} ellipsizeMode="tail">{line}</Text>
+                  ))}
+                </View>
               </View>
             ) : loadingMaquinas ? (
               <ActivityIndicator size="large" color={colors.primary} style={{ padding: 20 }} />
@@ -519,4 +589,13 @@ const styles = StyleSheet.create({
   modalSubtitle: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginBottom: 16 },
   modalCancelBtn: { paddingVertical: 12, marginTop: 8 },
   modalCancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  logPanel: {
+    marginTop: 20, backgroundColor: '#0F172A', borderRadius: 12, padding: 10,
+  },
+  logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  logTitle: { color: '#93C5FD', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  logClear: { color: '#FCA5A5', fontSize: 10, fontWeight: '700', textDecorationLine: 'underline' },
+  logBody: { minHeight: 60, marginTop: 4 },
+  logEmpty: { color: '#64748B', fontSize: 11, fontStyle: 'italic' },
+  logLine: { color: '#E2E8F0', fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', lineHeight: 14 },
 });

@@ -225,6 +225,21 @@ class ServerCallbacks : public BLEServerCallbacks {
     Serial.println(deviceCount);
     Serial.print("[INFO] Conexion #");
     Serial.println(connectionCount);
+    Serial.print("[STATE] Slots: ");
+    for (int i = 0; i < MAX_MAQUINAS; i++) {
+      Serial.print("s");
+      Serial.print(i);
+      Serial.print("=");
+      if (slots[i].maquina_id.length() == 0) Serial.print("libre");
+      else {
+        Serial.print(slots[i].maquina_id);
+        Serial.print(slots[i].activa ? "[ON]" : "[idle]");
+      }
+      Serial.print(" ");
+    }
+    Serial.println();
+    // LED encendido mientras hay cliente conectado (si no hay slot activo también)
+    digitalWrite(LED_PIN, HIGH);
     Serial.println("=========================================");
     // Mantener advertising para aceptar más clientes
     BLEDevice::startAdvertising();
@@ -236,6 +251,7 @@ class ServerCallbacks : public BLEServerCallbacks {
     Serial.print("[!!] CLIENTE DESCONECTADO — quedan: ");
     Serial.println(deviceCount);
     Serial.println("=========================================");
+    if (deviceCount == 0 && !anyActive()) digitalWrite(LED_PIN, LOW);
     disconnectBeepPending = true;
     advertisingRestartPending = true;
     advertisingRestartAt = millis() + 500;
@@ -272,7 +288,14 @@ void turnOnSlot(int idx, int durSec, String userId, String tipo, String maquina_
 class ControlCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pChar) {
     String value = pChar->getValue().c_str();
+    // Blink LED brevemente para confirmar recepción
+    digitalWrite(LED_PIN, LOW); delay(30); digitalWrite(LED_PIN, HIGH);
     Serial.println("-----------------------------------------");
+    Serial.print("[RX] ");
+    Serial.print(value.length());
+    Serial.print(" bytes @ ");
+    Serial.print(millis() / 1000);
+    Serial.println("s");
     Serial.print("[CMD] \"");
     Serial.print(value);
     Serial.println("\"");
@@ -651,12 +674,24 @@ void loop() {
 
   static unsigned long lastHeartbeat = 0;
   if (deviceCount == 0 && !anyActive() && (millis() - lastHeartbeat > 30000)) {
-    Serial.print("[HB] uptime ");
+    Serial.print("[HB] esperando cliente — uptime ");
     Serial.print(millis() / 1000);
     Serial.print("s — ");
     Serial.print(getLogCount());
     Serial.println(" logs");
     lastHeartbeat = millis();
+  }
+
+  // Heartbeat con cliente conectado pero sin actividad — muestra q el ESP32 está a la escucha
+  static unsigned long lastIdleTalk = 0;
+  if (deviceCount > 0 && !anyActive() && (millis() - lastIdleTalk > 15000)) {
+    Serial.print("[IDLE] cliente conectado — esperando comando. Slots: ");
+    for (int i = 0; i < MAX_MAQUINAS; i++) {
+      Serial.print(slots[i].maquina_id.length() > 0 ? slots[i].maquina_id : "-");
+      if (i < MAX_MAQUINAS - 1) Serial.print(" ");
+    }
+    Serial.println();
+    lastIdleTalk = millis();
   }
 
   delay(100);
