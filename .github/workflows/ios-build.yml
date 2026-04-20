@@ -48,16 +48,6 @@ jobs:
       - name: Print Xcode version
         run: xcodebuild -version
 
-      - name: Ensure iOS platform runtime installed
-        # IBTool (compilador de storyboards) valida contra el SDK del Xcode
-        # activo (iphoneos18.1) y requiere la Platform iOS instalada — no
-        # basta con tener el SDK. -downloadPlatform baja lo que falte.
-        run: |
-          xcodebuild -runFirstLaunch || true
-          sudo xcodebuild -downloadPlatform iOS 2>&1 | tail -20 || true
-          echo "---"
-          xcrun simctl list runtimes 2>&1 | head -10 || true
-
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
@@ -74,13 +64,12 @@ jobs:
       - name: Prebuild (expo → ios/)
         run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: Patch SplashScreen.storyboard (sin dependencia de platform iOS)
-        # toolsVersion 19529 = Xcode 14.
-        # targetRuntime="AppleSimulator" es el valor que Xcode 14 / ibtool 16.x
-        # acepta para storyboards iOS sin requerir la platform runtime instalada.
+      - name: Fix SplashScreen.storyboard targetRuntime
+        # expo prebuild genera targetRuntime="AppleSimulator" pero ibtool
+        # necesita "AppleMobile" para compilar con -sdk iphoneos.
         run: |
-          STORYBOARD='<?xml version="1.0" encoding="UTF-8"?><document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="19529" targetRuntime="AppleSimulator" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES"><scenes><scene sceneID="EHf-IW-A2E"><objects><viewController id="01J-lp-oVM" sceneMemberID="viewController"><view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3"><rect key="frame" x="0.0" y="0.0" width="390" height="844"/><autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/><color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/></view></viewController><placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/></objects><point key="canvasLocation" x="53" y="375"/></scene></scenes></document>'
-          echo "$STORYBOARD" > ios/CleanCare/SplashScreen.storyboard
+          sed -i '' 's/targetRuntime="AppleSimulator"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard
+          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || true
 
       - name: Install CocoaPods
         working-directory: app/ios
@@ -89,9 +78,8 @@ jobs:
           pod install --repo-update
 
       - name: Archive (unsigned)
-        # -destination generic/platform=iOS + ONLY_ACTIVE_ARCH=NO permite
-        # archivar sin que xcodebuild exija la platform iOS runtime instalada
-        # (solo el SDK basta con estos flags).
+        # IPHONEOS_DEPLOYMENT_TARGET=16.0 hace que ibtool no busque la
+        # platform iOS 18.x (que no está instalada en macos-15 runner).
         working-directory: app/ios
         run: |
           xcodebuild \
@@ -105,6 +93,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             clean archive
 
       - name: Package unsigned IPA
