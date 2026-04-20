@@ -7,7 +7,7 @@ import { getBleManager, getConnectedDevice, setConnectedDevice, parseBleStatus }
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import NetInfoLite from '../services/netinfo';
-import { iniciarUso, actualizarUso, obtenerTipRandom, guardarCicloActivo, obtenerCicloActivo, clearCicloActivo, getUsuarioGuardado } from '../services/api.service';
+import { iniciarUso, actualizarUso, obtenerTipRandom, guardarCicloActivo, obtenerCicloActivoPorMaquina, clearCicloActivo, getUsuarioGuardado } from '../services/api.service';
 import { colors } from '../constants/colors';
 import { SERVICE_UUID, CONTROL_UUID, STATUS_UUID, ESP32_BLE_NAME } from '../constants/ble';
 
@@ -162,17 +162,15 @@ export default function CycleScreen({ navigation, route }: Props) {
   // --- Restauración de ciclo en curso (app reabrió durante ciclo) ---
   useEffect(() => {
     (async () => {
-      const ciclo = await obtenerCicloActivo();
+      const ciclo = await obtenerCicloActivoPorMaquina(maquina_id);
       if (!ciclo) return;
-      // Solo restaurar si coincide la máquina con los params
-      if (ciclo.maquina_id !== maquina_id) return;
       const elapsed = Math.floor((Date.now() - ciclo.startTime) / 1000);
       const remaining = Math.max(0, ciclo.duracionSeconds - elapsed);
       if (remaining <= 0) {
         completedRef.current = true;
         setIsComplete(true);
         setSecondsRemaining(0);
-        clearCicloActivo().catch(() => {});
+        clearCicloActivo(maquina_id).catch(() => {});
         return;
       }
       resumingRef.current = true;
@@ -614,7 +612,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     setSecondsRemaining(0);
     Vibration.vibrate([0, 500, 200, 500, 200, 500]);
     playNotificationSound();
-    clearCicloActivo().catch(() => {});
+    clearCicloActivo(maquina_id).catch(() => {});
 
     if (usoIdRef.current) {
       actualizarUso(usoIdRef.current, 'completado').catch(() => {});
@@ -645,7 +643,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           userExitedRef.current = true;
           await cancelAllNotifications();
           await sendBleOff();
-          await clearCicloActivo();
+          await clearCicloActivo(maquina_id);
           if (usoIdRef.current) {
             actualizarUso(usoIdRef.current, 'cancelado').catch(() => {});
           }

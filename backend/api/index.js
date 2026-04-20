@@ -48,7 +48,8 @@ app.delete('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
 app.get('/api/resumen', verificarToken, soloAdmin, resumenHandler);
 app.get('/api/resumen-creditos', verificarToken, soloAdmin, resumenCreditosHandler);
 app.get('/api/resumen-apartamento', verificarToken, soloAdmin, resumenApartamentoHandler);
-app.get('/api/config-edificio', verificarToken, soloAdmin, configEdificioHandler);
+// GET abierto a cualquier usuario autenticado (residentes necesitan duraciones para activar ciclos)
+app.get('/api/config-edificio', verificarToken, configEdificioHandler);
 app.put('/api/config-edificio', verificarToken, soloAdmin, configEdificioHandler);
 app.post('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
 app.delete('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);

@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { getBleManager, getConnectedDevice, setConnectedDevice, parseBleStatus } from '../services/bleManager';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, obtenerConfigEdificio, Maquina } from '../services/api.service';
+import { obtenerBilletera, listarMaquinas, getUsuarioGuardado, obtenerConfigEdificio, obtenerCiclosActivos, CicloActivo, Maquina } from '../services/api.service';
 import { colors } from '../constants/colors';
 import { SERVICE_UUID, CONTROL_UUID, STATUS_UUID, ESP32_BLE_NAME } from '../constants/ble';
 
@@ -43,6 +43,9 @@ export default function SelectScreen({ navigation }: Props) {
   const [esp32Running, setEsp32Running] = useState(false);
   const [esp32Remaining, setEsp32Remaining] = useState(0);
   const [bleLog, setBleLog] = useState('');
+
+  const [ciclosActivos, setCiclosActivos] = useState<CicloActivo[]>([]);
+  const [now, setNow] = useState(Date.now());
 
   const [eventLog, setEventLog] = useState<string[]>([]);
   const logEvent = useCallback((msg: string) => {
@@ -237,11 +240,18 @@ export default function SelectScreen({ navigation }: Props) {
     }, 500);
   }
 
+  // Tick cada segundo para actualizar timers de las tarjetas de ciclos activos
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       setSelectingTipo(null);
       setActivating(false);
       obtenerBilletera().then(data => setSaldo(data.saldo)).catch(() => {});
+      obtenerCiclosActivos().then(setCiclosActivos).catch(() => setCiclosActivos([]));
       getUsuarioGuardado().then(u => {
         if (!u?.edificio_id) return;
         Promise.all([
@@ -464,6 +474,47 @@ export default function SelectScreen({ navigation }: Props) {
         <Text style={styles.title}>¿Qué vas a usar?</Text>
         <Text style={styles.subtitle}>Elegí el tipo de máquina</Text>
 
+        {/* Tarjetas de ciclos activos del usuario — tocar para volver al ciclo */}
+        {ciclosActivos.length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            <Text style={styles.activeHeader}>🔄 Tus máquinas en uso</Text>
+            {ciclosActivos.map((c) => {
+              const finishAt = c.startTime + c.duracionSeconds * 1000;
+              const remainingMs = Math.max(0, finishAt - now);
+              const mins = Math.floor(remainingMs / 60000);
+              const secs = Math.floor((remainingMs % 60000) / 1000);
+              const esLav = c.tipo === 'lavarropas';
+              return (
+                <TouchableOpacity
+                  key={c.maquina_id}
+                  style={[styles.activeCard, { borderColor: esLav ? colors.primary : '#F59E0B' }]}
+                  onPress={() => {
+                    logEvent(`↩ Volviendo al ciclo ${c.maquina_id}`);
+                    navigation.push('Cycle', {
+                      maquina_id: c.maquina_id,
+                      edificio_id: c.edificio_id,
+                      tipo: c.tipo,
+                      duracion_min: c.duracion_min,
+                      nombre_maquina: c.nombre_maquina,
+                      preArmed: true,
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.activeIcon}>{esLav ? '🫧' : '🌀'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.activeName}>{c.nombre_maquina}</Text>
+                    <Text style={styles.activeSub}>
+                      {esLav ? 'Lavando' : 'Secando'} · {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')} restantes
+                    </Text>
+                  </View>
+                  <Text style={styles.activeArrow}>➜</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.typeCard, styles.washerCard, bleStatus !== 'connected' && styles.typeCardDisabled]}
           onPress={() => handleTipoPress('lavarropas')}
@@ -632,6 +683,16 @@ const styles = StyleSheet.create({
   modalSubtitle: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginBottom: 16 },
   modalCancelBtn: { paddingVertical: 12, marginTop: 8 },
   modalCancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  activeHeader: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 },
+  activeCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
+    borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 2, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  activeIcon: { fontSize: 32 },
+  activeName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  activeSub: { fontSize: 12, color: colors.textSecondary, fontWeight: '600', marginTop: 2 },
+  activeArrow: { fontSize: 22, color: colors.textSecondary },
   logPanel: {
     marginTop: 20, backgroundColor: '#0F172A', borderRadius: 12, padding: 10,
   },

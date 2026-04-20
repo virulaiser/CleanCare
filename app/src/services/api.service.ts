@@ -93,7 +93,7 @@ export async function logout(): Promise<void> {
   await clearCicloActivo();
 }
 
-// --- Ciclo activo (persistencia en SecureStore) ---
+// --- Ciclos activos (persistencia en SecureStore, mapa por maquina_id) ---
 export interface CicloActivo {
   maquina_id: string;
   edificio_id: string;
@@ -104,27 +104,71 @@ export interface CicloActivo {
   duracionSeconds: number;   // duracion total del ciclo
 }
 
-export async function guardarCicloActivo(c: CicloActivo): Promise<void> {
-  try { await SecureStore.setItemAsync('cleancare_ciclo_activo', JSON.stringify(c)); } catch {}
-}
+type CiclosMap = Record<string, CicloActivo>;
 
-export async function obtenerCicloActivo(): Promise<CicloActivo | null> {
+async function leerMapa(): Promise<CiclosMap> {
   try {
-    const raw = await SecureStore.getItemAsync('cleancare_ciclo_activo');
-    if (!raw) return null;
-    const c = JSON.parse(raw) as CicloActivo;
-    // Si ya terminó (con margen de 2 min), limpiarlo
-    const finishedAt = c.startTime + c.duracionSeconds * 1000;
-    if (Date.now() > finishedAt + 120000) {
-      await clearCicloActivo();
-      return null;
+    const raw = await SecureStore.getItemAsync('cleancare_ciclos_activos');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    // Compat: si el storage viejo era un objeto single, migrar
+    if (parsed && parsed.maquina_id && parsed.startTime) {
+      return { [parsed.maquina_id]: parsed as CicloActivo };
     }
-    return c;
-  } catch { return null; }
+    return parsed as CiclosMap;
+  } catch { return {}; }
 }
 
-export async function clearCicloActivo(): Promise<void> {
-  try { await SecureStore.deleteItemAsync('cleancare_ciclo_activo'); } catch {}
+async function escribirMapa(mapa: CiclosMap): Promise<void> {
+  try { await SecureStore.setItemAsync('cleancare_ciclos_activos', JSON.stringify(mapa)); } catch {}
+}
+
+function vencido(c: CicloActivo): boolean {
+  const finishedAt = c.startTime + c.duracionSeconds * 1000;
+  return Date.now() > finishedAt + 120000; // margen 2min
+}
+
+export async function guardarCicloActivo(c: CicloActivo): Promise<void> {
+  const mapa = await leerMapa();
+  mapa[c.maquina_id] = c;
+  await escribirMapa(mapa);
+}
+
+export async function obtenerCiclosActivos(): Promise<CicloActivo[]> {
+  const mapa = await leerMapa();
+  const vivos: CicloActivo[] = [];
+  let cambio = false;
+  for (const id of Object.keys(mapa)) {
+    if (vencido(mapa[id])) { delete mapa[id]; cambio = true; }
+    else vivos.push(mapa[id]);
+  }
+  if (cambio) await escribirMapa(mapa);
+  return vivos;
+}
+
+export async function obtenerCicloActivoPorMaquina(maquina_id: string): Promise<CicloActivo | null> {
+  const mapa = await leerMapa();
+  const c = mapa[maquina_id];
+  if (!c) return null;
+  if (vencido(c)) { delete mapa[maquina_id]; await escribirMapa(mapa); return null; }
+  return c;
+}
+
+// Compat con código viejo — devuelve el primer ciclo vivo si hay.
+export async function obtenerCicloActivo(): Promise<CicloActivo | null> {
+  const ciclos = await obtenerCiclosActivos();
+  return ciclos[0] || null;
+}
+
+// Si recibe maquina_id borra sólo ese. Sin argumento borra todos (compat).
+export async function clearCicloActivo(maquina_id?: string): Promise<void> {
+  if (!maquina_id) {
+    try { await SecureStore.deleteItemAsync('cleancare_ciclos_activos'); } catch {}
+    return;
+  }
+  const mapa = await leerMapa();
+  delete mapa[maquina_id];
+  await escribirMapa(mapa);
 }
 
 export async function iniciarUso(uso: {
