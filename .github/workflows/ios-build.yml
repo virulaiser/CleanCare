@@ -47,13 +47,6 @@ jobs:
       - name: Print Xcode version
         run: xcodebuild -version
 
-      - name: Ensure iOS platform runtime installed
-        run: |
-          xcodebuild -runFirstLaunch || true
-          sudo xcodebuild -downloadPlatform iOS 2>&1 | tail -20 || true
-          echo "---"
-          xcrun simctl list runtimes 2>&1 | head -10 || true
-
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
@@ -67,24 +60,28 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Prebuild (expo -> ios/)
+      - name: Prebuild (expo → ios/)
         run: npx expo prebuild --platform ios --clean --no-install
 
-      - name: Fix storyboard and deployment target
-        # Corrige 2 problemas que genera expo prebuild:
-        # 1) targetRuntime="AppleCocoa" en el storyboard -> "AppleMobile"
-        # 2) IPHONEOS_DEPLOYMENT_TARGET=18.1 en el xcodeproj -> 15.1
-        #    Usando regex para capturar cualquier version (18.x, 18.0, 18.1...)
+      - name: Lower deployment target to iOS 16.0
+        # expo prebuild fija IPHONEOS_DEPLOYMENT_TARGET a 18.x en el pbxproj
+        # y platform :ios, '18.x' en el Podfile.
+        # Bajamos ambos a 16.0 para que xcodebuild y CocoaPods no requieran iOS 18.
         run: |
-          # Fix storyboard targetRuntime
-          sed -i '' 's/targetRuntime="AppleCocoa"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard || true
-          sed -i '' 's/targetRuntime="AppleSimulator"/targetRuntime="AppleMobile"/g' ios/CleanCare/SplashScreen.storyboard || true
-          echo "=== storyboard targetRuntime ==="
-          grep -o 'targetRuntime="[^"]*"' ios/CleanCare/SplashScreen.storyboard || echo "no targetRuntime found"
-          # Fix deployment target (cualquier version 18.x)
-          LC_ALL=C sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 1[0-9][.][0-9]*/IPHONEOS_DEPLOYMENT_TARGET = 15.1/g' ios/CleanCare.xcodeproj/project.pbxproj
-          echo "=== deployment targets after fix ==="
-          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/CleanCare.xcodeproj/project.pbxproj | head -5
+          python3 - <<'PYEOF'
+          import re
+          path = 'ios/CleanCare.xcodeproj/project.pbxproj'
+          with open(path, 'r') as f:
+              c = f.read()
+          new = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [0-9]+\.[0-9]+', 'IPHONEOS_DEPLOYMENT_TARGET = 16.0', c)
+          with open(path, 'w') as f:
+              f.write(new)
+          print('pbxproj: patched', new.count('IPHONEOS_DEPLOYMENT_TARGET = 16.0'), 'targets')
+          PYEOF
+          sed -i "" "s/platform :ios, '[0-9][0-9.]*'/platform :ios, '16.0'/g" ios/Podfile
+          sed -i "" "s/targetRuntime=\"AppleSimulator\"/targetRuntime=\"AppleMobile\"/g" ios/CleanCare/SplashScreen.storyboard
+          echo "Podfile platform: $(grep 'platform :ios' ios/Podfile || echo 'not found')"
+          echo "Storyboard: $(grep -o 'targetRuntime=\"[^\"]*\"' ios/CleanCare/SplashScreen.storyboard || echo 'not found')"
 
       - name: Install CocoaPods
         working-directory: app/ios
