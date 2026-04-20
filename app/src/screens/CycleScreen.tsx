@@ -39,8 +39,18 @@ async function requestNotificationPermissions() {
   return status === 'granted';
 }
 
-async function scheduleEndNotification(tipo: 'lavarropas' | 'secadora', seconds: number) {
+function notifIdFor(maquina_id: string) {
+  // Identifier determinístico: una sola notif "fin de ciclo" por máquina.
+  // Al reutilizar el mismo id, scheduleNotificationAsync reemplaza la previa.
+  return `cleancare_end_${maquina_id}`;
+}
+
+async function scheduleEndNotification(tipo: 'lavarropas' | 'secadora', seconds: number, maquina_id: string) {
+  const identifier = notifIdFor(maquina_id);
+  // Cancelar cualquier notif colgada de esta máquina (por un ciclo anterior)
+  try { await Notifications.cancelScheduledNotificationAsync(identifier); } catch {}
   await Notifications.scheduleNotificationAsync({
+    identifier,
     content: {
       title: tipo === 'lavarropas' ? '¡Lavado listo!' : '¡Secado listo!',
       body: tipo === 'lavarropas'
@@ -52,8 +62,8 @@ async function scheduleEndNotification(tipo: 'lavarropas' | 'secadora', seconds:
   });
 }
 
-async function cancelAllNotifications() {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+async function cancelCycleNotification(maquina_id: string) {
+  try { await Notifications.cancelScheduledNotificationAsync(notifIdFor(maquina_id)); } catch {}
 }
 
 async function playNotificationSound() {
@@ -301,7 +311,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           }
 
           const granted = await requestNotificationPermissions();
-          if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds);
+          if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds, maquina_id);
           return;
         } catch (err: any) {
           // Si falla con device existente, limpiar y caer al flujo de scan
@@ -437,7 +447,7 @@ export default function CycleScreen({ navigation, route }: Props) {
             }
 
             const granted = await requestNotificationPermissions();
-            if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds);
+            if (granted) await scheduleEndNotification(tipo, cycleDurationSeconds, maquina_id);
 
           } catch (err: any) {
             setBleState('error');
@@ -613,6 +623,9 @@ export default function CycleScreen({ navigation, route }: Props) {
     Vibration.vibrate([0, 500, 200, 500, 200, 500]);
     playNotificationSound();
     clearCicloActivo(maquina_id).catch(() => {});
+    // El ESP32 ya disparó OFF → cancelamos la notif programada para que no
+    // vuelva a avisar cuando ya terminó (caso: cerró el ciclo por serial/timer antes).
+    cancelCycleNotification(maquina_id).catch(() => {});
 
     if (usoIdRef.current) {
       actualizarUso(usoIdRef.current, 'completado').catch(() => {});
@@ -641,7 +654,7 @@ export default function CycleScreen({ navigation, route }: Props) {
         style: 'destructive',
         onPress: async () => {
           userExitedRef.current = true;
-          await cancelAllNotifications();
+          await cancelCycleNotification(maquina_id);
           await sendBleOff();
           await clearCicloActivo(maquina_id);
           if (usoIdRef.current) {
@@ -664,7 +677,7 @@ export default function CycleScreen({ navigation, route }: Props) {
           style: 'destructive',
           onPress: async () => {
             userExitedRef.current = true;
-            await cancelAllNotifications();
+            await cancelCycleNotification(maquina_id);
             await sendBleOff();
             if (usoIdRef.current) {
               actualizarUso(usoIdRef.current, 'averia').catch(() => {});
@@ -806,7 +819,7 @@ export default function CycleScreen({ navigation, route }: Props) {
     // Programar notificacion
     const granted = await requestNotificationPermissions();
     if (granted) {
-      await scheduleEndNotification(tipo, cycleDurationSeconds);
+      await scheduleEndNotification(tipo, cycleDurationSeconds, maquina_id);
     }
   };
 
