@@ -1,16 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import QRCode from 'react-qr-code';
 import {
   listarDispositivos, crearDispositivo, eliminarDispositivo,
   listarEdificios, listarMaquinas, eliminarMaquina,
   Dispositivo, Edificio, Maquina,
 } from '../services/api';
 import { colors } from '../constants/colors';
-
-function buildQRValue(m: Maquina): string {
-  return `cleancare://maquina?id=${m.maquina_id}&edificio=${m.edificio_id}`;
-}
 
 export default function Dispositivos() {
   const navigate = useNavigate();
@@ -31,12 +26,8 @@ export default function Dispositivos() {
   const [creando, setCreando] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Modal resultado (firmware + QRs)
+  // Modal resultado (firmware + maquinas asociadas)
   const [resultado, setResultado] = useState<{ dispositivo: Dispositivo; maquinas: Maquina[] } | null>(null);
-
-  // Modal QR individual
-  const [qrMaquina, setQrMaquina] = useState<Maquina | null>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!localStorage.getItem('cleancare_token')) navigate('/login');
@@ -156,36 +147,6 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
     alert(`Código del dispositivo #${d.esp32_id} copiado`);
   }
 
-  function imprimirQR(m: Maquina) {
-    const qrValue = buildQRValue(m);
-    const w = window.open('', '_blank', 'width=420,height=520');
-    if (!w) return;
-    w.document.write(`
-      <!DOCTYPE html><html><head><title>QR — ${m.nombre}</title>
-      <style>
-        body { font-family: 'Inter', system-ui, sans-serif; text-align: center; padding: 40px; margin: 0; }
-        h2 { color: #1E293B; margin-bottom: 4px; }
-        .tipo { color: #94A3B8; font-size: 14px; margin-bottom: 24px; }
-        .footer { margin-top: 24px; color: #94A3B8; font-size: 12px; border-top: 1px solid #E5E7EB; padding-top: 16px; }
-        svg { margin: 0 auto; }
-      </style></head><body>
-        <h2>${m.nombre}</h2>
-        <div class="tipo">${m.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'}</div>
-        <div id="qr"></div>
-        <div class="footer">Escaneá con la app CleanCare</div>
-        <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
-        <script>
-          var qr = qrcode(0, 'M');
-          qr.addData('${qrValue}');
-          qr.make();
-          document.getElementById('qr').innerHTML = qr.createSvgTag(8);
-          setTimeout(function(){window.print();}, 500);
-        <\/script>
-      </body></html>
-    `);
-    w.document.close();
-  }
-
   return (
     <div style={styles.page}>
       <header style={styles.header}>
@@ -215,7 +176,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
           <div>
             <h2 style={{ ...styles.pageTitle, marginBottom: 4 }}>Dispositivos y máquinas</h2>
             <p style={{ fontSize: 13, color: colors.textSecondary, margin: 0 }}>
-              Cada micro (ESP32/Pico) controla una o más máquinas. Al crearlo se generan UUIDs únicas y los QR de las máquinas.
+              Cada micro (ESP32/Pico) controla una o más máquinas. Al crearlo se generan las UUIDs BLE del firmware y los IDs de las máquinas.
             </p>
           </div>
           <button onClick={abrirModalCrear} style={styles.btnPrimary}>+ Nuevo dispositivo</button>
@@ -244,7 +205,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button onClick={() => copiarFirmware(d)} style={styles.btnSecondary}>📋 Copiar código</button>
-                        <button onClick={() => setResultado({ dispositivo: d, maquinas: sus })} style={styles.btnSecondary}>Ver QRs</button>
+                        <button onClick={() => setResultado({ dispositivo: d, maquinas: sus })} style={styles.btnSecondary}>Ver detalles</button>
                         <button onClick={() => handleEliminarDispo(d)} style={styles.btnDelete}>Eliminar</button>
                       </div>
                     </div>
@@ -261,8 +222,6 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
                               <div style={{ fontSize: 11, color: colors.textSecondary, fontFamily: 'monospace' }}>{m.maquina_id}</div>
                             </div>
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button onClick={() => setQrMaquina(m)} style={styles.iconBtn} title="Ver QR">📱</button>
-                              <button onClick={() => imprimirQR(m)} style={styles.iconBtn} title="Imprimir">🖨️</button>
                               <button onClick={() => handleEliminarMaquina(m)} style={{ ...styles.iconBtn, color: colors.error }} title="Eliminar">×</button>
                             </div>
                           </div>
@@ -366,7 +325,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
         </div>
       )}
 
-      {/* Modal Resultado (firmware + QRs) */}
+      {/* Modal Resultado (firmware + maquinas asociadas) */}
       {resultado && (
         <div style={styles.overlay} onClick={() => setResultado(null)}>
           <div style={{ ...styles.modal, maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
@@ -388,11 +347,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
                   <div key={m.maquina_id} style={{ border: `1px solid ${colors.border}`, borderRadius: 12, padding: 12, textAlign: 'center', backgroundColor: colors.white }}>
                     <div style={{ fontSize: 24, marginBottom: 4 }}>{m.tipo === 'secadora' ? '🌀' : '🧺'}</div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 2 }}>{m.nombre}</div>
-                    <div style={{ fontSize: 10, color: colors.textSecondary, fontFamily: 'monospace', marginBottom: 8 }}>{m.maquina_id}</div>
-                    <div ref={qrRef} style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                      <QRCode value={buildQRValue(m)} size={120} level="M" />
-                    </div>
-                    <button onClick={() => imprimirQR(m)} style={{ ...styles.btnSecondary, width: '100%' }}>🖨️ Imprimir</button>
+                    <div style={{ fontSize: 10, color: colors.textSecondary, fontFamily: 'monospace' }}>{m.maquina_id}</div>
                   </div>
                 ))}
               </div>
@@ -400,23 +355,6 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
 
             <div style={styles.modalActions}>
               <button style={styles.btnPrimary} onClick={() => setResultado(null)}>Listo</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal QR individual */}
-      {qrMaquina && (
-        <div style={styles.overlay} onClick={() => setQrMaquina(null)}>
-          <div style={{ ...styles.modal, maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>{qrMaquina.nombre}</h3>
-            <p style={styles.modalSubtitle}>{qrMaquina.tipo === 'secadora' ? 'Secadora' : 'Lavarropas'} — {qrMaquina.maquina_id}</p>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-              <QRCode value={buildQRValue(qrMaquina)} size={220} level="M" />
-            </div>
-            <div style={styles.modalActions}>
-              <button style={styles.btnOutline} onClick={() => setQrMaquina(null)}>Cerrar</button>
-              <button style={styles.btnPrimary} onClick={() => imprimirQR(qrMaquina)}>🖨️ Imprimir</button>
             </div>
           </div>
         </div>
