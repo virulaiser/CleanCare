@@ -36,6 +36,9 @@
 #define BOOT_PULSE_MS 3000
 #define BUZZER_PIN 26
 #define BUZZER_CHANNEL 0
+// LEDs externos del shield Cytron Robo ESP32
+#define EXT_LED_LAV 16   // se enciende con lavarropas actuando
+#define EXT_LED_SEC 17   // se enciende con secadora actuando
 #define RESET_INTERVAL_MS   86400000UL
 #define WARNING_THRESHOLD_SEC 30
 #define WARNING_INTERVAL_MS 5000
@@ -85,6 +88,7 @@ void sendStatusAll();
 void sendStatusSlot(int idx);
 void turnOffSlot(int idx, bool playEndMel);
 bool anyActive();
+void updateExternalLeds();
 
 // ==========================================
 // NVS — MAPEO DE MÁQUINAS (maquina_id → slot)
@@ -282,6 +286,7 @@ void turnOnSlot(int idx, int durSec, String userId, String tipo, String maquina_
   Serial.println("s");
 
   saveLog(getCurrentDateTime(), userId, durSec, tipo, maquina_id);
+  updateExternalLeds();
   sendStatusSlot(idx);
 }
 
@@ -501,16 +506,28 @@ void turnOffSlot(int idx, bool playEndMel) {
   slots[idx].durationMs = 0;
   slots[idx].startTime = 0;
   digitalWrite(RELAY_PINS[idx], LOW);
-  if (!anyActive()) digitalWrite(LED_PIN, LOW);
+  if (!anyActive() && deviceCount == 0) digitalWrite(LED_PIN, LOW);
   Serial.print("[OFF] Slot ");
   Serial.println(idx);
   if (playEndMel) playEndMelody();
+  updateExternalLeds();
   sendStatusSlot(idx);
 }
 
 bool anyActive() {
   for (int i = 0; i < MAX_MAQUINAS; i++) if (slots[i].activa) return true;
   return false;
+}
+
+void updateExternalLeds() {
+  bool lav = false, sec = false;
+  for (int i = 0; i < MAX_MAQUINAS; i++) {
+    if (!slots[i].activa) continue;
+    if (slots[i].tipo == "lavarropas") lav = true;
+    else if (slots[i].tipo == "secadora") sec = true;
+  }
+  digitalWrite(EXT_LED_LAV, lav ? HIGH : LOW);
+  digitalWrite(EXT_LED_SEC, sec ? HIGH : LOW);
 }
 
 // ==========================================
@@ -538,9 +555,13 @@ void setup() {
   pinMode(BOOT_PULSE_PIN, OUTPUT);
   digitalWrite(BOOT_PULSE_PIN, HIGH);
   bootPulseEndsAt = millis() + BOOT_PULSE_MS;
+  pinMode(EXT_LED_LAV, OUTPUT);
+  pinMode(EXT_LED_SEC, OUTPUT);
+  digitalWrite(EXT_LED_LAV, LOW);
+  digitalWrite(EXT_LED_SEC, LOW);
   buzzerInit();
 
-  Serial.print("[1/6] LED D2, RELAYS D21/22/23/19, BOOT D32, BUZZER D26\n");
+  Serial.print("[1/6] LED D2, RELAYS D21/22/23/19, BOOT D32, BUZZER D26, EXT_LED D16/D17\n");
 
   // NVS
   Serial.println("[2/6] NVS...");
