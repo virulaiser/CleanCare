@@ -66,15 +66,15 @@ jobs:
           gem install cocoapods
           pod install --repo-update
 
-      - name: Patch SplashScreen.storyboard
+      - name: Patch SplashScreen.storyboard toolsVersion
         working-directory: app/ios/CleanCare
         run: |
-          echo "--- Before patch ---"
-          head -5 SplashScreen.storyboard
-          # Remove systemVersion attribute so ibtool does not require iOS 18.2 platform
-          sed -i '' 's/ systemVersion="[0-9.]*"//g' SplashScreen.storyboard
-          echo "--- After patch ---"
-          head -5 SplashScreen.storyboard
+          echo "--- Before ---"
+          grep -o 'toolsVersion="[^"]*"' SplashScreen.storyboard || true
+          # Lower toolsVersion to Xcode 15.2 (21507.3) so ibtool does not require iOS 18.2 platform
+          sed -i '' 's/toolsVersion="[0-9.]*"/toolsVersion="21507.3"/g' SplashScreen.storyboard
+          echo "--- After ---"
+          grep -o 'toolsVersion="[^"]*"' SplashScreen.storyboard || true
 
       - name: Archive (unsigned)
         working-directory: app/ios
