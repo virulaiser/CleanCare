@@ -40,13 +40,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16.1 (plataforma iOS 18.1 ya pre-instalada en macos-15)
+      - name: Select Xcode 16.1
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "16.1"
 
       - name: Print Xcode version
         run: xcodebuild -version
+
+      - name: Ensure iOS platform runtime installed
+        # IBTool (compilador de storyboards) valida contra el SDK del Xcode
+        # activo (iphoneos18.1) y requiere la Platform iOS instalada — no
+        # basta con tener el SDK. -downloadPlatform baja lo que falte.
+        run: |
+          xcodebuild -runFirstLaunch || true
+          sudo xcodebuild -downloadPlatform iOS 2>&1 | tail -20 || true
+          echo "---"
+          xcrun simctl list runtimes 2>&1 | head -10 || true
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
