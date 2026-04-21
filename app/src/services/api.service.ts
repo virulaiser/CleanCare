@@ -93,6 +93,11 @@ export async function registrarUsuario(campos: {
   return data;
 }
 
+export async function solicitarResetPassword(email: string): Promise<{ message: string }> {
+  const { data } = await api.post('/api/auth?action=reset-solicitar', { email });
+  return data;
+}
+
 export async function getMe(): Promise<{ usuario: Usuario; requiere_aprobacion: boolean }> {
   const { data } = await api.get('/api/auth', { params: { action: 'me' } });
   // Refrescar cache local

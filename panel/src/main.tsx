@@ -15,6 +15,8 @@ import Dispositivos from './pages/Dispositivos';
 import Liquidacion from './pages/Liquidacion';
 import Facturacion from './pages/Facturacion';
 import Notificaciones from './pages/Notificaciones';
+import RecuperarClave from './pages/RecuperarClave';
+import ResetClave from './pages/ResetClave';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -35,6 +37,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/liquidacion" element={<Liquidacion />} />
         <Route path="/facturacion" element={<Facturacion />} />
         <Route path="/notificaciones" element={<Notificaciones />} />
+        <Route path="/recuperar-clave" element={<RecuperarClave />} />
+        <Route path="/reset/:token" element={<ResetClave />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

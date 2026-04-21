@@ -63,6 +63,10 @@ export default function Login() {
           {loading ? 'Ingresando...' : 'Ingresar'}
         </button>
 
+        <button type="button" onClick={() => navigate('/recuperar-clave')} style={styles.backButton}>
+          ¿Olvidaste tu contraseña?
+        </button>
+
         <button type="button" onClick={() => navigate('/')} style={styles.backButton}>
           ← Volver al inicio
         </button>

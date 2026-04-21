@@ -135,4 +135,26 @@ function miembroAprobado({ apartamento, titularNombre }) {
   return { subject: `Fuiste aprobado en el apto ${apartamento}`, html: layout('Solicitud aprobada', body) };
 }
 
-module.exports = { facturaMensual, cierreInquilino, aperturaInquilino, nuevoMiembroPendiente, miembroAprobado };
+function passwordReset({ nombre, link }) {
+  const body = `
+    <h2 style="margin:0 0 12px;font-size:22px;color:${C.text};">Recuperá tu contraseña</h2>
+    <p style="margin:0 0 16px;color:${C.textSoft};">Hola ${nombre || ''},</p>
+    <p style="margin:0 0 20px;color:${C.textSoft};">
+      Recibimos un pedido para cambiar la contraseña de tu cuenta CleanCare.
+      Hacé click en el botón de abajo para elegir una nueva. El link <strong>expira en 30 minutos</strong>.
+    </p>
+    <p style="text-align:center;margin:0 0 24px;">${btn(link, 'Cambiar contraseña')}</p>
+    <p style="margin:0 0 8px;color:${C.textMuted};font-size:12px;">
+      Si no podés ver el botón, copiá y pegá este link en tu navegador:
+    </p>
+    <p style="margin:0 0 16px;color:${C.primary};font-size:12px;word-break:break-all;">
+      ${link}
+    </p>
+    <p style="margin:0;color:${C.textMuted};font-size:12px;">
+      Si no pediste cambiar tu contraseña, podés ignorar este mail — tu cuenta sigue segura.
+    </p>
+  `;
+  return { subject: 'Recuperá tu contraseña de CleanCare', html: layout('Recuperar contraseña', body) };
+}
+
+module.exports = { facturaMensual, cierreInquilino, aperturaInquilino, nuevoMiembroPendiente, miembroAprobado, passwordReset };

@@ -77,6 +77,9 @@ export default function Usuarios() {
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
 
+          <p style={{ ...styles.registerLink, marginBottom: 8 }}>
+            <span onClick={() => navigate('/recuperar-clave')} style={styles.link}>¿Olvidaste tu contraseña?</span>
+          </p>
           <p style={styles.registerLink}>
             ¿No tenés cuenta?{' '}
             <span onClick={() => navigate('/registro')} style={styles.link}>Registrate</span>

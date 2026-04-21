@@ -1,11 +1,17 @@
+const crypto = require('crypto');
 const connectDB = require('../lib/mongodb');
 const Usuario = require('../models/Usuario');
 const Unidad = require('../models/Unidad');
 const Ocupacion = require('../models/Ocupacion');
+const PasswordReset = require('../models/PasswordReset');
 const { generarToken, verificarToken } = require('../lib/auth');
 const { obtenerSaldo } = require('./billetera');
 const { notificar } = require('../lib/notificar');
-const { nuevoMiembroPendiente } = require('../lib/email-templates');
+const { nuevoMiembroPendiente, passwordReset: tplPasswordReset } = require('../lib/email-templates');
+
+const RESET_TTL_MIN = 30;
+const RESET_RATE_LIMIT = 3;        // máx solicitudes por hora y email
+const PANEL_URL = process.env.PANEL_URL || 'https://panel-three-blush.vercel.app';
 
 module.exports = async (req, res) => {
   try {
@@ -28,8 +34,14 @@ module.exports = async (req, res) => {
     if (action === 'login') {
       return await login(req, res);
     }
+    if (action === 'reset-solicitar') {
+      return await resetSolicitar(req, res);
+    }
+    if (action === 'reset-confirmar') {
+      return await resetConfirmar(req, res);
+    }
 
-    return res.status(400).json({ ok: false, error: 'Acción no válida. Usar ?action=login, ?action=registro o ?action=me' });
+    return res.status(400).json({ ok: false, error: 'Acción no válida' });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -177,4 +189,79 @@ async function me(req, res) {
     usuario: resumirUsuario(usuario),
     requiere_aprobacion: usuario.estado_aprobacion === 'pendiente',
   });
+}
+
+async function resetSolicitar(req, res) {
+  const { email } = req.body || {};
+  const emailNorm = String(email || '').trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const respuestaGenerica = () => res.json({
+    ok: true,
+    message: 'Si el email está registrado, vas a recibir un correo con las instrucciones.',
+  });
+  if (!emailNorm || !emailRegex.test(emailNorm)) return respuestaGenerica();
+
+  const usuario = await Usuario.findOne({ email: emailNorm, activo: true });
+  if (!usuario) return respuestaGenerica();
+
+  const haceUnaHora = new Date(Date.now() - 60 * 60 * 1000);
+  const recientes = await PasswordReset.countDocuments({ usuario_id: usuario.usuario_id, creado: { $gte: haceUnaHora } });
+  if (recientes >= RESET_RATE_LIMIT) return respuestaGenerica();
+
+  await PasswordReset.updateMany(
+    { usuario_id: usuario.usuario_id, usado: false },
+    { $set: { usado: true, usado_en: new Date() } }
+  );
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expira_en = new Date(Date.now() + RESET_TTL_MIN * 60 * 1000);
+  await PasswordReset.create({
+    token, usuario_id: usuario.usuario_id, email: emailNorm,
+    expira_en, ip_origen: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null,
+  });
+
+  const link = `${PANEL_URL}/reset/${token}`;
+  const { subject, html } = tplPasswordReset({ nombre: usuario.nombre, link });
+  notificar({
+    tipo: 'password_reset',
+    destinatario_usuario_id: usuario.usuario_id,
+    destinatario_email: usuario.email,
+    canal: 'email',
+    subject, html,
+    relacionado: { tipo: 'usuario', ref_id: usuario.usuario_id },
+  }).catch((e) => console.warn('No se pudo enviar mail de reset:', e.message));
+
+  return respuestaGenerica();
+}
+
+async function resetConfirmar(req, res) {
+  const { token, password_nueva } = req.body || {};
+  if (!token || !password_nueva) {
+    return res.status(400).json({ ok: false, error: 'token y password_nueva son requeridos' });
+  }
+  if (String(password_nueva).length < 6) {
+    return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' });
+  }
+
+  const reset = await PasswordReset.findOne({ token });
+  if (!reset) return res.status(400).json({ ok: false, error: 'Link inválido o ya utilizado' });
+  if (reset.usado) return res.status(400).json({ ok: false, error: 'Este link ya fue utilizado' });
+  if (reset.expira_en < new Date()) return res.status(400).json({ ok: false, error: 'El link expiró. Solicitá uno nuevo.' });
+
+  const usuario = await Usuario.findOne({ usuario_id: reset.usuario_id, activo: true });
+  if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+
+  usuario.password = String(password_nueva);
+  await usuario.save();
+
+  reset.usado = true;
+  reset.usado_en = new Date();
+  await reset.save();
+
+  await PasswordReset.updateMany(
+    { usuario_id: usuario.usuario_id, usado: false, _id: { $ne: reset._id } },
+    { $set: { usado: true, usado_en: new Date() } }
+  );
+
+  return res.json({ ok: true, message: 'Contraseña actualizada. Ya podés iniciar sesión.' });
 }

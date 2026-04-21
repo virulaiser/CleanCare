@@ -128,6 +128,17 @@ export async function loginUsuario(email: string, password: string): Promise<{ t
   return data;
 }
 
+// --- Recuperación de contraseña ---
+export async function solicitarResetPassword(email: string): Promise<{ message: string }> {
+  const { data } = await api.post('/api/auth?action=reset-solicitar', { email });
+  return data;
+}
+
+export async function confirmarResetPassword(token: string, password_nueva: string): Promise<{ message: string }> {
+  const { data } = await api.post('/api/auth?action=reset-confirmar', { token, password_nueva });
+  return data;
+}
+
 export async function listarMaquinas(edificioId: string): Promise<Maquina[]> {
   const { data } = await api.get('/api/maquinas', {
     params: { edificioId },

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { loginUsuario, getToken, obtenerCicloActivo } from '../services/api.service';
+import { loginUsuario, getToken, obtenerCicloActivo, solicitarResetPassword } from '../services/api.service';
 import { colors } from '../constants/colors';
 import SignatureBadge from '../components/SignatureBadge';
 
@@ -13,6 +13,10 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -100,11 +104,64 @@ export default function LoginScreen({ navigation }: Props) {
         {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Ingresar</Text>}
       </TouchableOpacity>
 
+      <TouchableOpacity onPress={() => { setResetMsg(''); setResetEmail(email); setResetOpen(true); }}>
+        <Text style={styles.linkText}>¿Olvidaste tu contraseña?</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
         <Text style={styles.linkText}>No tenés cuenta? Registrate</Text>
       </TouchableOpacity>
 
       <SignatureBadge />
+
+      <Modal visible={resetOpen} transparent animationType="fade" onRequestClose={() => setResetOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Recuperar contraseña</Text>
+            {resetMsg ? (
+              <>
+                <Text style={styles.modalSub}>📧 {resetMsg}</Text>
+                <TouchableOpacity style={styles.button} onPress={() => setResetOpen(false)}>
+                  <Text style={styles.buttonText}>Cerrar</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalSub}>
+                  Ingresá tu email. Te vamos a mandar un link para elegir una nueva contraseña.
+                </Text>
+                <TextInput
+                  style={styles.input} autoFocus
+                  placeholder="tu@email.com" placeholderTextColor={colors.textSecondary}
+                  value={resetEmail} onChangeText={setResetEmail}
+                  keyboardType="email-address" autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  style={[styles.button, resetBusy && { opacity: 0.6 }]}
+                  disabled={resetBusy}
+                  onPress={async () => {
+                    if (!resetEmail.trim()) { Alert.alert('Error', 'Ingresá tu email'); return; }
+                    setResetBusy(true);
+                    try {
+                      const r = await solicitarResetPassword(resetEmail.trim().toLowerCase());
+                      setResetMsg(r.message || 'Si el email está registrado, vas a recibir un correo.');
+                    } catch {
+                      setResetMsg('No se pudo conectar. Intentá de nuevo.');
+                    } finally {
+                      setResetBusy(false);
+                    }
+                  }}
+                >
+                  {resetBusy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Enviar instrucciones</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setResetOpen(false)} style={{ marginTop: 12 }}>
+                  <Text style={styles.linkText}>Cancelar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -197,5 +254,22 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 14,
     textAlign: 'center',
+    marginTop: 12,
+  },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', padding: 20,
+  },
+  modalCard: {
+    backgroundColor: colors.white, borderRadius: 16, padding: 24,
+    width: '100%', maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 18, fontWeight: '700', color: colors.textPrimary,
+    marginBottom: 8, textAlign: 'center',
+  },
+  modalSub: {
+    fontSize: 13, color: colors.textSecondary,
+    textAlign: 'center', marginBottom: 20, lineHeight: 18,
   },
 });
