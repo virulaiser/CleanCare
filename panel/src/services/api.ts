@@ -29,11 +29,32 @@ api.interceptors.response.use(
 
 export interface Usuario {
   id: string;
+  usuario_id?: string;
   email: string;
   nombre: string;
+  apartamento?: string;
   rol: string;
   edificio_id: string;
   unidad?: string;
+  rol_apto?: 'titular' | 'miembro';
+  estado_aprobacion?: 'pendiente' | 'aprobado' | 'rechazado';
+}
+
+export async function getMe(): Promise<{ usuario: Usuario; requiere_aprobacion: boolean }> {
+  const { data } = await api.get('/api/auth', { params: { action: 'me' } });
+  if (data?.usuario) {
+    localStorage.setItem('cleancare_usuario', JSON.stringify(data.usuario));
+  }
+  return data;
+}
+
+export async function comprarFichas(pin: string, cantidad: number): Promise<{ nuevo_saldo: number }> {
+  const { data } = await api.post('/api/billetera/comprar', { pin, cantidad });
+  return data;
+}
+
+export async function cambiarPinCompra(pin_actual: string, pin_nuevo: string): Promise<void> {
+  await api.patch('/api/billetera/pin', { pin_actual, pin_nuevo });
 }
 
 export interface Uso {

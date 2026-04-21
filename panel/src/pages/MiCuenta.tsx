@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listarMisUsos, obtenerBilletera, listarMaquinas, Uso, Maquina, Usuario, Transaccion } from '../services/api';
+import { listarMisUsos, obtenerBilletera, listarMaquinas, getMe, Uso, Maquina, Usuario, Transaccion } from '../services/api';
 import { colors } from '../constants/colors';
+import PurchaseModal from '../components/PurchaseModal';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -22,7 +23,8 @@ const meses = [
 
 export default function MiCuenta() {
   const navigate = useNavigate();
-  const usuario = getUsuario();
+  const usuarioLS = getUsuario();
+  const [usuario, setUsuario] = useState<Usuario | null>(usuarioLS);
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [anio, setAnio] = useState(now.getFullYear());
@@ -31,6 +33,7 @@ export default function MiCuenta() {
   const [maquinasDisp, setMaquinasDisp] = useState<(Maquina & { ocupada?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showPurchase, setShowPurchase] = useState(false);
 
   useEffect(() => {
     if (!localStorage.getItem('cleancare_token')) {
@@ -46,14 +49,16 @@ export default function MiCuenta() {
     setLoading(true);
     setError('');
     const edificio = usuario?.edificio_id || '';
-    const [data, billetera, maqData] = await Promise.all([
+    const [data, billetera, maqData, me] = await Promise.all([
       listarMisUsos().catch(() => [] as Uso[]),
       obtenerBilletera().catch(() => ({ saldo: 0, transacciones: [] as Transaccion[] })),
       edificio ? listarMaquinas(edificio).catch(() => [] as Maquina[]) : Promise.resolve([] as Maquina[]),
+      getMe().catch(() => null),
     ]);
     setUsos(data || []);
     setSaldo(billetera.saldo ?? 0);
     setMaquinasDisp((maqData || []) as (Maquina & { ocupada?: boolean })[]);
+    if (me?.usuario) setUsuario(me.usuario);
     setLoading(false);
   }
 
@@ -103,12 +108,56 @@ export default function MiCuenta() {
         {error && <div style={styles.error}>{error}</div>}
 
         {/* Saldo */}
-        <div style={{ ...styles.card, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, padding: '20px 24px' }}>
-          <span style={{ fontSize: 15, color: colors.textSecondary }}>Tu saldo:</span>
-          <span style={{ fontSize: 32, fontWeight: 700, color: saldo !== null && saldo <= 0 ? '#EF4444' : colors.primary }}>
-            {loading ? '...' : saldo ?? 0} fichas
-          </span>
+        <div style={{ ...styles.card, marginBottom: 24, padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 15, color: colors.textSecondary }}>
+              Saldo del apto {usuario?.apartamento ? `· ${usuario.apartamento}` : ''}:
+            </span>
+            <span style={{ fontSize: 32, fontWeight: 700, color: saldo !== null && saldo <= 0 ? '#EF4444' : colors.primary }}>
+              {loading ? '...' : saldo ?? 0} fichas
+            </span>
+            {usuario?.rol_apto && (
+              <span style={{
+                marginLeft: 'auto', padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+                backgroundColor: usuario.rol_apto === 'titular' ? colors.bgBlueLight : '#F1F5F9',
+                color: usuario.rol_apto === 'titular' ? colors.primary : '#64748B',
+              }}>
+                {usuario.rol_apto === 'titular' ? '👑 Titular del apto' : '🏠 Miembro del apto'}
+              </span>
+            )}
+          </div>
+          {usuario?.rol_apto === 'titular' && (
+            <button
+              onClick={() => setShowPurchase(true)}
+              style={{
+                marginTop: 16,
+                padding: '12px 24px', borderRadius: 999, border: 'none',
+                backgroundColor: colors.primary, color: colors.white,
+                fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              🪙 Comprar fichas
+            </button>
+          )}
+          {usuario?.rol_apto === 'miembro' && (
+            <p style={{ marginTop: 12, fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
+              Solo el titular del apto puede comprar fichas. Tus lavados se descuentan del mismo pozo.
+            </p>
+          )}
         </div>
+
+        {showPurchase && usuario?.edificio_id && (
+          <PurchaseModal
+            edificioId={usuario.edificio_id}
+            onClose={() => setShowPurchase(false)}
+            onSuccess={(nuevoSaldo) => {
+              setSaldo(nuevoSaldo);
+              setShowPurchase(false);
+              alert('¡Compra realizada! Saldo actual: ' + nuevoSaldo);
+            }}
+          />
+        )}
 
         {/* Disponibilidad de máquinas */}
         {maquinasDisp.length > 0 && (
