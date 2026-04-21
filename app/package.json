@@ -1,6 +1,6 @@
 {
   "name": "cleancare-app",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "CleanCare — App móvil React Native (Expo)",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {

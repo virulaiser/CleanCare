@@ -2,7 +2,7 @@
   "expo": {
     "name": "CleanCare",
     "slug": "cleancare",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "uy.cleancare.app",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "CleanCare usa Bluetooth para activar las máquinas de lavado y secado",
         "NSBluetoothPeripheralUsageDescription": "CleanCare usa Bluetooth para activar las máquinas de lavado y secado",
