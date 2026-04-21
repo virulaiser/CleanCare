@@ -534,12 +534,26 @@ async function resumenApto(edificio_id, apartamento, mes, anio) {
   return { movimientos, saldo_final, titular_nombre: titular?.nombre || null };
 }
 
-async function upsertFactura({ edificio_id, mes, anio, tipo, apartamento, pdf_url, totales }) {
+const crypto = require('crypto');
+function nuevoFacturaId() {
+  return 'FAC-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+// Upsert que reutiliza factura_id existente o genera uno nuevo si es el primer write.
+async function upsertFactura({ edificio_id, mes, anio, tipo, apartamento, pdf_url, totales, facturaId }) {
   return Factura.findOneAndUpdate(
     { edificio_id, mes, anio, tipo, apartamento: apartamento ?? null },
-    { pdf_url, totales: totales || {}, generada: new Date() },
+    {
+      $set: { pdf_url, totales: totales || {}, generada: new Date() },
+      $setOnInsert: { factura_id: facturaId, edificio_id, mes, anio, tipo, apartamento: apartamento ?? null },
+    },
     { upsert: true, new: true }
   );
+}
+
+async function obtenerOGenerarFacturaId({ edificio_id, mes, anio, tipo, apartamento }) {
+  const existing = await Factura.findOne({ edificio_id, mes, anio, tipo, apartamento: apartamento ?? null }, { factura_id: 1 }).lean();
+  return existing?.factura_id || nuevoFacturaId();
 }
 
 async function generarFacturasMes(edificio_id, mes, anio) {
@@ -551,39 +565,30 @@ async function generarFacturasMes(edificio_id, mes, anio) {
   const mesKey = `${anio}-${String(mes).padStart(2, '0')}`;
   const facturaBase = `${edificio_id}-${mesKey}`;
 
-  // Upsert primero para tener el factura_id estable en el PDF
-  const preA = await Factura.findOneAndUpdate(
-    { edificio_id, mes, anio, tipo: 'ingreso', apartamento: null },
-    { $setOnInsert: { pdf_url: '', totales: {} } }, { upsert: true, new: true }
-  );
-  const preB = await Factura.findOneAndUpdate(
-    { edificio_id, mes, anio, tipo: 'consumo_resumen', apartamento: null },
-    { $setOnInsert: { pdf_url: '', totales: {} } }, { upsert: true, new: true }
-  );
-
-  const pdfA = await pdfIngreso({ edificio, config, mes, anio, totales, facturaId: preA.factura_id });
+  // A: Ingreso
+  const facIdA = await obtenerOGenerarFacturaId({ edificio_id, mes, anio, tipo: 'ingreso' });
+  const pdfA = await pdfIngreso({ edificio, config, mes, anio, totales, facturaId: facIdA });
   const urlA = await uploadPDF(pdfA, `facturas/${facturaBase}-ingreso.pdf`);
-  const facA = await upsertFactura({ edificio_id, mes, anio, tipo: 'ingreso', apartamento: null, pdf_url: urlA, totales });
+  const facA = await upsertFactura({ edificio_id, mes, anio, tipo: 'ingreso', apartamento: null, pdf_url: urlA, totales, facturaId: facIdA });
 
-  const pdfB = await pdfConsumoResumen({ edificio, config, mes, anio, totales, facturaId: preB.factura_id });
+  // B: Consumo resumen
+  const facIdB = await obtenerOGenerarFacturaId({ edificio_id, mes, anio, tipo: 'consumo_resumen' });
+  const pdfB = await pdfConsumoResumen({ edificio, config, mes, anio, totales, facturaId: facIdB });
   const urlB = await uploadPDF(pdfB, `facturas/${facturaBase}-consumo.pdf`);
-  const facB = await upsertFactura({ edificio_id, mes, anio, tipo: 'consumo_resumen', apartamento: null, pdf_url: urlB, totales });
+  const facB = await upsertFactura({ edificio_id, mes, anio, tipo: 'consumo_resumen', apartamento: null, pdf_url: urlB, totales, facturaId: facIdB });
 
-  // PDFs por apartamento
+  // C: Por apto
   const aptos = [...new Set((await Usuario.find({ edificio_id, activo: true }, { apartamento: 1 }).lean())
     .map(u => u.apartamento).filter(Boolean))];
   const aptoFacs = [];
   for (const apto of aptos) {
     const { movimientos, saldo_final, titular_nombre } = await resumenApto(edificio_id, apto, mes, anio);
-    const preC = await Factura.findOneAndUpdate(
-      { edificio_id, mes, anio, tipo: 'resumen_apto', apartamento: apto },
-      { $setOnInsert: { pdf_url: '', totales: {} } }, { upsert: true, new: true }
-    );
-    const pdfC = await pdfResumenApto({ edificio, mes, anio, apartamento: apto, movimientos, saldo_final, facturaId: preC.factura_id, titular_nombre });
+    const facIdC = await obtenerOGenerarFacturaId({ edificio_id, mes, anio, tipo: 'resumen_apto', apartamento: apto });
+    const pdfC = await pdfResumenApto({ edificio, mes, anio, apartamento: apto, movimientos, saldo_final, facturaId: facIdC, titular_nombre });
     const urlC = await uploadPDF(pdfC, `facturas/${facturaBase}-apto-${apto}.pdf`);
     const fac = await upsertFactura({
       edificio_id, mes, anio, tipo: 'resumen_apto', apartamento: apto, pdf_url: urlC,
-      totales: { saldo_final, movimientos: movimientos.length },
+      totales: { saldo_final, movimientos: movimientos.length }, facturaId: facIdC,
     });
     aptoFacs.push(fac);
   }
