@@ -7,6 +7,10 @@ const edificioSchema = new mongoose.Schema({
   direccion:       { type: String },
   admin_nombre:    { type: String },
   admin_telefono:  { type: String },
+  pisos:           { type: Number, default: 0 },
+  aptos_por_piso:  { type: Number, default: 0 },
+  nomenclatura:    { type: String, enum: ['numerica', 'letras'], default: 'numerica' },
+  extras:          [{ codigo: String, tipo: { type: String, enum: ['portero', 'otro'], default: 'otro' } }],
   activo:          { type: Boolean, default: true },
   creado:          { type: Date, default: Date.now }
 });

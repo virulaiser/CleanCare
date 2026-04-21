@@ -368,3 +368,19 @@ export async function listarEdificios(): Promise<Edificio[]> {
   const { data } = await api.get('/api/edificios');
   return data.edificios;
 }
+
+export interface Unidad {
+  _id: string;
+  edificio_id: string;
+  codigo: string;
+  piso: number | null;
+  numero_apto: number | null;
+  es_extra: boolean;
+  tipo_extra: 'portero' | 'otro' | null;
+  activa: boolean;
+}
+
+export async function listarUnidades(edificioId: string): Promise<Unidad[]> {
+  const { data } = await api.get('/api/unidades', { params: { edificioId, activa: 'true' } });
+  return data.unidades;
+}

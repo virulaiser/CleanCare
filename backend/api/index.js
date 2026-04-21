@@ -17,6 +17,7 @@ const edificiosHandler = require('./edificios');
 const tipsHandler = require('./tips');
 const dispositivosHandler = require('./dispositivos');
 const apartamentoHandler = require('./apartamento');
+const unidadesHandler = require('./unidades');
 
 const app = express();
 app.use(cors());
@@ -29,6 +30,7 @@ app.get('/api', (req, res) => {
 app.post('/api/auth', authHandler);
 app.get('/api/auth', authHandler);
 app.get('/api/edificios', edificiosHandler);
+app.get('/api/unidades', unidadesHandler);
 app.get('/api/tips', tipsHandler);
 
 // Rutas protegidas (requieren token)
@@ -59,6 +61,9 @@ app.post('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
 app.delete('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
 app.post('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
 app.delete('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
+app.post('/api/unidades', verificarToken, soloAdmin, unidadesHandler);
+app.patch('/api/unidades', verificarToken, soloAdmin, unidadesHandler);
+app.delete('/api/unidades', verificarToken, soloAdmin, unidadesHandler);
 app.post('/api/tips', verificarToken, soloAdmin, tipsHandler);
 app.delete('/api/tips', verificarToken, soloAdmin, tipsHandler);
 app.get('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);

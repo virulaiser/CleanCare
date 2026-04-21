@@ -329,7 +329,12 @@ export async function eliminarDispositivo(id: string): Promise<void> {
   await api.delete('/api/dispositivos', { params: { id } });
 }
 
-export async function crearEdificio(campos: { nombre: string; direccion?: string; admin_nombre?: string; admin_telefono?: string }): Promise<Edificio> {
+export async function crearEdificio(campos: {
+  nombre: string; direccion?: string; admin_nombre?: string; admin_telefono?: string;
+  pisos?: number; aptos_por_piso?: number;
+  nomenclatura?: 'numerica' | 'letras';
+  extras?: { codigo: string; tipo: 'portero' | 'otro' }[];
+}): Promise<Edificio> {
   const { data } = await api.post('/api/edificios', campos);
   return data.edificio;
 }

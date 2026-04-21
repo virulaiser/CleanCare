@@ -116,7 +116,7 @@ export default function ProfileScreen({ navigation }: Props) {
         <Text style={styles.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>CleanCare v1.2.0</Text>
+      <Text style={styles.version}>CleanCare v1.2.1</Text>
       <SignatureBadge />
     </ScrollView>
   );

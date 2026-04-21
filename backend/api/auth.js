@@ -1,5 +1,6 @@
 const connectDB = require('../lib/mongodb');
 const Usuario = require('../models/Usuario');
+const Unidad = require('../models/Unidad');
 const { generarToken, verificarToken } = require('../lib/auth');
 const { obtenerSaldo } = require('./billetera');
 
@@ -66,6 +67,16 @@ async function registro(req, res) {
   const existe = await Usuario.findOne({ email });
   if (existe) {
     return res.status(409).json({ ok: false, error: 'Ya existe un usuario con ese email' });
+  }
+
+  // Si el edificio tiene unidades generadas, el apartamento debe matchear una activa.
+  // Si no hay unidades (edificio legacy), se acepta el apartamento libre.
+  const unidadesDelEdificio = await Unidad.countDocuments({ edificio_id });
+  if (unidadesDelEdificio > 0) {
+    const unidadMatch = await Unidad.findOne({ edificio_id, codigo: apartamento, activa: true }).lean();
+    if (!unidadMatch) {
+      return res.status(400).json({ ok: false, error: 'El apartamento no existe en este edificio. Elegí uno de la lista.' });
+    }
   }
 
   // ¿Hay titular aprobado en este apto?

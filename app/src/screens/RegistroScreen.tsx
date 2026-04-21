@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Modal, FlatList } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { registrarUsuario, listarEdificios, Edificio } from '../services/api.service';
+import { registrarUsuario, listarEdificios, listarUnidades, Edificio, Unidad } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Registro'>;
@@ -20,10 +20,23 @@ export default function RegistroScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [edificios, setEdificios] = useState<Edificio[]>([]);
   const [showEdificios, setShowEdificios] = useState(false);
+  const [unidades, setUnidades] = useState<Unidad[]>([]);
+  const [showUnidades, setShowUnidades] = useState(false);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
 
   useEffect(() => {
     listarEdificios().then(setEdificios).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!edificio) { setUnidades([]); return; }
+    setLoadingUnidades(true);
+    setApartamento('');
+    listarUnidades(edificio)
+      .then(setUnidades)
+      .catch(() => setUnidades([]))
+      .finally(() => setLoadingUnidades(false));
+  }, [edificio]);
 
   const handleRegistro = async () => {
     if (!nombre || !email || !password || !edificio || !apartamento) {
@@ -92,13 +105,38 @@ export default function RegistroScreen({ navigation }: Props) {
       </View>
 
       <TextInput style={styles.input} placeholder="Teléfono (ej: 099123456)" placeholderTextColor={colors.textSecondary} value={telefono} onChangeText={setTelefono} keyboardType="phone-pad" />
-      <TextInput style={styles.input} placeholder="Apartamento (ej: 3B) *" placeholderTextColor={colors.textSecondary} value={apartamento} onChangeText={setApartamento} />
       <TouchableOpacity style={styles.selectorInput} onPress={() => setShowEdificios(true)}>
         <Text style={{ fontSize: 16, color: edificio ? colors.textPrimary : colors.textSecondary }}>
           {edificioNombre || 'Seleccioná tu edificio *'}
         </Text>
         <Text style={{ fontSize: 14, color: colors.textSecondary }}>▼</Text>
       </TouchableOpacity>
+
+      {/* Apartamento: si el edificio tiene unidades generadas → dropdown; si no → input libre */}
+      {edificio && unidades.length > 0 ? (
+        <TouchableOpacity
+          style={styles.selectorInput}
+          onPress={() => setShowUnidades(true)}
+          disabled={loadingUnidades}
+        >
+          <Text style={{ fontSize: 16, color: apartamento ? colors.textPrimary : colors.textSecondary }}>
+            {apartamento
+              ? `Apto ${apartamento}`
+              : loadingUnidades ? 'Cargando apartamentos...' : 'Seleccioná tu apartamento *'}
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.textSecondary }}>▼</Text>
+        </TouchableOpacity>
+      ) : (
+        <TextInput
+          style={styles.input}
+          placeholder={edificio && !loadingUnidades ? 'Apartamento (ej: 3B) *' : 'Primero elegí el edificio'}
+          placeholderTextColor={colors.textSecondary}
+          value={apartamento}
+          onChangeText={setApartamento}
+          editable={!!edificio}
+        />
+      )}
+
       <TextInput style={styles.input} placeholder="Unidad (ej: apto-302) — opcional" placeholderTextColor={colors.textSecondary} value={unidad} onChangeText={setUnidad} />
 
       <Modal visible={showEdificios} transparent animationType="fade">
@@ -125,6 +163,38 @@ export default function RegistroScreen({ navigation }: Props) {
               ListEmptyComponent={<Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>No hay edificios registrados</Text>}
             />
             <TouchableOpacity onPress={() => setShowEdificios(false)} style={styles.modalClose}>
+              <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showUnidades} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Elegí tu apartamento</Text>
+            <FlatList
+              data={unidades}
+              keyExtractor={(item) => item._id}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.modalItem, apartamento === item.codigo && { backgroundColor: colors.bgBlueLight }]}
+                  onPress={() => {
+                    setApartamento(item.codigo);
+                    setShowUnidades(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>
+                    {item.codigo}
+                    {item.es_extra ? ` (${item.tipo_extra || 'extra'})` : ''}
+                  </Text>
+                  {item.piso ? <Text style={styles.modalItemSub}>Piso {item.piso}</Text> : null}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={<Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 20 }}>Este edificio no tiene apartamentos cargados</Text>}
+            />
+            <TouchableOpacity onPress={() => setShowUnidades(false)} style={styles.modalClose}>
               <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Cancelar</Text>
             </TouchableOpacity>
           </View>

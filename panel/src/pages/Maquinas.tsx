@@ -37,6 +37,12 @@ export default function Maquinas() {
   const [ediDireccion, setEdiDireccion] = useState('');
   const [ediAdminNombre, setEdiAdminNombre] = useState('');
   const [ediAdminTel, setEdiAdminTel] = useState('');
+  const [ediPisos, setEdiPisos] = useState<number>(0);
+  const [ediAptosPorPiso, setEdiAptosPorPiso] = useState<number>(0);
+  const [ediNomenclatura, setEdiNomenclatura] = useState<'numerica' | 'letras'>('numerica');
+  const [ediExtras, setEdiExtras] = useState<{ codigo: string; tipo: 'portero' | 'otro' }[]>([]);
+  const [ediExtraCodigo, setEdiExtraCodigo] = useState('');
+  const [ediExtraTipo, setEdiExtraTipo] = useState<'portero' | 'otro'>('portero');
   const [ediCreando, setEdiCreando] = useState(false);
   const [ediMsg, setEdiMsg] = useState('');
   const [edificios, setEdificios] = useState<Edificio[]>([]);
@@ -324,6 +330,81 @@ export default function Maquinas() {
                 <label style={styles.label}>Administrador — Teléfono</label>
                 <input style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: 099123456" value={ediAdminTel} onChange={(e) => setEdiAdminTel(e.target.value)} />
               </div>
+
+              <hr style={{ border: 'none', borderTop: `1px solid ${colors.border}`, margin: '8px 0' }} />
+              <p style={{ fontSize: 13, color: colors.textSecondary, margin: 0 }}>
+                Generar apartamentos automáticamente:
+              </p>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={styles.label}>Pisos</label>
+                  <input type="number" min={0} style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: 10" value={ediPisos || ''} onChange={(e) => setEdiPisos(Number(e.target.value) || 0)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={styles.label}>Aptos / piso</label>
+                  <input type="number" min={0} style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} placeholder="Ej: 4" value={ediAptosPorPiso || ''} onChange={(e) => setEdiAptosPorPiso(Number(e.target.value) || 0)} />
+                </div>
+              </div>
+              <div>
+                <label style={styles.label}>Nomenclatura</label>
+                <select style={{ ...styles.input, width: '100%', boxSizing: 'border-box' }} value={ediNomenclatura} onChange={(e) => setEdiNomenclatura(e.target.value as 'numerica' | 'letras')}>
+                  <option value="numerica">Numérica (101, 102, 201, 202…)</option>
+                  <option value="letras">Letras (1A, 1B, 2A, 2B…)</option>
+                </select>
+              </div>
+
+              {ediPisos > 0 && ediAptosPorPiso > 0 && (() => {
+                const total = ediPisos * ediAptosPorPiso + ediExtras.length;
+                const preview: string[] = [];
+                outer: for (let p = 1; p <= ediPisos; p++) {
+                  for (let n = 1; n <= ediAptosPorPiso; n++) {
+                    if (preview.length >= 8) break outer;
+                    preview.push(
+                      ediNomenclatura === 'letras'
+                        ? `${p}${String.fromCharCode(64 + n)}`
+                        : `${p * 100 + n}`
+                    );
+                  }
+                }
+                return (
+                  <p style={{ fontSize: 12, color: colors.textSecondary, margin: 0 }}>
+                    Se crearán <strong style={{ color: colors.primary }}>{total}</strong> unidades: {preview.join(', ')}
+                    {total > preview.length + ediExtras.length ? '…' : ''}
+                    {ediExtras.length > 0 ? ` + extras: ${ediExtras.map(e => e.codigo).join(', ')}` : ''}
+                  </p>
+                );
+              })()}
+
+              <div>
+                <label style={styles.label}>Extras (portero, etc.)</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input style={{ ...styles.input, flex: 1 }} placeholder="Código (ej: portero)" value={ediExtraCodigo} onChange={(e) => setEdiExtraCodigo(e.target.value)} />
+                  <select style={{ ...styles.input, width: 110 }} value={ediExtraTipo} onChange={(e) => setEdiExtraTipo(e.target.value as 'portero' | 'otro')}>
+                    <option value="portero">Portero</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                  <button
+                    type="button"
+                    style={{ ...styles.btnOutline, padding: '6px 12px' }}
+                    disabled={!ediExtraCodigo}
+                    onClick={() => {
+                      if (!ediExtraCodigo) return;
+                      setEdiExtras([...ediExtras, { codigo: ediExtraCodigo, tipo: ediExtraTipo }]);
+                      setEdiExtraCodigo('');
+                    }}
+                  >+</button>
+                </div>
+                {ediExtras.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                    {ediExtras.map((e, i) => (
+                      <span key={i} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 999, backgroundColor: colors.bgBlueLight, color: colors.primary }}>
+                        {e.codigo} ({e.tipo})
+                        <button type="button" onClick={() => setEdiExtras(ediExtras.filter((_, idx) => idx !== i))} style={{ marginLeft: 6, border: 'none', background: 'none', color: colors.error, cursor: 'pointer', fontSize: 14, padding: 0 }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             {ediMsg && <p style={{ fontSize: 13, color: ediMsg.includes('Error') ? colors.error : colors.success, marginBottom: 12 }}>{ediMsg}</p>}
 
@@ -360,16 +441,24 @@ export default function Maquinas() {
                       direccion: ediDireccion || undefined,
                       admin_nombre: ediAdminNombre || undefined,
                       admin_telefono: ediAdminTel || undefined,
+                      pisos: ediPisos || undefined,
+                      aptos_por_piso: ediAptosPorPiso || undefined,
+                      nomenclatura: ediNomenclatura,
+                      extras: ediExtras.length > 0 ? ediExtras : undefined,
                     });
                     setEdiNombre('');
                     setEdiDireccion('');
                     setEdiAdminNombre('');
                     setEdiAdminTel('');
+                    setEdiPisos(0);
+                    setEdiAptosPorPiso(0);
+                    setEdiNomenclatura('numerica');
+                    setEdiExtras([]);
                     const updated = await listarEdificios();
                     setEdificios(updated);
                     setShowEdificioModal(false);
-                  } catch {
-                    setEdiMsg('Error al crear edificio');
+                  } catch (err: any) {
+                    setEdiMsg(err?.response?.data?.error || 'Error al crear edificio');
                   } finally {
                     setEdiCreando(false);
                   }
