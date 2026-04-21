@@ -25,6 +25,8 @@ const usuarioSchema = new mongoose.Schema({
   aprobado_por:       { type: String, default: null },
   aprobado_en:        { type: Date, default: null },
   activo:      { type: Boolean, default: true },
+  fecha_baja:  { type: Date, default: null },
+  motivo_baja: { type: String, enum: ['cambio_inquilino', 'solicitud_propia', 'rechazado', null], default: null },
   creado:      { type: Date, default: Date.now }
 });
 

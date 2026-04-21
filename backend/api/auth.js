@@ -1,6 +1,7 @@
 const connectDB = require('../lib/mongodb');
 const Usuario = require('../models/Usuario');
 const Unidad = require('../models/Unidad');
+const Ocupacion = require('../models/Ocupacion');
 const { generarToken, verificarToken } = require('../lib/auth');
 const { obtenerSaldo } = require('./billetera');
 
@@ -79,7 +80,7 @@ async function registro(req, res) {
     }
   }
 
-  // ¿Hay titular aprobado en este apto?
+  // ¿Hay titular aprobado y ocupación vigente en este apto?
   const titularExistente = await Usuario.findOne({
     edificio_id,
     apartamento,
@@ -88,7 +89,10 @@ async function registro(req, res) {
     activo: true,
   }).lean();
 
-  const esTitular = !titularExistente;
+  // Todo nuevo registro queda pendiente; el admin debe aprobar.
+  // - Si hay titular: el nuevo se marca miembro + pendiente (espera aprobación del titular o admin).
+  // - Si NO hay titular (apto vacío o tras cambio de inquilino): queda pendiente sin titularidad;
+  //   el admin lo confirma titular desde el panel (evita que un randomer se registre y tome el apto).
   const campos = {
     email,
     password,
@@ -98,10 +102,10 @@ async function registro(req, res) {
     rol: rol || 'residente',
     edificio_id,
     unidad,
-    rol_apto: esTitular ? 'titular' : 'miembro',
-    estado_aprobacion: esTitular ? 'aprobado' : 'pendiente',
-    aprobado_por: esTitular ? null : null,
-    aprobado_en: esTitular ? new Date() : null,
+    rol_apto: 'miembro',
+    estado_aprobacion: 'pendiente',
+    aprobado_por: null,
+    aprobado_en: null,
   };
 
   const usuario = await Usuario.create(campos);
@@ -113,8 +117,9 @@ async function registro(req, res) {
     token,
     saldo,
     usuario: resumirUsuario(usuario),
-    requiere_aprobacion: !esTitular,
+    requiere_aprobacion: true,
     titular_nombre: titularExistente?.nombre || null,
+    apto_sin_titular: !titularExistente, // para que la app muestre el mensaje correcto
   });
 }
 

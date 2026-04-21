@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   listarUsuariosEdificio, listarEdificios, crearUsuarioAdmin,
   editarUsuarioAdmin, eliminarUsuarioAdmin, listarUsos,
+  cerrarInquilino, confirmarTitular,
   Edificio, Uso,
 } from '../services/api';
 import { colors } from '../constants/colors';
@@ -97,6 +98,24 @@ function RolAptoCell({ usuario, onChange }: { usuario: UsuarioRow; onChange: () 
             style={{ padding: '2px 8px', fontSize: 11, borderRadius: 999, border: `1px solid #3B82F6`, backgroundColor: 'transparent', color: '#3B82F6', cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}
           >
             Hacer titular
+          </button>
+        )}
+        {estado === 'pendiente' && (
+          <button
+            disabled={busy}
+            onClick={async () => {
+              if (!window.confirm(`¿Confirmar a ${usuario.nombre} como TITULAR del apto ${usuario.apartamento}?`)) return;
+              try {
+                await confirmarTitular(usuario.usuario_id);
+                await onChange();
+              } catch (err: any) {
+                alert(err?.response?.data?.error || 'No se pudo confirmar el titular');
+              }
+            }}
+            style={{ padding: '2px 8px', fontSize: 11, borderRadius: 999, border: 'none', backgroundColor: '#1D4ED8', color: '#fff', cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}
+            title="Aprueba al pendiente y abre una ocupación nueva con él como titular"
+          >
+            👑 Aprobar como titular
           </button>
         )}
       </div>
@@ -740,7 +759,30 @@ export default function AdminUsuarios() {
               ))}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <button
+                onClick={async () => {
+                  const ok = window.confirm(
+                    `¿Cerrar la ocupación del apto ${aptoModal.apartamento}?\n\n` +
+                    `Esto marca de baja a los ${aptoModal.usuarios.length} usuario(s) actuales, ` +
+                    `resetea el saldo del apto a 0 y genera un PDF de cierre.\n\n` +
+                    `El nuevo inquilino deberá registrarse desde la web/app y vos aprobarlo como titular.`
+                  );
+                  if (!ok) return;
+                  try {
+                    const r = await cerrarInquilino(aptoModal.edificio_id, aptoModal.apartamento);
+                    alert(`Inquilino cerrado. Saldo previo: ${r.saldo_previo} fichas.\nPDF: ${r.pdf_cierre_url}`);
+                    window.open(r.pdf_cierre_url, '_blank');
+                    setAptoModal(null);
+                    await fetchData();
+                  } catch (err: any) {
+                    alert(err?.response?.data?.error || 'No se pudo cerrar el inquilino');
+                  }
+                }}
+                style={{ ...styles.btnDelete, fontSize: 13 }}
+              >
+                🚪 Cambiar inquilino
+              </button>
               <button onClick={() => setAptoModal(null)} style={styles.btnCancel}>Cerrar</button>
             </div>
           </div>

@@ -387,6 +387,39 @@ export async function generarFacturas(edificio_id: string, mes: number, anio: nu
   return data;
 }
 
+// --- Ocupaciones / cambio de inquilino ---
+export interface Ocupacion {
+  _id: string;
+  ocupacion_id: string;
+  edificio_id: string;
+  apartamento: string;
+  desde: string;
+  hasta: string | null;
+  titular_usuario_id: string;
+  miembros_usuario_ids: string[];
+  cerrada_por: string | null;
+  motivo_cierre: 'rotacion' | 'baja' | 'admin' | null;
+  saldo_al_cierre: number | null;
+  pdf_cierre_url: string;
+  pdf_apertura_url: string;
+  notas: string;
+}
+
+export async function cerrarInquilino(edificio_id: string, apartamento: string, notas?: string): Promise<{ saldo_previo: number; pdf_cierre_url: string; inquilinos_dados_baja: number }> {
+  const { data } = await api.post('/api/apartamento/cerrar-inquilino', { edificio_id, apartamento, notas });
+  return data;
+}
+
+export async function confirmarTitular(usuario_id: string): Promise<{ usuario: any; ocupacion: Ocupacion }> {
+  const { data } = await api.post('/api/apartamento/confirmar-titular', { usuario_id });
+  return data;
+}
+
+export async function listarOcupaciones(edificioId: string, apartamento?: string): Promise<Ocupacion[]> {
+  const { data } = await api.get('/api/apartamento/ocupaciones', { params: { edificioId, apartamento } });
+  return data.ocupaciones;
+}
+
 export async function crearEdificio(campos: {
   nombre: string; direccion?: string; admin_nombre?: string; admin_telefono?: string;
   pisos?: number; aptos_por_piso?: number;

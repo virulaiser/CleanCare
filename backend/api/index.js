@@ -20,6 +20,7 @@ const apartamentoHandler = require('./apartamento');
 const unidadesHandler = require('./unidades');
 const facturacionHandler = require('./facturacion');
 const cronFacturacionHandler = require('./cron-facturacion');
+const cambioInquilinoHandler = require('./cambio-inquilino');
 
 const app = express();
 app.use(cors());
@@ -88,6 +89,11 @@ app.get('/api/apartamento/miembros', verificarToken, apartamentoHandler);
 app.post('/api/apartamento/aprobar', verificarToken, apartamentoHandler);
 app.post('/api/apartamento/rechazar', verificarToken, apartamentoHandler);
 app.post('/api/apartamento/transferir-titularidad', verificarToken, apartamentoHandler);
+
+// Cambio de inquilino (admin / admin_edificio)
+app.post('/api/apartamento/cerrar-inquilino', verificarToken, cambioInquilinoHandler);
+app.post('/api/apartamento/confirmar-titular', verificarToken, cambioInquilinoHandler);
+app.get('/api/apartamento/ocupaciones', verificarToken, cambioInquilinoHandler);
 
 // Facturación (admin / admin_edificio)
 app.get('/api/facturacion', verificarToken, facturacionHandler);
