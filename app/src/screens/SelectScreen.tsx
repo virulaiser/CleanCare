@@ -368,52 +368,19 @@ export default function SelectScreen({ navigation }: Props) {
     setActivatingLog('⚡ Preparando comando...');
     logEvent(`⚡ Preparando comando (user=${userId}, ${segs}s = ${duracion}min)`);
 
-    // Monitor temporal dedicado a la confirmación
-    let confirmed = false;
-    const sub = device.monitorCharacteristicForService(SERVICE_UUID, STATUS_UUID, (err, char) => {
-      if (err) {
-        logEvent(`⚠ Monitor error: ${err.message || err}`);
-        return;
-      }
-      if (!char?.value) return;
-      const s = parseBleStatus(char);
-      if (!s) return;
-      logEvent(`📥 ESP32→app: ${s.state}:${s.secs}${s.maquina_id ? ':' + s.maquina_id : ''}`);
-      if (s.state === 'ON' && s.secs > 0 && (!s.maquina_id || s.maquina_id === maq.maquina_id)) {
-        confirmed = true;
-        logEvent(`✅ Confirmación recibida para ${maq.maquina_id}`);
-      }
-    });
-
+    // El write-with-response del ESP32 ya implica ACK a nivel BLE (si no recibió, tira excepción).
+    // No hacemos un segundo monitor sobre STATUS_UUID porque choca con attachStatusMonitor
+    // (react-native-ble-plx no garantiza que ambos listeners reciban la misma Notify).
     const cmd = `ON:${segs}:${userId}:${tipo}:${maq.maquina_id}`;
     try {
       setActivatingLog(`📡 Enviando: ${cmd}`);
       logEvent(`📤 app→ESP32: ${cmd}`);
       await device.writeCharacteristicWithResponseForService(SERVICE_UUID, CONTROL_UUID, btoa(cmd));
-      setActivatingLog('⏳ Esperando confirmación del ESP32...');
-      logEvent(`✉ Write OK, esperando Notify (8s)`);
+      logEvent(`✉ Write-with-response OK — ESP32 recibió el comando`);
     } catch (err: any) {
-      sub.remove();
       setActivating(false);
       logEvent(`❌ Write falló: ${err?.message || err}`);
       Alert.alert('Error al enviar', err?.message || 'No se pudo enviar el comando.');
-      return;
-    }
-
-    // Esperar hasta 8s a que el ESP32 confirme "modo actuar" (relay encendido)
-    const start = Date.now();
-    while (Date.now() - start < 8000 && !confirmed) {
-      await new Promise(r => setTimeout(r, 200));
-    }
-    sub.remove();
-
-    if (!confirmed) {
-      setActivating(false);
-      logEvent(`⏱ Timeout 8s sin confirmación`);
-      Alert.alert(
-        'ESP32 no confirmó activación',
-        'La máquina no respondió. Verificá que el ESP32 esté cerca y volvé a intentar.'
-      );
       return;
     }
 

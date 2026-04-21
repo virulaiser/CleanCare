@@ -31,6 +31,10 @@
 #define CONTROL_CHAR_UUID   "cc7a5001-bb73-4e02-8f1d-a0b0c0d0e0f2"
 #define STATUS_CHAR_UUID    "cc7a5001-bb73-4e02-8f1d-a0b0c0d0e0f3"
 
+// Bump este string cada vez que querés forzar limpieza de NVS en el próximo boot.
+// Si no coincide con el stored, se borran slots y logs (una sola vez).
+#define FIRMWARE_BUILD_TAG  "v4.1-2026-04-21b"
+
 #define LED_PIN 2
 #define BOOT_PULSE_PIN 32
 #define BOOT_PULSE_MS 3000
@@ -71,6 +75,8 @@ unsigned long advertisingRestartAt = 0;
 bool bootPulseActive = true;
 unsigned long bootPulseEndsAt = 0;
 bool disconnectBeepPending = false;
+bool startMelodyPending = false;
+bool endMelodyPending = false;
 int connectionCount = 0;
 
 String currentDateTime = "";
@@ -273,7 +279,9 @@ void turnOnSlot(int idx, int durSec, String userId, String tipo, String maquina_
   slots[idx].lastWarningBeep = 0;
   digitalWrite(RELAY_PINS[idx], HIGH);
   digitalWrite(LED_PIN, HIGH);
-  playStartMelody();
+  // Diferir la melodía al main loop para no bloquear el callback BLE
+  // (playStartMelody tarda ~390ms con delays y causa timeout del write-response).
+  startMelodyPending = true;
 
   Serial.print("[ON] Slot ");
   Serial.print(idx);
@@ -509,7 +517,8 @@ void turnOffSlot(int idx, bool playEndMel) {
   if (!anyActive() && deviceCount == 0) digitalWrite(LED_PIN, LOW);
   Serial.print("[OFF] Slot ");
   Serial.println(idx);
-  if (playEndMel) playEndMelody();
+  // Diferir la melodía al main loop (ver turnOnSlot).
+  if (playEndMel) endMelodyPending = true;
   updateExternalLeds();
   sendStatusSlot(idx);
 }
@@ -563,8 +572,33 @@ void setup() {
 
   Serial.print("[1/6] LED D2, RELAYS D21/22/23/19, BOOT D32, BUZZER D26, EXT_LED D16/D17\n");
 
-  // NVS
+  // NVS — limpieza automática si cambió FIRMWARE_BUILD_TAG
   Serial.println("[2/6] NVS...");
+  {
+    preferences.begin("meta", false);
+    String storedTag = preferences.getString("build", "");
+    if (storedTag != FIRMWARE_BUILD_TAG) {
+      Serial.print("       Nuevo firmware (");
+      Serial.print(FIRMWARE_BUILD_TAG);
+      Serial.print(" vs ");
+      Serial.print(storedTag.length() > 0 ? storedTag : "ninguno");
+      Serial.println(") — limpiando NVS");
+      preferences.putString("build", FIRMWARE_BUILD_TAG);
+      preferences.end();
+      // Borrar mapeo de slots
+      preferences.begin("maqmap", false);
+      preferences.clear();
+      preferences.end();
+      // Borrar logs
+      preferences.begin("logs", false);
+      preferences.clear();
+      preferences.end();
+      Serial.println("       NVS reseteado (slots vacíos, 0 logs)");
+    } else {
+      preferences.end();
+      Serial.println("       Firmware sin cambios — NVS preservado");
+    }
+  }
   loadMapping();
   for (int i = 0; i < MAX_MAQUINAS; i++) {
     if (slots[i].maquina_id.length() > 0) {
@@ -639,6 +673,17 @@ void loop() {
   if (disconnectBeepPending) {
     disconnectBeepPending = false;
     playDisconnectBeep();
+  }
+
+  // Melodías diferidas desde callbacks BLE (evitan bloquear el callback ~400ms
+  // y causar timeout del write-response + desconexión del cliente).
+  if (startMelodyPending) {
+    startMelodyPending = false;
+    playStartMelody();
+  }
+  if (endMelodyPending) {
+    endMelodyPending = false;
+    playEndMelody();
   }
 
   if (millis() >= RESET_INTERVAL_MS && !anyActive()) {
