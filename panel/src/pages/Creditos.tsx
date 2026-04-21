@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { exportExcelTable } from '../utils/excel';
+import { printTable } from '../utils/print';
 import AdminNav from '../components/AdminNav';
 import {
   obtenerConfigEdificio, actualizarConfigEdificio,
@@ -231,6 +232,86 @@ export default function Creditos() {
     });
   }
 
+  function imprimirResumen() {
+    if (resumen.length === 0) return;
+    const totalAsignados   = resumen.reduce((s, r) => s + r.creditos_asignados, 0);
+    const totalDevoluciones = resumen.reduce((s, r) => s + r.devoluciones, 0);
+    const totalSaldo       = resumen.reduce((s, r) => s + r.saldo_actual, 0);
+    const ediNombre = edificios.find((e) => e.edificio_id === edificioId)?.nombre || edificioId;
+
+    printTable({
+      documentTitle: `creditos_${edificioId}_${meses[mes - 1]}_${anio}`,
+      title: 'Resumen de consumo de créditos',
+      subtitle: `${ediNombre} · ${meses[mes - 1]} ${anio}`,
+      columns: [
+        { key: 'nombre',       label: 'Usuario' },
+        { key: 'apartamento',  label: 'Apto',          align: 'center' },
+        { key: 'usados',       label: 'Usados',        align: 'right' },
+        { key: 'asignados',    label: 'Asignados',     align: 'right' },
+        { key: 'devoluciones', label: 'Devoluciones',  align: 'right' },
+        { key: 'saldo',        label: 'Saldo actual',  align: 'right' },
+      ],
+      rows: resumen.map((r) => ({
+        nombre: r.nombre,
+        apartamento: r.apartamento,
+        usados: r.creditos_usados,
+        asignados: r.creditos_asignados,
+        devoluciones: r.devoluciones,
+        saldo: r.saldo_actual,
+      })),
+      totals: {
+        nombre: 'TOTAL',
+        apartamento: '',
+        usados: totalConsumo,
+        asignados: totalAsignados,
+        devoluciones: totalDevoluciones,
+        saldo: totalSaldo,
+      },
+    });
+  }
+
+  function imprimirUsuarios() {
+    const q = busqueda.toLowerCase();
+    const filtered = usuarios.filter((u) => {
+      if (filtroEdificio && u.edificio_id !== filtroEdificio) return false;
+      if (q && !u.nombre.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q) && !(u.apartamento || '').toLowerCase().includes(q) && !String(u.saldo).includes(q)) return false;
+      return true;
+    });
+    if (filtered.length === 0) return;
+
+    const totalSaldo = filtered.reduce((s, u) => s + u.saldo, 0);
+    const ediNombre = filtroEdificio
+      ? (edificios.find((e) => e.edificio_id === filtroEdificio)?.nombre || filtroEdificio)
+      : 'Todos los edificios';
+
+    printTable({
+      documentTitle: `usuarios_saldos_${filtroEdificio || 'todos'}`,
+      title: 'Usuarios y saldos',
+      subtitle: `${ediNombre}${busqueda ? ` · Filtro: "${busqueda}"` : ''} · ${filtered.length} usuario${filtered.length !== 1 ? 's' : ''}`,
+      columns: [
+        { key: 'nombre',      label: 'Usuario' },
+        { key: 'email',       label: 'Email' },
+        { key: 'apartamento', label: 'Apto',     align: 'center' },
+        { key: 'edificio',    label: 'Edificio' },
+        { key: 'saldo',       label: 'Saldo',    align: 'right' },
+      ],
+      rows: filtered.map((u) => ({
+        nombre: u.nombre,
+        email: u.email,
+        apartamento: u.apartamento || '-',
+        edificio: edificios.find((e) => e.edificio_id === u.edificio_id)?.nombre || u.edificio_id,
+        saldo: u.saldo,
+      })),
+      totals: {
+        nombre: 'TOTAL',
+        email: '',
+        apartamento: '',
+        edificio: '',
+        saldo: totalSaldo,
+      },
+    });
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('cleancare_token');
     localStorage.removeItem('cleancare_usuario');
@@ -346,7 +427,16 @@ export default function Creditos() {
 
         {/* Usuarios + saldos */}
         <div style={styles.card}>
-          <h3 style={styles.cardTitle}>Usuarios y saldos</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <h3 style={{ ...styles.cardTitle, marginBottom: 0 }}>Usuarios y saldos</h3>
+            <button
+              onClick={imprimirUsuarios}
+              disabled={usuarios.length === 0}
+              style={{ ...styles.printBtn, opacity: usuarios.length === 0 ? 0.5 : 1 }}
+            >
+              Imprimir PDF
+            </button>
+          </div>
 
           {/* Buscador y filtros */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -456,6 +546,7 @@ export default function Creditos() {
                 {[2025, 2026, 2027].map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
               <button onClick={exportarExcel} disabled={resumen.length === 0} style={{ ...styles.exportBtn, opacity: resumen.length === 0 ? 0.5 : 1 }}>Exportar Excel</button>
+              <button onClick={imprimirResumen} disabled={resumen.length === 0} style={{ ...styles.printBtn, opacity: resumen.length === 0 ? 0.5 : 1 }}>Imprimir PDF</button>
             </div>
           </div>
 
@@ -689,6 +780,11 @@ const styles: Record<string, React.CSSProperties> = {
   exportBtn: {
     padding: '8px 20px', borderRadius: 999, border: 'none',
     backgroundColor: colors.success, color: colors.white, fontSize: 14,
+    fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  },
+  printBtn: {
+    padding: '8px 20px', borderRadius: 999, border: 'none',
+    backgroundColor: '#DC2626', color: colors.white, fontSize: 14,
     fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
   },
   kpiMini: {
