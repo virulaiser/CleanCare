@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import { exportExcelTable } from '../utils/excel';
 import { obtenerResumen, listarUsos, listarMaquinas, listarEdificios, ResumenItem, Uso, Maquina, Edificio, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
@@ -85,17 +85,33 @@ export default function Dashboard() {
   function exportarExcel() {
     if (resumen.length === 0) return;
 
-    const data = resumen.map((r) => ({
-      'Máquina': maquinaMap[r._id] || r._id,
-      'Usos': r.total_usos,
-      'Minutos': r.minutos_totales,
+    const edi = edificios.find((e) => e.edificio_id === edificioId);
+    const rows = resumen.map((r) => ({
+      maquina: maquinaMap[r._id] || r._id,
+      usos: r.total_usos,
+      minutos: r.minutos_totales,
+      promedio: r.total_usos > 0 ? Math.round(r.minutos_totales / r.total_usos) : 0,
     }));
-    data.push({ 'Máquina': 'TOTAL', 'Usos': totalUsos, 'Minutos': totalMinutos });
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
-    XLSX.writeFile(wb, `cleancare_resumen_${meses[mes - 1]}_${anio}.xlsx`);
+    exportExcelTable({
+      filename: `cleancare_resumen_${edificioId}_${meses[mes - 1]}_${anio}.xlsx`,
+      sheetName: 'Resumen',
+      title: 'Resumen mensual de uso',
+      subtitle: `${edi?.nombre || edificioId} · ${meses[mes - 1]} ${anio}`,
+      columns: [
+        { key: 'maquina',  label: 'Máquina',          width: 32 },
+        { key: 'usos',     label: 'Usos',             width: 12, align: 'right', numFmt: '#,##0' },
+        { key: 'minutos',  label: 'Minutos totales',  width: 18, align: 'right', numFmt: '#,##0' },
+        { key: 'promedio', label: 'Promedio min/uso', width: 20, align: 'right', numFmt: '#,##0' },
+      ],
+      rows,
+      totals: {
+        maquina: 'TOTAL',
+        usos: totalUsos,
+        minutos: totalMinutos,
+        promedio: totalUsos > 0 ? Math.round(totalMinutos / totalUsos) : 0,
+      },
+    });
   }
 
   const handleLogout = () => {

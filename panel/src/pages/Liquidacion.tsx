@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import { obtenerResumen, listarMaquinas, listarEdificios, listarUsos, ResumenItem, Maquina, Edificio, Uso, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 import NumericInput from '../components/NumericInput';
@@ -303,50 +303,124 @@ export default function Liquidacion() {
 
   function exportarExcel() {
     const edi = edificios.find((e) => e.edificio_id === edificioId);
-    const rows = [
-      ['Liquidación CleanCare'],
-      ['Edificio', edi?.nombre || edificioId],
-      ['Periodo', `${meses[mes - 1]} ${anio}`],
-      [],
-      ['Consumo'],
-      ['Lavados', calculo.usosLav, 'usos'],
-      ['Secados', calculo.usosSec, 'usos'],
-      [],
-      ['Agua OSE'],
-      ['Litros por lavado', tarifas.litros_lavado],
-      ['Total litros', Math.round(calculo.litrosTotal)],
-      ['Total m³', calculo.m3Total.toFixed(3)],
-      ['Precio agua $/m³', tarifas.precio_agua_m3],
-      ['Precio saneamiento $/m³', tarifas.precio_saneamiento_m3],
-      ['Costo agua', `$ ${calculo.costoAgua.toFixed(2)}`],
-      ['Costo saneamiento', `$ ${calculo.costoSaneamiento.toFixed(2)}`],
-      [],
-      ['Electricidad UTE'],
-      ['kWh por lavado', tarifas.kwh_lavado],
-      ['kWh por secado', tarifas.kwh_secado],
-      ['Total kWh', calculo.kwhTotal.toFixed(2)],
-      ['Precio kWh (sin IVA)', tarifas.precio_kwh],
-      ['Subtotal electricidad (sin IVA)', `$ ${calculo.costoElectricidadSinIva.toFixed(2)}`],
-      [`IVA ${tarifas.iva_porcentaje}%`, `$ ${calculo.ivaElectricidad.toFixed(2)}`],
-      ['Costo electricidad (con IVA)', `$ ${calculo.costoElectricidad.toFixed(2)}`],
-      [],
-      ['Otros'],
-      [tarifas.otros_gastos_desc, `$ ${calculo.costoOtros.toFixed(2)}`],
-      [],
-      ['TOTAL GASTOS', `$ ${calculo.totalGasto.toFixed(2)}`],
-      [],
-      ['Ingresos por fichas'],
-      ['Fichas lavado', calculo.usosLav, `$ ${tarifas.valor_ficha_lavado}`, `$ ${calculo.ingresoLavado.toFixed(2)}`],
-      ['Fichas secado', calculo.usosSec, `$ ${tarifas.valor_ficha_secado}`, `$ ${calculo.ingresoSecado.toFixed(2)}`],
-      ['TOTAL INGRESOS', `$ ${calculo.ingresoTotal.toFixed(2)}`],
-      [],
-      ['UTILIDAD', `$ ${calculo.utilidad.toFixed(2)}`],
-      [],
-      ['Fuentes oficiales'],
-      ['UTE', 'Pliego Tarifario 01/01/2026 — Residencial Simple $8,452/kWh + IVA 22%'],
-      ['OSE', 'Decreto 340/025 01/01/2026 — bloque 10-15 m³ $36,91/m³ + saneamiento 100%'],
+
+    const BRAND = { primary: '3B82F6', primaryDk: '1D4ED8', soft: 'EFF6FF', zebra: 'F8FAFC', border: 'E5E7EB', text: '0F172A', textSoft: '475569' };
+    const borderAll = {
+      top: { style: 'thin', color: { rgb: BRAND.border } },
+      left: { style: 'thin', color: { rgb: BRAND.border } },
+      right: { style: 'thin', color: { rgb: BRAND.border } },
+      bottom: { style: 'thin', color: { rgb: BRAND.border } },
+    };
+    const S = {
+      title:   { font: { sz: 18, bold: true, color: { rgb: BRAND.primaryDk } } },
+      subtitle:{ font: { sz: 11, color: { rgb: BRAND.textSoft } } },
+      section: {
+        font: { sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { patternType: 'solid', fgColor: { rgb: BRAND.primary } },
+        alignment: { vertical: 'center' },
+      },
+      kvKey:   { font: { sz: 10, color: { rgb: BRAND.textSoft } }, border: borderAll },
+      kvVal:   { font: { sz: 10, bold: true, color: { rgb: BRAND.text } }, alignment: { horizontal: 'right' }, border: borderAll },
+      zebra:   { font: { sz: 10, color: { rgb: BRAND.text } }, fill: { patternType: 'solid', fgColor: { rgb: BRAND.zebra } }, border: borderAll },
+      totalK:  { font: { sz: 11, bold: true, color: { rgb: BRAND.primaryDk } }, fill: { patternType: 'solid', fgColor: { rgb: BRAND.soft } }, border: borderAll },
+      totalV:  { font: { sz: 12, bold: true, color: { rgb: BRAND.primaryDk } }, fill: { patternType: 'solid', fgColor: { rgb: BRAND.soft } }, alignment: { horizontal: 'right' }, border: borderAll },
+      note:    { font: { sz: 9, italic: true, color: { rgb: BRAND.textSoft } } },
+    };
+
+    const ws: any = {};
+    const enc = (r: number, c: number) => XLSX.utils.encode_cell({ r, c });
+    let row = 0;
+
+    // Título
+    ws[enc(row, 0)] = { v: 'Liquidación CleanCare', s: S.title };
+    row++;
+    ws[enc(row, 0)] = { v: `${edi?.nombre || edificioId} · ${meses[mes - 1]} ${anio}`, s: S.subtitle };
+    row++;
+    ws[enc(row, 0)] = { v: `Generado: ${new Date().toLocaleString('es-UY')}`, s: S.note };
+    row += 2;
+
+    const section = (label: string) => {
+      ws[enc(row, 0)] = { v: label, s: S.section };
+      ws[enc(row, 1)] = { v: '', s: S.section };
+      ws[enc(row, 2)] = { v: '', s: S.section };
+      ws[enc(row, 3)] = { v: '', s: S.section };
+      row++;
+    };
+    const kv = (k: string, v: any) => {
+      ws[enc(row, 0)] = { v: k, s: S.kvKey };
+      ws[enc(row, 1)] = { v, t: typeof v === 'number' ? 'n' : 's', s: S.kvVal };
+      row++;
+    };
+    const kvMoney = (k: string, v: number) => {
+      ws[enc(row, 0)] = { v: k, s: S.kvKey };
+      ws[enc(row, 1)] = { v, t: 'n', s: { ...S.kvVal, numFmt: '"$" #,##0.00' } };
+      row++;
+    };
+    const total = (k: string, v: number) => {
+      ws[enc(row, 0)] = { v: k, s: S.totalK };
+      ws[enc(row, 1)] = { v, t: 'n', s: { ...S.totalV, numFmt: '"$" #,##0.00' } };
+      row++;
+    };
+    const blank = () => { row++; };
+
+    section('Consumo');
+    kv('Lavados (usos)', calculo.usosLav);
+    kv('Secados (usos)', calculo.usosSec);
+    blank();
+
+    section('Agua OSE');
+    kv('Litros por lavado', tarifas.litros_lavado);
+    kv('Total litros', Math.round(calculo.litrosTotal));
+    kv('Total m³', Number(calculo.m3Total.toFixed(3)));
+    kv('Precio agua $/m³', tarifas.precio_agua_m3);
+    kv('Precio saneamiento $/m³', tarifas.precio_saneamiento_m3);
+    kvMoney('Costo agua', calculo.costoAgua);
+    kvMoney('Costo saneamiento', calculo.costoSaneamiento);
+    blank();
+
+    section('Electricidad UTE');
+    kv('kWh por lavado', tarifas.kwh_lavado);
+    kv('kWh por secado', tarifas.kwh_secado);
+    kv('Total kWh', Number(calculo.kwhTotal.toFixed(2)));
+    kv('Precio kWh (sin IVA)', tarifas.precio_kwh);
+    kvMoney('Subtotal electricidad (sin IVA)', calculo.costoElectricidadSinIva);
+    kvMoney(`IVA ${tarifas.iva_porcentaje}%`, calculo.ivaElectricidad);
+    kvMoney('Costo electricidad (con IVA)', calculo.costoElectricidad);
+    blank();
+
+    section('Otros gastos');
+    kvMoney(tarifas.otros_gastos_desc || 'Otros', calculo.costoOtros);
+    blank();
+
+    total('TOTAL GASTOS', calculo.totalGasto);
+    blank();
+
+    section('Ingresos por fichas');
+    kvMoney(`Fichas lavado (${calculo.usosLav} × $${tarifas.valor_ficha_lavado})`, calculo.ingresoLavado);
+    kvMoney(`Fichas secado (${calculo.usosSec} × $${tarifas.valor_ficha_secado})`, calculo.ingresoSecado);
+    total('TOTAL INGRESOS', calculo.ingresoTotal);
+    blank();
+
+    total('UTILIDAD', calculo.utilidad);
+    blank();
+
+    section('Fuentes oficiales');
+    ws[enc(row, 0)] = { v: 'UTE', s: S.kvKey };
+    ws[enc(row, 1)] = { v: 'Pliego 01/01/2026 — Residencial Simple $8,452/kWh + IVA 22%', s: S.kvVal };
+    row++;
+    ws[enc(row, 0)] = { v: 'OSE', s: S.kvKey };
+    ws[enc(row, 1)] = { v: 'Decreto 340/025 01/01/2026 — bloque 10-15 m³ $36,91/m³ + saneamiento 100%', s: S.kvVal };
+    row++;
+
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 3 } },
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 38 }, { wch: 22 }, { wch: 18 }, { wch: 18 }];
+    ws['!rows'] = [{ hpt: 26 }, { hpt: 18 }, { hpt: 14 }];
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: 3 } });
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Liquidación');
     XLSX.writeFile(wb, `liquidacion_${edificioId}_${meses[mes - 1]}_${anio}.xlsx`);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import { exportExcelTable } from '../utils/excel';
 import {
   obtenerConfigEdificio, actualizarConfigEdificio,
   listarUsuariosEdificio, agregarCreditos, agregarCreditosMasivo,
@@ -194,20 +194,40 @@ export default function Creditos() {
 
   function exportarExcel() {
     if (resumen.length === 0) return;
-    const data = resumen.map(r => ({
-      'Usuario': r.nombre,
-      'Apartamento': r.apartamento,
-      'Créditos usados': r.creditos_usados,
-      'Créditos asignados': r.creditos_asignados,
-      'Devoluciones': r.devoluciones,
-      'Saldo actual': r.saldo_actual,
-    }));
-    data.push({ 'Usuario': 'TOTAL', 'Apartamento': '', 'Créditos usados': totalConsumo, 'Créditos asignados': 0, 'Devoluciones': 0, 'Saldo actual': 0 });
+    const totalAsignados   = resumen.reduce((s, r) => s + r.creditos_asignados, 0);
+    const totalDevoluciones = resumen.reduce((s, r) => s + r.devoluciones, 0);
+    const totalSaldo       = resumen.reduce((s, r) => s + r.saldo_actual, 0);
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Créditos');
-    XLSX.writeFile(wb, `creditos_${meses[mes - 1]}_${anio}.xlsx`);
+    exportExcelTable({
+      filename: `creditos_${edificioId}_${meses[mes - 1]}_${anio}.xlsx`,
+      sheetName: 'Créditos',
+      title: 'Resumen de consumo de créditos',
+      subtitle: `Edificio ${edificioId} · ${meses[mes - 1]} ${anio}`,
+      columns: [
+        { key: 'nombre',      label: 'Usuario',           width: 28 },
+        { key: 'apartamento', label: 'Apartamento',       width: 14, align: 'center' },
+        { key: 'usados',      label: 'Créditos usados',   width: 16, align: 'right', numFmt: '#,##0' },
+        { key: 'asignados',   label: 'Créditos asignados', width: 18, align: 'right', numFmt: '#,##0' },
+        { key: 'devoluciones', label: 'Devoluciones',     width: 14, align: 'right', numFmt: '#,##0' },
+        { key: 'saldo',       label: 'Saldo actual',      width: 14, align: 'right', numFmt: '#,##0' },
+      ],
+      rows: resumen.map((r) => ({
+        nombre: r.nombre,
+        apartamento: r.apartamento,
+        usados: r.creditos_usados,
+        asignados: r.creditos_asignados,
+        devoluciones: r.devoluciones,
+        saldo: r.saldo_actual,
+      })),
+      totals: {
+        nombre: 'TOTAL',
+        apartamento: '',
+        usados: totalConsumo,
+        asignados: totalAsignados,
+        devoluciones: totalDevoluciones,
+        saldo: totalSaldo,
+      },
+    });
   }
 
   const handleLogout = () => {
