@@ -17,7 +17,7 @@ export default function Login() {
 
     try {
       const { token, usuario } = await login(email, password);
-      if (usuario.rol !== 'admin') {
+      if (!['admin', 'admin_edificio'].includes(usuario.rol)) {
         setError('Acceso solo para administradores');
         return;
       }

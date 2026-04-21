@@ -13,7 +13,7 @@ const usuarioSchema = new mongoose.Schema({
   nombre:      { type: String, required: true },
   telefono:    { type: String, trim: true },
   apartamento: { type: String, trim: true },
-  rol:         { type: String, enum: ['admin', 'residente'], default: 'residente' },
+  rol:         { type: String, enum: ['admin', 'admin_edificio', 'residente'], default: 'residente' },
   edificio_id: { type: String, required: true },
   unidad:      { type: String },
   foto:        { type: String },

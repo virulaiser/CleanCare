@@ -49,15 +49,18 @@ async function handler(req, res) {
       return res.json({ ok: true, saldo, transacciones });
     }
 
-    // GET /api/billetera?usuarioId=X — saldo del apto de un usuario (admin)
+    // GET /api/billetera?usuarioId=X — saldo del apto de un usuario (admin / admin_edificio)
     if (req.method === 'GET' && req.query.usuarioId) {
-      if (req.usuario.rol !== 'admin') return res.status(403).json({ ok: false, error: 'Solo admin' });
+      if (!['admin', 'admin_edificio'].includes(req.usuario.rol)) return res.status(403).json({ ok: false, error: 'Solo admin' });
 
       const usuario_id = req.query.usuarioId;
       const limite = parseInt(req.query.limite) || 20;
 
       const u = await Usuario.findOne({ usuario_id }).lean();
       if (!u) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+      if (req.usuario.rol === 'admin_edificio' && u.edificio_id !== req.usuario.edificio_id) {
+        return res.status(403).json({ ok: false, error: 'El usuario no pertenece a tu edificio' });
+      }
 
       const [saldo, transacciones] = await Promise.all([
         obtenerSaldoApto(u.edificio_id, u.apartamento),
@@ -67,15 +70,20 @@ async function handler(req, res) {
       return res.json({ ok: true, saldo, transacciones });
     }
 
-    // POST /api/billetera/creditos — agregar créditos a un usuario (admin)
+    // POST /api/billetera/creditos — agregar créditos a un usuario (admin o admin_edificio)
     if (req.method === 'POST' && req.path === '/api/billetera/creditos') {
-      if (req.usuario.rol !== 'admin') return res.status(403).json({ ok: false, error: 'Solo admin' });
+      if (!['admin', 'admin_edificio'].includes(req.usuario.rol)) return res.status(403).json({ ok: false, error: 'Solo admin' });
 
       const { usuario_id, cantidad, descripcion } = req.body;
       if (!usuario_id || !cantidad) return res.status(400).json({ ok: false, error: 'usuario_id y cantidad son requeridos' });
 
       const usuario = await Usuario.findOne({ usuario_id, activo: true });
       if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+
+      // admin_edificio solo puede acreditar a usuarios de su propio edificio
+      if (req.usuario.rol === 'admin_edificio' && usuario.edificio_id !== req.usuario.edificio_id) {
+        return res.status(403).json({ ok: false, error: 'El usuario no pertenece a tu edificio' });
+      }
 
       const transaccion = await Transaccion.create({
         usuario_id,
@@ -152,12 +160,15 @@ async function handler(req, res) {
       return res.json({ ok: true });
     }
 
-    // POST /api/billetera/creditos-masivo — admin agrega créditos a todos los titulares de un edificio
+    // POST /api/billetera/creditos-masivo — admin / admin_edificio agrega créditos a todos los titulares de un edificio
     if (req.method === 'POST' && req.path === '/api/billetera/creditos-masivo') {
-      if (req.usuario.rol !== 'admin') return res.status(403).json({ ok: false, error: 'Solo admin' });
+      if (!['admin', 'admin_edificio'].includes(req.usuario.rol)) return res.status(403).json({ ok: false, error: 'Solo admin' });
 
       const { edificio_id, cantidad, descripcion } = req.body;
       if (!edificio_id || !cantidad) return res.status(400).json({ ok: false, error: 'edificio_id y cantidad son requeridos' });
+      if (req.usuario.rol === 'admin_edificio' && edificio_id !== req.usuario.edificio_id) {
+        return res.status(403).json({ ok: false, error: 'No podés operar sobre otro edificio' });
+      }
 
       // 1 crédito por apto, acreditado al titular aprobado
       const titulares = await Usuario.find({

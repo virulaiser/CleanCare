@@ -8,11 +8,21 @@ module.exports = async (req, res) => {
   try {
     await connectDB();
 
+    const esSuperAdmin = req.usuario?.rol === 'admin';
+    const esAdminEdificio = req.usuario?.rol === 'admin_edificio';
+
     // GET — listar usuarios
     if (req.method === 'GET') {
-      const { edificioId } = req.query;
+      const { edificioId, rol: rolQuery } = req.query;
 
-      const filter = { activo: true, rol: 'residente' };
+      const filter = { activo: true };
+      // Por default listamos residentes; el super-admin puede pedir otro rol explicitamente
+      if (rolQuery && esSuperAdmin) {
+        filter.rol = rolQuery;
+      } else {
+        // admin_edificio NUNCA ve super-admins ni a otros admin_edificio
+        filter.rol = 'residente';
+      }
       if (edificioId) filter.edificio_id = edificioId;
 
       const usuarios = await Usuario.find(filter)
@@ -46,10 +56,22 @@ module.exports = async (req, res) => {
 
     // POST — crear usuario manualmente (admin)
     if (req.method === 'POST') {
-      const { nombre, email, password, telefono, apartamento, edificio_id, unidad, foto } = req.body;
+      const { nombre, email, password, telefono, apartamento, edificio_id, unidad, foto, rol: rolBody } = req.body;
 
       if (!nombre || !email || !password || !edificio_id) {
         return res.status(400).json({ ok: false, error: 'Faltan campos obligatorios (nombre, email, password, edificio_id)' });
+      }
+
+      // Solo el super-admin puede crear otros admins (admin o admin_edificio)
+      let rolNuevo = 'residente';
+      if (rolBody && rolBody !== 'residente') {
+        if (!esSuperAdmin) {
+          return res.status(403).json({ ok: false, error: 'Solo el super-admin puede crear otros administradores' });
+        }
+        if (!['admin', 'admin_edificio'].includes(rolBody)) {
+          return res.status(400).json({ ok: false, error: 'Rol inválido' });
+        }
+        rolNuevo = rolBody;
       }
 
       if (password.length < 6) {
@@ -75,7 +97,10 @@ module.exports = async (req, res) => {
         edificio_id,
         unidad: unidad || undefined,
         foto: foto || undefined,
-        rol: 'residente',
+        rol: rolNuevo,
+        // Admins del edificio no tienen flujo titular/miembro; quedan aprobados para que
+        // puedan operar endpoints sin gate.
+        estado_aprobacion: rolNuevo === 'residente' ? 'aprobado' : 'aprobado',
       });
 
       await usuario.save();
@@ -101,18 +126,32 @@ module.exports = async (req, res) => {
         return res.status(400).json({ ok: false, error: 'Falta usuarioId' });
       }
 
-      const { nombre, email, telefono, apartamento, edificio_id, unidad, password, foto, rol_apto, estado_aprobacion } = req.body;
+      const { nombre, email, telefono, apartamento, edificio_id, unidad, password, foto, rol_apto, estado_aprobacion, rol: rolBody } = req.body;
       const usuario = await Usuario.findOne({ usuario_id: usuarioId, activo: true });
       if (!usuario) {
         return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
       }
 
+      // admin_edificio: no puede editar super-admins ni a usuarios de otros edificios
+      if (esAdminEdificio) {
+        if (usuario.rol === 'admin') {
+          return res.status(403).json({ ok: false, error: 'No podés editar super-admins' });
+        }
+        if (usuario.edificio_id !== req.usuario.edificio_id) {
+          return res.status(403).json({ ok: false, error: 'El usuario no pertenece a tu edificio' });
+        }
+      }
+
       if (nombre) usuario.nombre = nombre;
       if (telefono !== undefined) usuario.telefono = telefono;
       if (apartamento !== undefined) usuario.apartamento = apartamento;
-      if (edificio_id) usuario.edificio_id = edificio_id;
+      if (edificio_id && esSuperAdmin) usuario.edificio_id = edificio_id;
       if (unidad !== undefined) usuario.unidad = unidad;
       if (foto !== undefined) usuario.foto = foto;
+      // Cambio de rol solo por super-admin
+      if (rolBody && esSuperAdmin && ['admin', 'admin_edificio', 'residente'].includes(rolBody)) {
+        usuario.rol = rolBody;
+      }
 
       if (rol_apto && ['titular', 'miembro'].includes(rol_apto)) {
         // Si lo hacen titular, destronamos al titular anterior del mismo apto
@@ -173,6 +212,16 @@ module.exports = async (req, res) => {
       const usuario = await Usuario.findOne({ usuario_id: usuarioId });
       if (!usuario) {
         return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+      }
+
+      // admin_edificio: no puede borrar super-admins ni a usuarios de otro edificio
+      if (esAdminEdificio) {
+        if (usuario.rol === 'admin') {
+          return res.status(403).json({ ok: false, error: 'No podés eliminar super-admins' });
+        }
+        if (usuario.edificio_id !== req.usuario.edificio_id) {
+          return res.status(403).json({ ok: false, error: 'El usuario no pertenece a tu edificio' });
+        }
       }
 
       usuario.activo = false;

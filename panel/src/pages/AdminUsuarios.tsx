@@ -128,7 +128,11 @@ export default function AdminUsuarios() {
   const [formEdificio, setFormEdificio] = useState('');
   const [formUnidad, setFormUnidad] = useState('');
   const [formFoto, setFormFoto] = useState('');
+  const [formRol, setFormRol] = useState<'residente' | 'admin_edificio'>('residente');
   const [creando, setCreando] = useState(false);
+
+  const meLogged = (() => { try { return JSON.parse(localStorage.getItem('cleancare_usuario') || 'null'); } catch { return null; } })();
+  const soySuperAdmin = meLogged?.rol === 'admin';
 
   // Modal apto (lista de usuarios del mismo apartamento+edificio)
   const [aptoModal, setAptoModal] = useState<{ apartamento: string; edificio_id: string; usuarios: UsuarioRow[] } | null>(null);
@@ -192,6 +196,7 @@ export default function AdminUsuarios() {
         telefono: formTelefono || undefined, apartamento: formApto || undefined,
         edificio_id: formEdificio, unidad: formUnidad || undefined,
         foto: formFoto || undefined,
+        rol: soySuperAdmin ? formRol : undefined,
       });
       setShowCrear(false);
       setFormNombre(''); setFormEmail(''); setFormPassword('');
@@ -684,6 +689,19 @@ export default function AdminUsuarios() {
                 <label style={styles.label}>Unidad (opcional)</label>
                 <input style={styles.input} value={formUnidad} onChange={(e) => setFormUnidad(e.target.value)} placeholder="Ej: apto-302" />
               </div>
+              {soySuperAdmin && (
+                <div style={styles.formRow}>
+                  <label style={styles.label}>Rol</label>
+                  <select
+                    style={styles.input}
+                    value={formRol}
+                    onChange={(e) => setFormRol(e.target.value as 'residente' | 'admin_edificio')}
+                  >
+                    <option value="residente">Residente</option>
+                    <option value="admin_edificio">Admin del edificio (recibe factura)</option>
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
                 <button type="button" onClick={() => setShowCrear(false)} style={styles.btnCancel}>Cancelar</button>
                 <button type="submit" disabled={creando} style={{ ...styles.btnPrimary, opacity: creando ? 0.5 : 1 }}>

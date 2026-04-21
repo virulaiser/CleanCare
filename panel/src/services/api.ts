@@ -231,6 +231,7 @@ export async function listarUsuariosEdificio(edificioId?: string): Promise<{
 export async function crearUsuarioAdmin(campos: {
   nombre: string; email: string; password: string;
   telefono?: string; apartamento?: string; edificio_id: string; unidad?: string; foto?: string;
+  rol?: 'residente' | 'admin_edificio' | 'admin';
 }): Promise<{ usuario_id: string; nombre: string; email: string }> {
   const { data } = await api.post('/api/usuarios', campos);
   return data.usuario;

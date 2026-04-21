@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { verificarToken, soloAdmin } = require('../lib/auth');
+const { verificarToken, soloAdmin, soloAdminOEdificio } = require('../lib/auth');
 
 const authHandler = require('./auth');
 const usoHandler = require('./uso');
@@ -43,33 +43,43 @@ app.get('/api/maquinas', verificarToken, maquinasHandler);
 app.get('/api/billetera', verificarToken, billeteraHandler);
 app.post('/api/billetera/comprar', verificarToken, billeteraHandler);
 app.patch('/api/billetera/pin', verificarToken, billeteraHandler);
-app.post('/api/billetera/creditos', verificarToken, soloAdmin, billeteraHandler);
-app.post('/api/billetera/creditos-masivo', verificarToken, soloAdmin, billeteraHandler);
+// Acciones de admin sobre saldos (super-admin o admin_edificio dentro de su propio edificio)
+app.post('/api/billetera/creditos', verificarToken, soloAdminOEdificio, billeteraHandler);
+app.post('/api/billetera/creditos-masivo', verificarToken, soloAdminOEdificio, billeteraHandler);
 
-// Rutas solo admin
-app.get('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
-app.post('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
-app.patch('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
-app.delete('/api/usuarios', verificarToken, soloAdmin, usuariosHandler);
-app.get('/api/resumen', verificarToken, soloAdmin, resumenHandler);
-app.get('/api/resumen-creditos', verificarToken, soloAdmin, resumenCreditosHandler);
-app.get('/api/resumen-apartamento', verificarToken, soloAdmin, resumenApartamentoHandler);
-// GET abierto a cualquier usuario autenticado (residentes necesitan duraciones para activar ciclos)
+// Admin gestiona residentes del edificio (admin_edificio queda filtrado a su edificio)
+app.get('/api/usuarios', verificarToken, soloAdminOEdificio, usuariosHandler);
+app.post('/api/usuarios', verificarToken, soloAdminOEdificio, usuariosHandler);
+app.patch('/api/usuarios', verificarToken, soloAdminOEdificio, usuariosHandler);
+app.delete('/api/usuarios', verificarToken, soloAdminOEdificio, usuariosHandler);
+
+// Reportes del edificio (admin_edificio solo ve los suyos, ya filtrado por middleware)
+app.get('/api/resumen', verificarToken, soloAdminOEdificio, resumenHandler);
+app.get('/api/resumen-creditos', verificarToken, soloAdminOEdificio, resumenCreditosHandler);
+app.get('/api/resumen-apartamento', verificarToken, soloAdminOEdificio, resumenApartamentoHandler);
+
+// Config del edificio
 app.get('/api/config-edificio', verificarToken, configEdificioHandler);
-app.put('/api/config-edificio', verificarToken, soloAdmin, configEdificioHandler);
-app.post('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
-app.delete('/api/maquinas', verificarToken, soloAdmin, maquinasHandler);
+app.put('/api/config-edificio', verificarToken, soloAdminOEdificio, configEdificioHandler);
+
+// Máquinas del edificio
+app.post('/api/maquinas', verificarToken, soloAdminOEdificio, maquinasHandler);
+app.delete('/api/maquinas', verificarToken, soloAdminOEdificio, maquinasHandler);
+
+// Recursos globales — solo super-admin
 app.post('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
 app.delete('/api/edificios', verificarToken, soloAdmin, edificiosHandler);
-app.post('/api/unidades', verificarToken, soloAdmin, unidadesHandler);
-app.patch('/api/unidades', verificarToken, soloAdmin, unidadesHandler);
-app.delete('/api/unidades', verificarToken, soloAdmin, unidadesHandler);
+app.post('/api/unidades', verificarToken, soloAdminOEdificio, unidadesHandler);
+app.patch('/api/unidades', verificarToken, soloAdminOEdificio, unidadesHandler);
+app.delete('/api/unidades', verificarToken, soloAdminOEdificio, unidadesHandler);
 app.post('/api/tips', verificarToken, soloAdmin, tipsHandler);
 app.delete('/api/tips', verificarToken, soloAdmin, tipsHandler);
-app.get('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
-app.post('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
-app.patch('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
-app.delete('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
+
+// Dispositivos (máquinas BLE) — admin_edificio puede ver los suyos
+app.get('/api/dispositivos', verificarToken, soloAdminOEdificio, dispositivosHandler);
+app.post('/api/dispositivos', verificarToken, soloAdminOEdificio, dispositivosHandler);
+app.patch('/api/dispositivos', verificarToken, soloAdminOEdificio, dispositivosHandler);
+app.delete('/api/dispositivos', verificarToken, soloAdminOEdificio, dispositivosHandler);
 
 // Rutas apartamento (titular/miembros)
 app.get('/api/apartamento/miembros', verificarToken, apartamentoHandler);
