@@ -37,16 +37,20 @@ async function handler(req, res) {
           if (config[k] == null) config[k] = DEFAULTS[k];
         }
         // Auto-corrección: si costo_lavado / costo_secado vienen con decimal
-        // (típico mistake: se cargó el valor en pesos), redondear y persistir.
+        // es casi seguro un mistake (el admin cargó pesos en vez de fichas).
+        // En ese caso NO redondeamos al valor grande — forzamos a 1 (default sano).
+        // Solo si es entero válido >=1 lo dejamos como está.
         const patch = {};
-        const clCorr = Math.max(1, Math.round(Number(config.costo_lavado)));
-        const csCorr = Math.max(1, Math.round(Number(config.costo_secado)));
+        const cl = Number(config.costo_lavado);
+        const cs = Number(config.costo_secado);
+        const clCorr = Number.isInteger(cl) && cl >= 1 ? cl : 1;
+        const csCorr = Number.isInteger(cs) && cs >= 1 ? cs : 1;
         if (clCorr !== config.costo_lavado) patch.costo_lavado = clCorr;
         if (csCorr !== config.costo_secado) patch.costo_secado = csCorr;
         if (Object.keys(patch).length > 0) {
           await ConfigEdificio.updateOne({ edificio_id }, { $set: patch });
           Object.assign(config, patch);
-          console.log(`[config] corregido costo_lavado/secado en ${edificio_id}:`, patch);
+          console.log(`[config] corregido costo_lavado/secado en ${edificio_id} (forzado a 1 por detectar decimal/inválido):`, patch);
         }
       }
 
