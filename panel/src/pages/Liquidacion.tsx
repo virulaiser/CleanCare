@@ -204,14 +204,7 @@ export default function Liquidacion() {
           </tr>
         `).join('');
 
-    // Sin dimensiones → abre como pestaña, no como popup (no dispara bloqueador)
-    const w = window.open('about:blank', '_blank');
-    if (!w) {
-      alert('El navegador bloqueó la ventana nueva. Desbloqueá pop-ups para panel-three-blush.vercel.app y reintentá.');
-      return;
-    }
-    w.document.open();
-    w.document.write(`
+    const html = `
       <!DOCTYPE html><html><head><title>Liquidación ${edificioNombre} — ${periodo}</title>
       <style>
         * { box-sizing: border-box; }
@@ -301,10 +294,42 @@ export default function Liquidacion() {
           UTE — Pliego Tarifario vigente desde 01/01/2026. Tarifa Residencial Simple: $8,452/kWh (tramo 101–600 kWh/mes). IVA 22% sobre energía eléctrica.<br/>
           OSE — Decreto Tarifario 340/025 vigente desde 01/01/2026. Cargo variable bloque 10–15 m³: $36,91/m³. Saneamiento = 100% del cargo variable de agua.
         </div>
-        <script>setTimeout(function(){window.print();}, 400);</script>
       </body></html>
-    `);
-    w.document.close();
+    `;
+
+    // Usamos un iframe oculto: el print dispara sin popup-blocker y sin nueva pestaña.
+    let iframe: HTMLIFrameElement | null = document.getElementById('liquidacion-print-frame') as HTMLIFrameElement | null;
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'liquidacion-print-frame';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+    }
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) { alert('No se pudo preparar el documento para imprimir.'); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    // Esperar a que el iframe termine de renderizar antes de imprimir
+    const tryPrint = () => {
+      try {
+        iframe!.contentWindow?.focus();
+        iframe!.contentWindow?.print();
+      } catch (err) {
+        console.error('[liquidacion] print:', err);
+        alert('No se pudo abrir el diálogo de impresión. Probá de nuevo o revisá permisos del navegador.');
+      }
+    };
+    if (iframe.contentWindow && doc.readyState === 'complete') {
+      setTimeout(tryPrint, 300);
+    } else {
+      iframe.onload = () => setTimeout(tryPrint, 300);
+    }
   }
 
   function exportarExcel() {
