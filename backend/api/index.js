@@ -22,6 +22,7 @@ const facturacionHandler = require('./facturacion');
 const cronFacturacionHandler = require('./cron-facturacion');
 const cambioInquilinoHandler = require('./cambio-inquilino');
 const notificacionesHandler = require('./notificaciones');
+const adminFixFichasHandler = require('./admin-fix-fichas');
 
 const app = express();
 app.use(cors());
@@ -104,6 +105,9 @@ app.post('/api/notificaciones/enviar', verificarToken, notificacionesHandler);
 app.get('/api/facturacion', verificarToken, facturacionHandler);
 app.get('/api/facturacion/aptos/mios', verificarToken, facturacionHandler);
 app.post('/api/facturacion/generar', verificarToken, facturacionHandler);
+
+// Admin — one-shot fixes (solo super-admin)
+app.post('/api/admin/fix-fichas-decimales', verificarToken, soloAdmin, adminFixFichasHandler);
 
 // Cron (protegido por CRON_SECRET, no por JWT)
 app.get('/api/cron/asignacion-mensual', cronAsignacionHandler);

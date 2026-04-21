@@ -75,7 +75,8 @@ async function handler(req, res) {
       if (!['admin', 'admin_edificio'].includes(req.usuario.rol)) return res.status(403).json({ ok: false, error: 'Solo admin' });
 
       const { usuario_id, cantidad, descripcion } = req.body;
-      if (!usuario_id || !cantidad) return res.status(400).json({ ok: false, error: 'usuario_id y cantidad son requeridos' });
+      const cantidadInt = Math.trunc(Number(cantidad));
+      if (!usuario_id || !cantidadInt) return res.status(400).json({ ok: false, error: 'usuario_id y cantidad (entero, distinto de 0) son requeridos' });
 
       const usuario = await Usuario.findOne({ usuario_id, activo: true });
       if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
@@ -90,7 +91,7 @@ async function handler(req, res) {
         edificio_id: usuario.edificio_id,
         apartamento: usuario.apartamento,
         tipo: 'ajuste_admin',
-        cantidad: Number(cantidad),
+        cantidad: cantidadInt,
         descripcion: descripcion || `Ajuste manual por admin`,
         creado_por: req.usuario.usuario_id
       });
@@ -165,7 +166,8 @@ async function handler(req, res) {
       if (!['admin', 'admin_edificio'].includes(req.usuario.rol)) return res.status(403).json({ ok: false, error: 'Solo admin' });
 
       const { edificio_id, cantidad, descripcion } = req.body;
-      if (!edificio_id || !cantidad) return res.status(400).json({ ok: false, error: 'edificio_id y cantidad son requeridos' });
+      const cantidadInt = Math.trunc(Number(cantidad));
+      if (!edificio_id || !cantidadInt) return res.status(400).json({ ok: false, error: 'edificio_id y cantidad (entero, distinto de 0) son requeridos' });
       if (req.usuario.rol === 'admin_edificio' && edificio_id !== req.usuario.edificio_id) {
         return res.status(403).json({ ok: false, error: 'No podés operar sobre otro edificio' });
       }
@@ -182,13 +184,13 @@ async function handler(req, res) {
         edificio_id,
         apartamento: u.apartamento,
         tipo: 'ajuste_admin',
-        cantidad: Number(cantidad),
+        cantidad: cantidadInt,
         descripcion: descripcion || `Créditos masivos por admin`,
         creado_por: req.usuario.usuario_id
       }));
 
       await Transaccion.insertMany(transacciones);
-      return res.json({ ok: true, total_aptos: titulares.length, cantidad_por_apto: Number(cantidad) });
+      return res.json({ ok: true, total_aptos: titulares.length, cantidad_por_apto: cantidadInt });
     }
 
     return res.status(405).json({ ok: false, error: 'Método no permitido' });

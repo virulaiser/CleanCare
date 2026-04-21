@@ -18,6 +18,11 @@ transaccionSchema.pre('validate', function () {
   if (!this.transaccion_id) {
     this.transaccion_id = 'TXN-' + crypto.randomBytes(3).toString('hex').toUpperCase();
   }
+  // Regla: las fichas siempre son enteras. Redondear defensivamente
+  // cualquier cantidad que llegue con decimales (bug del costo_lavado en pesos).
+  if (typeof this.cantidad === 'number' && !Number.isInteger(this.cantidad)) {
+    this.cantidad = Math.trunc(this.cantidad) || (this.cantidad > 0 ? 1 : -1);
+  }
 });
 
 transaccionSchema.index({ usuario_id: 1, fecha: -1 });
