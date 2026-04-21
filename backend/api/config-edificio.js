@@ -9,7 +9,9 @@ async function handler(req, res) {
 
       let config = await ConfigEdificio.findOne({ edificio_id }).lean();
       if (!config) {
-        config = { edificio_id, creditos_mensuales: 10, costo_lavado: 1, costo_secado: 1, duracion_lavado: 45, duracion_secado: 30, activo: true };
+        config = { edificio_id, creditos_mensuales: 10, costo_lavado: 1, costo_secado: 1, duracion_lavado: 45, duracion_secado: 30, max_compra_fichas: 10, activo: true };
+      } else if (config.max_compra_fichas == null) {
+        config.max_compra_fichas = 10;
       }
 
       return res.json({ ok: true, config });
@@ -17,7 +19,7 @@ async function handler(req, res) {
 
     // PUT /api/config-edificio
     if (req.method === 'PUT') {
-      const { edificio_id, creditos_mensuales, costo_lavado, costo_secado, duracion_lavado, duracion_secado } = req.body;
+      const { edificio_id, creditos_mensuales, costo_lavado, costo_secado, duracion_lavado, duracion_secado, max_compra_fichas } = req.body;
       if (!edificio_id) return res.status(400).json({ ok: false, error: 'edificio_id requerido' });
 
       const config = await ConfigEdificio.findOneAndUpdate(
@@ -29,6 +31,7 @@ async function handler(req, res) {
           costo_secado: costo_secado ?? 1,
           duracion_lavado: duracion_lavado ?? 45,
           duracion_secado: duracion_secado ?? 30,
+          max_compra_fichas: max_compra_fichas ?? 10,
           activo: true,
           actualizado: new Date()
         },

@@ -37,6 +37,8 @@ app.get('/api/maquinas', verificarToken, maquinasHandler);
 
 // Rutas billetera (protegidas)
 app.get('/api/billetera', verificarToken, billeteraHandler);
+app.post('/api/billetera/comprar', verificarToken, billeteraHandler);
+app.patch('/api/billetera/pin', verificarToken, billeteraHandler);
 app.post('/api/billetera/creditos', verificarToken, soloAdmin, billeteraHandler);
 app.post('/api/billetera/creditos-masivo', verificarToken, soloAdmin, billeteraHandler);
 

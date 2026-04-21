@@ -17,6 +17,7 @@ const usuarioSchema = new mongoose.Schema({
   edificio_id: { type: String, required: true },
   unidad:      { type: String },
   foto:        { type: String },
+  pin_compra:  { type: String },
   activo:      { type: Boolean, default: true },
   creado:      { type: Date, default: Date.now }
 });
@@ -31,12 +32,23 @@ usuarioSchema.pre('validate', function () {
 });
 
 usuarioSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
-  this.password = await bcrypt.hash(this.password, 10);
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+  if (this.isModified('pin_compra') && this.pin_compra) {
+    this.pin_compra = await bcrypt.hash(this.pin_compra, 10);
+  }
 });
 
 usuarioSchema.methods.compararPassword = function (candidata) {
   return bcrypt.compare(candidata, this.password);
+};
+
+// PIN inicial por defecto '1111' cuando el usuario todavia no lo haya seteado.
+usuarioSchema.methods.compararPin = async function (candidata) {
+  if (!candidata) return false;
+  if (!this.pin_compra) return candidata === '1111';
+  return bcrypt.compare(candidata, this.pin_compra);
 };
 
 module.exports = mongoose.model('Usuario', usuarioSchema, 'usuarios');

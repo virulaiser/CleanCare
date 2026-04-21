@@ -7,6 +7,7 @@ const configEdificioSchema = new mongoose.Schema({
   costo_secado:       { type: Number, default: 1 },
   duracion_lavado:    { type: Number, default: 45 },
   duracion_secado:    { type: Number, default: 30 },
+  max_compra_fichas:  { type: Number, default: 10 },
   activo:             { type: Boolean, default: true },
   actualizado:        { type: Date, default: Date.now }
 });

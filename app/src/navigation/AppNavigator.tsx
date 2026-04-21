@@ -10,6 +10,7 @@ import CycleScreen from '../screens/CycleScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import BleTestScreen from '../screens/BleTestScreen';
 import WalletScreen from '../screens/WalletScreen';
+import PurchaseScreen from '../screens/PurchaseScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { colors } from '../constants/colors';
 
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   };
   History: undefined;
   Wallet: undefined;
+  Purchase: undefined;
   Profile: undefined;
   BleTest: undefined;
 };
@@ -86,6 +88,11 @@ export default function AppNavigator() {
           name="Wallet"
           component={WalletScreen}
           options={{ title: 'Mi Billetera' }}
+        />
+        <Stack.Screen
+          name="Purchase"
+          component={PurchaseScreen}
+          options={{ title: 'Comprar fichas' }}
         />
         <Stack.Screen
           name="Profile"

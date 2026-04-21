@@ -145,6 +145,7 @@ export interface ConfigEdificio {
   costo_secado: number;
   duracion_lavado: number;
   duracion_secado: number;
+  max_compra_fichas: number;
   activo: boolean;
 }
 
@@ -183,7 +184,7 @@ export async function obtenerConfigEdificio(edificioId: string): Promise<ConfigE
   return data.config;
 }
 
-export async function actualizarConfigEdificio(config: { edificio_id: string; creditos_mensuales: number; costo_lavado: number; costo_secado: number; duracion_lavado: number; duracion_secado: number }): Promise<ConfigEdificio> {
+export async function actualizarConfigEdificio(config: { edificio_id: string; creditos_mensuales: number; costo_lavado: number; costo_secado: number; duracion_lavado: number; duracion_secado: number; max_compra_fichas: number }): Promise<ConfigEdificio> {
   const { data } = await api.put('/api/config-edificio', config);
   return data.config;
 }

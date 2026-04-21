@@ -249,7 +249,7 @@ export interface Transaccion {
   _id: string;
   transaccion_id: string;
   usuario_id: string;
-  tipo: 'asignacion_mensual' | 'ajuste_admin' | 'uso_maquina' | 'devolucion';
+  tipo: 'asignacion_mensual' | 'ajuste_admin' | 'uso_maquina' | 'devolucion' | 'compra';
   cantidad: number;
   descripcion: string;
   fecha: string;
@@ -258,6 +258,15 @@ export interface Transaccion {
 export async function obtenerBilletera(): Promise<{ saldo: number; transacciones: Transaccion[] }> {
   const { data } = await api.get('/api/billetera');
   return data;
+}
+
+export async function comprarFichas(pin: string, cantidad: number): Promise<{ nuevo_saldo: number }> {
+  const { data } = await api.post('/api/billetera/comprar', { pin, cantidad });
+  return data;
+}
+
+export async function cambiarPinCompra(pin_actual: string, pin_nuevo: string): Promise<void> {
+  await api.patch('/api/billetera/pin', { pin_actual, pin_nuevo });
 }
 
 // --- Tips ---
@@ -278,6 +287,7 @@ export interface ConfigEdificio {
   costo_secado: number;
   duracion_lavado: number;
   duracion_secado: number;
+  max_compra_fichas?: number;
 }
 
 const CONFIG_CACHE_KEY = (edificioId: string) => `cleancare_config_${edificioId}`;

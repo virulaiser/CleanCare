@@ -28,6 +28,7 @@ export default function Creditos() {
   const [costoSecado, setCostoSecado] = useState(0);
   const [duracionLavado, setDuracionLavado] = useState(0);
   const [duracionSecado, setDuracionSecado] = useState(0);
+  const [maxCompraFichas, setMaxCompraFichas] = useState(0);
   const [configMsg, setConfigMsg] = useState('');
 
   // Modal apto (lista usuarios del mismo apartamento)
@@ -92,6 +93,7 @@ export default function Creditos() {
       setCostoSecado(configData.costo_secado);
       setDuracionLavado(configData.duracion_lavado ?? 0);
       setDuracionSecado(configData.duracion_secado ?? 0);
+      setMaxCompraFichas(configData.max_compra_fichas ?? 10);
       setUsuarios(usuariosData);
       await fetchResumen();
     } catch {
@@ -119,6 +121,7 @@ export default function Creditos() {
         costo_secado: costoSecado,
         duracion_lavado: duracionLavado,
         duracion_secado: duracionSecado,
+        max_compra_fichas: maxCompraFichas,
       });
       setConfig(updated);
       setConfigMsg('Configuración guardada');
@@ -229,6 +232,10 @@ export default function Creditos() {
                 <label style={styles.configLabel}>
                   Duración secado (min)
                   <NumericInput min={1} value={duracionSecado} onChange={setDuracionSecado} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Máx. fichas por compra
+                  <NumericInput min={1} value={maxCompraFichas} onChange={setMaxCompraFichas} style={styles.input} />
                 </label>
                 <button onClick={guardarConfig} style={styles.saveBtn}>Guardar</button>
               </div>

@@ -1,17 +1,23 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { obtenerBilletera, Transaccion } from '../services/api.service';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../constants/colors';
+
+type Nav = NativeStackNavigationProp<RootStackParamList, 'Wallet'>;
 
 const tipoLabels: Record<string, { label: string; color: string; bg: string }> = {
   asignacion_mensual: { label: 'Asignación', color: '#16A34A', bg: '#DCFCE7' },
   ajuste_admin:       { label: 'Ajuste', color: '#3B82F6', bg: '#DBEAFE' },
   uso_maquina:        { label: 'Uso', color: '#EF4444', bg: '#FEF2F2' },
   devolucion:         { label: 'Devolución', color: '#D97706', bg: '#FEF3C7' },
+  compra:             { label: 'Compra', color: '#0EA5E9', bg: '#E0F2FE' },
 };
 
 export default function WalletScreen() {
+  const navigation = useNavigation<Nav>();
   const [saldo, setSaldo] = useState<number>(0);
   const [transacciones, setTransacciones] = useState<Transaccion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +77,16 @@ export default function WalletScreen() {
         <Text style={styles.saldoUnit}>{saldo === 1 ? 'ficha' : 'fichas'}</Text>
       </View>
 
+      {/* Comprar fichas */}
+      <TouchableOpacity
+        style={styles.buyBtn}
+        onPress={() => navigation.navigate('Purchase')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.buyBtnIcon}>🪙</Text>
+        <Text style={styles.buyBtnText}>Comprar fichas</Text>
+      </TouchableOpacity>
+
       {/* Transacciones */}
       <Text style={styles.sectionTitle}>Movimientos recientes</Text>
       <FlatList
@@ -126,6 +142,23 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  buyBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  buyBtnIcon: { fontSize: 20, marginRight: 10 },
+  buyBtnText: { color: colors.white, fontSize: 16, fontWeight: '700' },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
