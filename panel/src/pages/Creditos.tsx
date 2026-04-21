@@ -29,6 +29,16 @@ export default function Creditos() {
   const [duracionLavado, setDuracionLavado] = useState(0);
   const [duracionSecado, setDuracionSecado] = useState(0);
   const [maxCompraFichas, setMaxCompraFichas] = useState(0);
+  const [precioFichaResidente, setPrecioFichaResidente] = useState(0);
+  const [comisionCleancare, setComisionCleancare] = useState(0);
+  const [litrosLavado, setLitrosLavado] = useState(0);
+  const [litrosSecado, setLitrosSecado] = useState(0);
+  const [kwhLavado, setKwhLavado] = useState(0);
+  const [kwhSecado, setKwhSecado] = useState(0);
+  const [facturacionDia, setFacturacionDia] = useState(31);
+  const [emailAdminEdi, setEmailAdminEdi] = useState('');
+  const [whatsappAdminEdi, setWhatsappAdminEdi] = useState('');
+  const [canalPreferido, setCanalPreferido] = useState<'email' | 'whatsapp' | 'ninguno'>('ninguno');
   const [configMsg, setConfigMsg] = useState('');
 
   // Modal apto (lista usuarios del mismo apartamento)
@@ -94,6 +104,16 @@ export default function Creditos() {
       setDuracionLavado(configData.duracion_lavado ?? 0);
       setDuracionSecado(configData.duracion_secado ?? 0);
       setMaxCompraFichas(configData.max_compra_fichas ?? 10);
+      setPrecioFichaResidente(configData.precio_ficha_residente ?? 120);
+      setComisionCleancare(configData.comision_cleancare ?? 33);
+      setLitrosLavado(configData.litros_por_lavado ?? 60);
+      setLitrosSecado(configData.litros_por_secado ?? 0);
+      setKwhLavado(configData.kwh_por_lavado ?? 1.2);
+      setKwhSecado(configData.kwh_por_secado ?? 2.5);
+      setFacturacionDia(configData.facturacion_dia ?? 31);
+      setEmailAdminEdi(configData.email_admin_edificio ?? '');
+      setWhatsappAdminEdi(configData.whatsapp_admin_edificio ?? '');
+      setCanalPreferido(configData.canal_preferido ?? 'ninguno');
       setUsuarios(usuariosData);
       await fetchResumen();
     } catch {
@@ -122,6 +142,16 @@ export default function Creditos() {
         duracion_lavado: duracionLavado,
         duracion_secado: duracionSecado,
         max_compra_fichas: maxCompraFichas,
+        precio_ficha_residente: precioFichaResidente,
+        comision_cleancare: comisionCleancare,
+        litros_por_lavado: litrosLavado,
+        litros_por_secado: litrosSecado,
+        kwh_por_lavado: kwhLavado,
+        kwh_por_secado: kwhSecado,
+        facturacion_dia: facturacionDia,
+        email_admin_edificio: emailAdminEdi,
+        whatsapp_admin_edificio: whatsappAdminEdi,
+        canal_preferido: canalPreferido,
       });
       setConfig(updated);
       setConfigMsg('Configuración guardada');
@@ -237,6 +267,65 @@ export default function Creditos() {
                   Máx. fichas por compra
                   <NumericInput min={1} value={maxCompraFichas} onChange={setMaxCompraFichas} style={styles.input} />
                 </label>
+              </div>
+
+              <h4 style={styles.sectionTitle}>Tarifas</h4>
+              <div style={styles.configRow}>
+                <label style={styles.configLabel}>
+                  Precio ficha al residente ($)
+                  <NumericInput min={0} value={precioFichaResidente} onChange={setPrecioFichaResidente} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Comisión a CleanCare por ficha vendida ($)
+                  <NumericInput min={0} value={comisionCleancare} onChange={setComisionCleancare} style={styles.input} />
+                </label>
+              </div>
+
+              <h4 style={styles.sectionTitle}>Consumo por ciclo</h4>
+              <div style={styles.configRow}>
+                <label style={styles.configLabel}>
+                  Litros por lavado
+                  <NumericInput min={0} value={litrosLavado} onChange={setLitrosLavado} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Litros por secado
+                  <NumericInput min={0} value={litrosSecado} onChange={setLitrosSecado} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  kWh por lavado
+                  <NumericInput min={0} value={kwhLavado} onChange={setKwhLavado} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  kWh por secado
+                  <NumericInput min={0} value={kwhSecado} onChange={setKwhSecado} style={styles.input} />
+                </label>
+              </div>
+
+              <h4 style={styles.sectionTitle}>Facturación y canales</h4>
+              <div style={styles.configRow}>
+                <label style={styles.configLabel}>
+                  Día de facturación (1-31, 31 = último del mes)
+                  <NumericInput min={1} value={facturacionDia} onChange={setFacturacionDia} style={styles.input} />
+                </label>
+                <label style={styles.configLabel}>
+                  Canal preferido
+                  <select value={canalPreferido} onChange={(e) => setCanalPreferido(e.target.value as 'email' | 'whatsapp' | 'ninguno')} style={styles.input}>
+                    <option value="ninguno">Ninguno (solo guardar)</option>
+                    <option value="email">Email</option>
+                    <option value="whatsapp">WhatsApp</option>
+                  </select>
+                </label>
+                <label style={styles.configLabel}>
+                  Email admin del edificio
+                  <input value={emailAdminEdi} onChange={(e) => setEmailAdminEdi(e.target.value)} style={styles.input} placeholder="admin@edificio.com" />
+                </label>
+                <label style={styles.configLabel}>
+                  WhatsApp admin del edificio
+                  <input value={whatsappAdminEdi} onChange={(e) => setWhatsappAdminEdi(e.target.value)} style={styles.input} placeholder="+598 99 123 456" />
+                </label>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
                 <button onClick={guardarConfig} style={styles.saveBtn}>Guardar</button>
               </div>
               {configMsg && <p style={{ fontSize: 13, color: configMsg.includes('Error') ? colors.error : colors.success, marginTop: 8 }}>{configMsg}</p>}
@@ -564,6 +653,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${colors.border}`, marginBottom: 24,
   },
   cardTitle: { fontSize: 16, fontWeight: 600, color: colors.textPrimary, marginBottom: 16 },
+  sectionTitle: { fontSize: 14, fontWeight: 600, color: colors.textPrimary, marginTop: 20, marginBottom: 12 },
   configRow: { display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' as const },
   configLabel: { display: 'flex', flexDirection: 'column' as const, fontSize: 13, color: colors.textSecondary, gap: 4 },
   input: {

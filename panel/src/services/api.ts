@@ -146,6 +146,17 @@ export interface ConfigEdificio {
   duracion_lavado: number;
   duracion_secado: number;
   max_compra_fichas: number;
+  precio_ficha_residente: number;
+  comision_cleancare: number;
+  litros_por_lavado: number;
+  litros_por_secado: number;
+  kwh_por_lavado: number;
+  kwh_por_secado: number;
+  facturacion_dia: number;
+  facturacion_hora: string;
+  email_admin_edificio: string;
+  whatsapp_admin_edificio: string;
+  canal_preferido: 'email' | 'whatsapp' | 'ninguno';
   activo: boolean;
 }
 
@@ -184,7 +195,7 @@ export async function obtenerConfigEdificio(edificioId: string): Promise<ConfigE
   return data.config;
 }
 
-export async function actualizarConfigEdificio(config: { edificio_id: string; creditos_mensuales: number; costo_lavado: number; costo_secado: number; duracion_lavado: number; duracion_secado: number; max_compra_fichas: number }): Promise<ConfigEdificio> {
+export async function actualizarConfigEdificio(config: Partial<ConfigEdificio> & { edificio_id: string }): Promise<ConfigEdificio> {
   const { data } = await api.put('/api/config-edificio', config);
   return data.config;
 }
@@ -328,6 +339,31 @@ export async function actualizarDispositivo(id: string, campos: Partial<Disposit
 
 export async function eliminarDispositivo(id: string): Promise<void> {
   await api.delete('/api/dispositivos', { params: { id } });
+}
+
+export interface Factura {
+  _id: string;
+  factura_id: string;
+  edificio_id: string;
+  mes: number;
+  anio: number;
+  tipo: 'ingreso' | 'consumo_resumen' | 'resumen_apto';
+  apartamento: string | null;
+  pdf_url: string;
+  totales: any;
+  generada: string;
+  enviada: boolean;
+  canal_envio: 'email' | 'whatsapp' | null;
+}
+
+export async function listarFacturas(filter: { edificioId?: string; mes?: number; anio?: number; tipo?: string; apartamento?: string } = {}): Promise<Factura[]> {
+  const { data } = await api.get('/api/facturacion', { params: filter });
+  return data.facturas;
+}
+
+export async function generarFacturas(edificio_id: string, mes: number, anio: number): Promise<any> {
+  const { data } = await api.post('/api/facturacion/generar', { edificio_id, mes, anio });
+  return data;
 }
 
 export async function crearEdificio(campos: {

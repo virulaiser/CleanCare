@@ -1,5 +1,26 @@
 const ConfigEdificio = require('../models/ConfigEdificio');
 
+const DEFAULTS = {
+  creditos_mensuales: 10,
+  costo_lavado: 1,
+  costo_secado: 1,
+  duracion_lavado: 45,
+  duracion_secado: 30,
+  max_compra_fichas: 10,
+  precio_ficha_residente: 120,
+  comision_cleancare: 33,
+  litros_por_lavado: 60,
+  litros_por_secado: 0,
+  kwh_por_lavado: 1.2,
+  kwh_por_secado: 2.5,
+  facturacion_dia: 31,
+  facturacion_hora: '23:59',
+  email_admin_edificio: '',
+  whatsapp_admin_edificio: '',
+  canal_preferido: 'ninguno',
+  activo: true,
+};
+
 async function handler(req, res) {
   try {
     // GET /api/config-edificio?edificioId=X
@@ -9,9 +30,12 @@ async function handler(req, res) {
 
       let config = await ConfigEdificio.findOne({ edificio_id }).lean();
       if (!config) {
-        config = { edificio_id, creditos_mensuales: 10, costo_lavado: 1, costo_secado: 1, duracion_lavado: 45, duracion_secado: 30, max_compra_fichas: 10, activo: true };
-      } else if (config.max_compra_fichas == null) {
-        config.max_compra_fichas = 10;
+        config = { edificio_id, ...DEFAULTS };
+      } else {
+        // Completar defaults de campos nuevos para configs preexistentes
+        for (const k of Object.keys(DEFAULTS)) {
+          if (config[k] == null) config[k] = DEFAULTS[k];
+        }
       }
 
       return res.json({ ok: true, config });
@@ -19,23 +43,19 @@ async function handler(req, res) {
 
     // PUT /api/config-edificio
     if (req.method === 'PUT') {
-      const { edificio_id, creditos_mensuales, costo_lavado, costo_secado, duracion_lavado, duracion_secado, max_compra_fichas } = req.body;
+      const body = req.body || {};
+      const { edificio_id } = body;
       if (!edificio_id) return res.status(400).json({ ok: false, error: 'edificio_id requerido' });
 
+      // Construir update usando defaults cuando falten campos
+      const update = { edificio_id, activo: true, actualizado: new Date() };
+      for (const k of Object.keys(DEFAULTS)) {
+        if (k === 'activo') continue;
+        update[k] = body[k] !== undefined ? body[k] : DEFAULTS[k];
+      }
+
       const config = await ConfigEdificio.findOneAndUpdate(
-        { edificio_id },
-        {
-          edificio_id,
-          creditos_mensuales: creditos_mensuales ?? 10,
-          costo_lavado: costo_lavado ?? 1,
-          costo_secado: costo_secado ?? 1,
-          duracion_lavado: duracion_lavado ?? 45,
-          duracion_secado: duracion_secado ?? 30,
-          max_compra_fichas: max_compra_fichas ?? 10,
-          activo: true,
-          actualizado: new Date()
-        },
-        { upsert: true, new: true }
+        { edificio_id }, update, { upsert: true, new: true }
       );
 
       return res.json({ ok: true, config });

@@ -18,6 +18,8 @@ const tipsHandler = require('./tips');
 const dispositivosHandler = require('./dispositivos');
 const apartamentoHandler = require('./apartamento');
 const unidadesHandler = require('./unidades');
+const facturacionHandler = require('./facturacion');
+const cronFacturacionHandler = require('./cron-facturacion');
 
 const app = express();
 app.use(cors());
@@ -87,8 +89,14 @@ app.post('/api/apartamento/aprobar', verificarToken, apartamentoHandler);
 app.post('/api/apartamento/rechazar', verificarToken, apartamentoHandler);
 app.post('/api/apartamento/transferir-titularidad', verificarToken, apartamentoHandler);
 
+// Facturación (admin / admin_edificio)
+app.get('/api/facturacion', verificarToken, facturacionHandler);
+app.get('/api/facturacion/aptos/mios', verificarToken, facturacionHandler);
+app.post('/api/facturacion/generar', verificarToken, facturacionHandler);
+
 // Cron (protegido por CRON_SECRET, no por JWT)
 app.get('/api/cron/asignacion-mensual', cronAsignacionHandler);
+app.get('/api/cron/facturacion-mensual', cronFacturacionHandler);
 
 // Vercel: exportar el app como serverless function
 module.exports = app;

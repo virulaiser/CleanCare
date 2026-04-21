@@ -7,6 +7,7 @@
     { "src": "/api/(.*)", "dest": "/api/index.js" }
   ],
   "crons": [
-    { "path": "/api/cron/asignacion-mensual", "schedule": "0 3 1 * *" }
+    { "path": "/api/cron/asignacion-mensual", "schedule": "0 3 1 * *" },
+    { "path": "/api/cron/facturacion-mensual", "schedule": "59 23 * * *" }
   ]
 }
