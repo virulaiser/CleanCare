@@ -100,6 +100,12 @@ export default function ProfileScreen({ navigation }: Props) {
         <Text style={styles.actionArrow}>›</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Resumenes')}>
+        <Text style={styles.actionIcon}>🗂️</Text>
+        <Text style={styles.actionText}>Resúmenes mensuales</Text>
+        <Text style={styles.actionArrow}>›</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.actionBtn}
         onPress={async () => {
@@ -116,7 +122,7 @@ export default function ProfileScreen({ navigation }: Props) {
         <Text style={styles.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>CleanCare v1.2.1</Text>
+      <Text style={styles.version}>CleanCare v1.2.2</Text>
       <SignatureBadge />
     </ScrollView>
   );

@@ -14,6 +14,7 @@ import PurchaseScreen from '../screens/PurchaseScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import WaitingApprovalScreen from '../screens/WaitingApprovalScreen';
 import ApartamentoScreen from '../screens/ApartamentoScreen';
+import ResumenesScreen from '../screens/ResumenesScreen';
 import { colors } from '../constants/colors';
 
 export type RootStackParamList = {
@@ -36,6 +37,7 @@ export type RootStackParamList = {
   Profile: undefined;
   WaitingApproval: undefined;
   Apartamento: undefined;
+  Resumenes: undefined;
   BleTest: undefined;
 };
 
@@ -112,6 +114,11 @@ export default function AppNavigator() {
           name="Apartamento"
           component={ApartamentoScreen}
           options={{ title: 'Miembros del apto' }}
+        />
+        <Stack.Screen
+          name="Resumenes"
+          component={ResumenesScreen}
+          options={{ title: 'Resúmenes mensuales' }}
         />
         <Stack.Screen
           name="BleTest"

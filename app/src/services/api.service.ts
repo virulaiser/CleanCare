@@ -384,3 +384,22 @@ export async function listarUnidades(edificioId: string): Promise<Unidad[]> {
   const { data } = await api.get('/api/unidades', { params: { edificioId, activa: 'true' } });
   return data.unidades;
 }
+
+// --- Facturación ---
+export interface FacturaApto {
+  _id: string;
+  factura_id: string;
+  edificio_id: string;
+  apartamento: string;
+  mes: number;
+  anio: number;
+  tipo: 'resumen_apto';
+  pdf_url: string;
+  totales: { saldo_final?: number; movimientos?: number };
+  generada: string;
+}
+
+export async function listarMisResumenes(): Promise<FacturaApto[]> {
+  const { data } = await api.get('/api/facturacion/aptos/mios');
+  return data.facturas;
+}
