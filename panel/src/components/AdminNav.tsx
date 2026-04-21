@@ -3,18 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { getUsuario, logout, esSuperAdmin } from '../utils/auth';
 import { colors } from '../constants/colors';
 
-type Item = { label: string; path: string; adminOnly?: boolean };
+type Item = { label: string; path: string; matches?: string[]; adminOnly?: boolean };
 
 const ITEMS: Item[] = [
-  { label: 'Dashboard',    path: '/dashboard' },
-  { label: 'Créditos',     path: '/creditos' },
-  { label: 'Usuarios',     path: '/admin-usuarios' },
-  { label: 'Máquinas',     path: '/maquinas' },
-  { label: 'Dispositivos', path: '/dispositivos' },
-  { label: 'Liquidación',  path: '/liquidacion' },
-  { label: 'Facturación',  path: '/facturacion' },
+  { label: 'Dashboard',      path: '/dashboard',     matches: ['/dashboard', '/liquidacion', '/facturacion'] },
+  { label: 'Créditos',       path: '/creditos' },
+  { label: 'Usuarios',       path: '/admin-usuarios' },
+  { label: 'Máquinas',       path: '/maquinas',      matches: ['/maquinas', '/dispositivos', '/tips'] },
   { label: 'Notificaciones', path: '/notificaciones' },
-  { label: 'Tips',         path: '/tips', adminOnly: true },
 ];
 
 interface Props {
@@ -38,7 +34,7 @@ export default function AdminNav({ active }: Props) {
       />
       <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {items.map((it) => {
-          const isActive = active === it.path;
+          const isActive = it.matches ? it.matches.includes(active) : active === it.path;
           return (
             <button
               key={it.path}

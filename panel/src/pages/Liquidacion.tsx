@@ -5,6 +5,7 @@ import { obtenerResumen, listarMaquinas, listarEdificios, listarUsos, ResumenIte
 import { colors } from '../constants/colors';
 import NumericInput from '../components/NumericInput';
 import AdminNav from '../components/AdminNav';
+import SubTabs, { DASHBOARD_TABS } from '../components/SubTabs';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -469,6 +470,7 @@ export default function Liquidacion() {
       <AdminNav active="/liquidacion" />
 
       <main style={styles.main}>
+        <SubTabs items={DASHBOARD_TABS} active="/liquidacion" />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
           <h2 style={{ ...styles.pageTitle, marginBottom: 0 }}>Liquidación mensual</h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

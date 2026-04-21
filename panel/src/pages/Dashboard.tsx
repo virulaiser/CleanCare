@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { exportExcelTable } from '../utils/excel';
 import AdminNav from '../components/AdminNav';
+import SubTabs, { DASHBOARD_TABS } from '../components/SubTabs';
 import { obtenerResumen, listarUsos, listarMaquinas, listarEdificios, ResumenItem, Uso, Maquina, Edificio, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
@@ -126,6 +127,7 @@ export default function Dashboard() {
       <AdminNav active="/dashboard" />
 
       <main style={styles.main}>
+        <SubTabs items={DASHBOARD_TABS} active="/dashboard" />
         <div style={styles.titleRow}>
           <h2 style={styles.pageTitle}>Resumen de facturación</h2>
           <div style={styles.filters}>

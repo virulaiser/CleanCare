@@ -7,6 +7,7 @@ import {
 } from '../services/api';
 import { colors } from '../constants/colors';
 import AdminNav from '../components/AdminNav';
+import SubTabs, { buildMaquinasTabs } from '../components/SubTabs';
 
 export default function Dispositivos() {
   const navigate = useNavigate();
@@ -153,15 +154,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
       <AdminNav active="/dispositivos" />
 
       <main style={styles.main}>
-        {/* Subtabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: `1px solid ${colors.border}` }}>
-          <button style={{ padding: '10px 20px', border: 'none', borderBottom: `3px solid ${colors.primary}`, backgroundColor: 'transparent', color: colors.primary, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Dispositivos
-          </button>
-          <button onClick={() => navigate('/tips')} style={{ padding: '10px 20px', border: 'none', borderBottom: '3px solid transparent', backgroundColor: 'transparent', color: colors.textSecondary, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Tips
-          </button>
-        </div>
+        <SubTabs items={buildMaquinasTabs()} active="/dispositivos" />
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <div>

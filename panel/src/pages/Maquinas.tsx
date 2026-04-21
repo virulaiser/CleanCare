@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { listarMaquinas, crearMaquina, eliminarMaquina, crearEdificio, listarEdificios, Maquina, Edificio, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 import AdminNav from '../components/AdminNav';
+import SubTabs, { buildMaquinasTabs } from '../components/SubTabs';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -148,6 +149,7 @@ export default function Maquinas() {
       <AdminNav active="/maquinas" />
 
       <main style={styles.main}>
+        <SubTabs items={buildMaquinasTabs()} active="/maquinas" />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ ...styles.pageTitle, marginBottom: 0 }}>Gestión de Máquinas</h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

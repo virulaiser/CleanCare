@@ -6,6 +6,7 @@ import {
 } from '../services/api';
 import { colors } from '../constants/colors';
 import AdminNav from '../components/AdminNav';
+import SubTabs, { DASHBOARD_TABS } from '../components/SubTabs';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -92,6 +93,7 @@ export default function Facturacion() {
       <AdminNav active="/facturacion" />
 
       <main style={styles.main}>
+        <SubTabs items={DASHBOARD_TABS} active="/facturacion" />
         <h2 style={styles.pageTitle}>Facturación</h2>
         {msg && <p style={{ fontSize: 13, marginBottom: 12, color: msg.includes('Error') ? colors.error : colors.success }}>{msg}</p>}
 

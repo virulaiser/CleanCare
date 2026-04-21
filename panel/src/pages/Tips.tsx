@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { listarTips, crearTip, eliminarTip, Tip, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 import AdminNav from '../components/AdminNav';
+import SubTabs, { buildMaquinasTabs } from '../components/SubTabs';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -73,15 +74,7 @@ export default function Tips() {
       <AdminNav active="/tips" />
 
       <main style={styles.main}>
-        {/* Subtabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: `1px solid ${colors.border}`, paddingBottom: 0 }}>
-          <button onClick={() => navigate('/dispositivos')} style={{ padding: '10px 20px', border: 'none', borderBottom: '3px solid transparent', backgroundColor: 'transparent', color: colors.textSecondary, fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Dispositivos
-          </button>
-          <button style={{ padding: '10px 20px', border: 'none', borderBottom: `3px solid ${colors.primary}`, backgroundColor: 'transparent', color: colors.primary, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Tips
-          </button>
-        </div>
+        <SubTabs items={buildMaquinasTabs()} active="/tips" />
 
         <h2 style={styles.pageTitle}>Consejos para usuarios</h2>
         <p style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 24 }}>
