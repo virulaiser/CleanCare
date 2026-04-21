@@ -41,8 +41,12 @@ export default function LoginScreen({ navigation }: Props) {
     }
     setLoading(true);
     try {
-      await loginUsuario(email.trim().toLowerCase(), password);
-      navigation.replace('Select');
+      const res = await loginUsuario(email.trim().toLowerCase(), password);
+      if (res.requiere_aprobacion || res.usuario?.estado_aprobacion === 'pendiente') {
+        navigation.replace('WaitingApproval');
+      } else {
+        navigation.replace('Select');
+      }
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo conectar con el servidor');
     } finally {

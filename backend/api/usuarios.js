@@ -16,7 +16,7 @@ module.exports = async (req, res) => {
       if (edificioId) filter.edificio_id = edificioId;
 
       const usuarios = await Usuario.find(filter)
-        .select('usuario_id nombre email apartamento telefono edificio_id unidad foto creado')
+        .select('usuario_id nombre email apartamento telefono edificio_id unidad foto creado rol_apto estado_aprobacion aprobado_por aprobado_en')
         .lean();
 
       // Obtener todas las transacciones de estos usuarios de una vez
@@ -101,7 +101,7 @@ module.exports = async (req, res) => {
         return res.status(400).json({ ok: false, error: 'Falta usuarioId' });
       }
 
-      const { nombre, email, telefono, apartamento, edificio_id, unidad, password, foto } = req.body;
+      const { nombre, email, telefono, apartamento, edificio_id, unidad, password, foto, rol_apto, estado_aprobacion } = req.body;
       const usuario = await Usuario.findOne({ usuario_id: usuarioId, activo: true });
       if (!usuario) {
         return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
@@ -113,6 +113,27 @@ module.exports = async (req, res) => {
       if (edificio_id) usuario.edificio_id = edificio_id;
       if (unidad !== undefined) usuario.unidad = unidad;
       if (foto !== undefined) usuario.foto = foto;
+
+      if (rol_apto && ['titular', 'miembro'].includes(rol_apto)) {
+        // Si lo hacen titular, destronamos al titular anterior del mismo apto
+        if (rol_apto === 'titular' && usuario.rol_apto !== 'titular' && usuario.apartamento && usuario.edificio_id) {
+          await Usuario.updateMany(
+            { edificio_id: usuario.edificio_id, apartamento: usuario.apartamento, rol_apto: 'titular', usuario_id: { $ne: usuario.usuario_id } },
+            { $set: { rol_apto: 'miembro', aprobado_por: usuario.usuario_id, aprobado_en: new Date() } }
+          );
+        }
+        usuario.rol_apto = rol_apto;
+      }
+      if (estado_aprobacion && ['pendiente', 'aprobado', 'rechazado'].includes(estado_aprobacion)) {
+        usuario.estado_aprobacion = estado_aprobacion;
+        if (estado_aprobacion === 'aprobado') {
+          usuario.aprobado_por = usuario.aprobado_por || req.usuario.usuario_id;
+          usuario.aprobado_en = usuario.aprobado_en || new Date();
+        }
+        if (estado_aprobacion === 'rechazado') {
+          usuario.activo = false;
+        }
+      }
 
       if (email && email.trim().toLowerCase() !== usuario.email) {
         const existe = await Usuario.findOne({ email: email.trim().toLowerCase() });

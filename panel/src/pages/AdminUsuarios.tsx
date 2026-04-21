@@ -19,6 +19,8 @@ interface UsuarioRow {
   saldo: number;
   fichas_usadas: number;
   fichas_extras: number;
+  rol_apto?: 'titular' | 'miembro';
+  estado_aprobacion?: 'pendiente' | 'aprobado' | 'rechazado';
 }
 
 // Comprimir imagen a max 200x200 y convertir a base64
@@ -44,6 +46,62 @@ function compressImage(file: File, maxSize = 200): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function RolAptoCell({ usuario, onChange }: { usuario: UsuarioRow; onChange: () => Promise<void> | void }) {
+  const [busy, setBusy] = React.useState(false);
+
+  async function aplicar(campos: { rol_apto?: 'titular' | 'miembro'; estado_aprobacion?: 'pendiente' | 'aprobado' | 'rechazado' }, confirmMsg?: string) {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setBusy(true);
+    try {
+      await editarUsuarioAdmin(usuario.usuario_id, campos);
+      await onChange();
+    } catch (err: any) {
+      alert(err?.response?.data?.error || 'No se pudo actualizar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const estado = usuario.estado_aprobacion || 'aprobado';
+  const rol = usuario.rol_apto || 'miembro';
+
+  const badgeStyle = (bg: string, color: string): React.CSSProperties => ({
+    display: 'inline-block', padding: '2px 8px', borderRadius: 999,
+    backgroundColor: bg, color, fontSize: 11, fontWeight: 700,
+  });
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      {rol === 'titular'
+        ? <span style={badgeStyle('#DBEAFE', '#1D4ED8')}>👑 Titular</span>
+        : <span style={badgeStyle('#F1F5F9', '#64748B')}>Miembro</span>}
+      {estado === 'pendiente' && <span style={badgeStyle('#FEF3C7', '#D97706')}>⏳ Pendiente</span>}
+      {estado === 'rechazado' && <span style={badgeStyle('#FEE2E2', '#B91C1C')}>Rechazado</span>}
+
+      <div style={{ display: 'flex', gap: 4 }}>
+        {estado === 'pendiente' && (
+          <button
+            disabled={busy}
+            onClick={() => aplicar({ estado_aprobacion: 'aprobado' })}
+            style={{ padding: '2px 8px', fontSize: 11, borderRadius: 999, border: 'none', backgroundColor: '#22C55E', color: '#fff', cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}
+          >
+            Aprobar
+          </button>
+        )}
+        {rol !== 'titular' && estado === 'aprobado' && (
+          <button
+            disabled={busy}
+            onClick={() => aplicar({ rol_apto: 'titular' }, 'Esto reemplaza al titular actual del apto. ¿Seguir?')}
+            style={{ padding: '2px 8px', fontSize: 11, borderRadius: 999, border: `1px solid #3B82F6`, backgroundColor: 'transparent', color: '#3B82F6', cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}
+          >
+            Hacer titular
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AdminUsuarios() {
@@ -522,6 +580,7 @@ export default function AdminUsuarios() {
                   <tr>
                     <th style={styles.th}>Apto</th>
                     <th style={styles.th}>Edificio</th>
+                    <th style={styles.th}>Rol apto</th>
                     <th style={styles.th}>Balance</th>
                     <th style={styles.th}>Acciones</th>
                   </tr>
@@ -560,6 +619,9 @@ export default function AdminUsuarios() {
                         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 999, backgroundColor: colors.bgBlueLight, color: colors.primary, fontWeight: 500 }}>
                           {edificioNombre(u.edificio_id)}
                         </span>
+                      </td>
+                      <td style={styles.td}>
+                        <RolAptoCell usuario={u} onChange={fetchData} />
                       </td>
                       <td style={styles.td}>
                         <button onClick={() => openBalance(u)} style={styles.btnBalance}>

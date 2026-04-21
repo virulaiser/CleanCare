@@ -31,6 +31,21 @@ export interface Usuario {
   rol: string;
   edificio_id: string;
   unidad?: string;
+  rol_apto?: 'titular' | 'miembro';
+  estado_aprobacion?: 'pendiente' | 'aprobado' | 'rechazado';
+}
+
+export interface MiembroApto {
+  usuario_id: string;
+  nombre: string;
+  email: string;
+  telefono?: string;
+  apartamento: string;
+  edificio_id: string;
+  rol_apto: 'titular' | 'miembro';
+  estado_aprobacion: 'pendiente' | 'aprobado' | 'rechazado';
+  aprobado_en?: string | null;
+  creado?: string;
 }
 
 export interface Uso {
@@ -56,7 +71,7 @@ export interface Maquina {
   activa: boolean;
 }
 
-export async function loginUsuario(email: string, password: string): Promise<{ token: string; usuario: Usuario }> {
+export async function loginUsuario(email: string, password: string): Promise<{ token: string; usuario: Usuario; requiere_aprobacion?: boolean }> {
   const { data } = await api.post('/api/auth?action=login', { email, password });
   await SecureStore.setItemAsync('cleancare_token', data.token);
   await SecureStore.setItemAsync('cleancare_usuario', JSON.stringify(data.usuario));
@@ -71,11 +86,38 @@ export async function registrarUsuario(campos: {
   unidad?: string;
   telefono?: string;
   apartamento?: string;
-}): Promise<{ token: string; usuario: Usuario }> {
+}): Promise<{ token: string; usuario: Usuario; requiere_aprobacion?: boolean; titular_nombre?: string | null }> {
   const { data } = await api.post('/api/auth?action=registro', campos);
   await SecureStore.setItemAsync('cleancare_token', data.token);
   await SecureStore.setItemAsync('cleancare_usuario', JSON.stringify(data.usuario));
   return data;
+}
+
+export async function getMe(): Promise<{ usuario: Usuario; requiere_aprobacion: boolean }> {
+  const { data } = await api.get('/api/auth', { params: { action: 'me' } });
+  // Refrescar cache local
+  if (data?.usuario) {
+    await SecureStore.setItemAsync('cleancare_usuario', JSON.stringify(data.usuario));
+  }
+  return data;
+}
+
+// --- Apartamento (titular/miembros) ---
+export async function listarMiembrosApto(): Promise<MiembroApto[]> {
+  const { data } = await api.get('/api/apartamento/miembros');
+  return data.miembros;
+}
+
+export async function aprobarMiembro(usuario_id: string): Promise<void> {
+  await api.post('/api/apartamento/aprobar', { usuario_id });
+}
+
+export async function rechazarMiembro(usuario_id: string): Promise<void> {
+  await api.post('/api/apartamento/rechazar', { usuario_id });
+}
+
+export async function transferirTitularidad(nuevo_titular_id: string): Promise<void> {
+  await api.post('/api/apartamento/transferir-titularidad', { nuevo_titular_id });
 }
 
 export async function getUsuarioGuardado(): Promise<Usuario | null> {

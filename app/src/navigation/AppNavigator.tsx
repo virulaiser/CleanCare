@@ -12,6 +12,8 @@ import BleTestScreen from '../screens/BleTestScreen';
 import WalletScreen from '../screens/WalletScreen';
 import PurchaseScreen from '../screens/PurchaseScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import WaitingApprovalScreen from '../screens/WaitingApprovalScreen';
+import ApartamentoScreen from '../screens/ApartamentoScreen';
 import { colors } from '../constants/colors';
 
 export type RootStackParamList = {
@@ -32,6 +34,8 @@ export type RootStackParamList = {
   Wallet: undefined;
   Purchase: undefined;
   Profile: undefined;
+  WaitingApproval: undefined;
+  Apartamento: undefined;
   BleTest: undefined;
 };
 
@@ -98,6 +102,16 @@ export default function AppNavigator() {
           name="Profile"
           component={ProfileScreen}
           options={{ title: 'Mi Perfil' }}
+        />
+        <Stack.Screen
+          name="WaitingApproval"
+          component={WaitingApprovalScreen}
+          options={{ title: 'Aprobación pendiente', headerBackVisible: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="Apartamento"
+          component={ApartamentoScreen}
+          options={{ title: 'Miembros del apto' }}
         />
         <Stack.Screen
           name="BleTest"

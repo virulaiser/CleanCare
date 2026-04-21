@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getUsuarioGuardado, logout, obtenerBilletera, Usuario } from '../services/api.service';
+import { getUsuarioGuardado, logout, obtenerBilletera, getMe, Usuario } from '../services/api.service';
 import { colors } from '../constants/colors';
 import SignatureBadge from '../components/SignatureBadge';
 
@@ -18,8 +18,9 @@ export default function ProfileScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       getUsuarioGuardado().then(setUsuario);
+      // Estado fresco (rol_apto, estado_aprobacion): por si cambió desde el login
+      getMe().then(res => setUsuario(res.usuario)).catch(() => {});
       obtenerBilletera().then(d => setSaldo(d.saldo)).catch(() => {});
-      // TODO: cargar foto de perfil guardada (SecureStore o backend)
     }, [])
   );
 
@@ -62,15 +63,31 @@ export default function ProfileScreen({ navigation }: Props) {
       <Text style={styles.name}>{usuario?.nombre || 'Cargando...'}</Text>
       <Text style={styles.email}>{usuario?.email || ''}</Text>
 
+      {usuario?.rol_apto && (
+        <View style={[styles.roleBadge, usuario.rol_apto === 'titular' ? styles.roleTitular : styles.roleMiembro]}>
+          <Text style={[styles.roleBadgeText, usuario.rol_apto === 'titular' ? { color: colors.primary } : { color: '#64748B' }]}>
+            {usuario.rol_apto === 'titular' ? '👑 Titular del apto' : '🏠 Miembro del apto'}
+          </Text>
+        </View>
+      )}
+
       {/* Info cards */}
       <View style={styles.infoCard}>
         <InfoRow label="Apartamento" value={usuario?.apartamento || '—'} />
         <InfoRow label="Teléfono" value={usuario?.telefono || '—'} />
         <InfoRow label="Edificio" value={usuario?.edificio_id || '—'} />
-        <InfoRow label="Fichas disponibles" value={`${saldo}`} highlight={saldo <= 0} />
+        <InfoRow label="Fichas del apto" value={`${saldo}`} highlight={saldo <= 0} />
       </View>
 
       {/* Actions */}
+      {usuario?.rol_apto === 'titular' && (
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Apartamento')}>
+          <Text style={styles.actionIcon}>👥</Text>
+          <Text style={styles.actionText}>Miembros del apto</Text>
+          <Text style={styles.actionArrow}>›</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('Wallet')}>
         <Text style={styles.actionIcon}>💰</Text>
         <Text style={styles.actionText}>Mi Billetera</Text>
@@ -99,7 +116,7 @@ export default function ProfileScreen({ navigation }: Props) {
         <Text style={styles.logoutText}>Cerrar sesión</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>CleanCare v1.1.1</Text>
+      <Text style={styles.version}>CleanCare v1.2.0</Text>
       <SignatureBadge />
     </ScrollView>
   );
@@ -175,8 +192,16 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: 24,
+    marginBottom: 12,
   },
+  roleBadge: {
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: 999, marginBottom: 20,
+    borderWidth: 1,
+  },
+  roleTitular: { backgroundColor: colors.bgBlueLight, borderColor: colors.primary },
+  roleMiembro: { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' },
+  roleBadgeText: { fontSize: 13, fontWeight: '700' },
   infoCard: {
     backgroundColor: colors.white,
     borderRadius: 16,

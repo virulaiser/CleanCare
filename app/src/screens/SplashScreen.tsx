@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getBleManager } from '../services/bleManager';
 import { ESP32_BLE_NAME } from '../constants/ble';
+import { getMe, obtenerCicloActivo } from '../services/api.service';
 import { colors } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
@@ -83,8 +84,35 @@ export default function SplashScreen({ navigation }: Props) {
       // Navegar al siguiente paso según estado
       if (onboardingDone !== 'true') {
         navigation.replace('Onboarding');
-      } else if (!token) {
+        return;
+      }
+      if (!token) {
         navigation.replace('Login');
+        return;
+      }
+
+      // Refrescar estado del usuario: puede estar pendiente o haber sido aprobado/rechazado
+      // mientras la app estaba cerrada.
+      try {
+        const me = await getMe();
+        if (!mounted.current) return;
+        if (me.usuario.estado_aprobacion === 'pendiente') {
+          navigation.replace('WaitingApproval');
+          return;
+        }
+      } catch { /* red caída → dejamos pasar; el resto del flujo fallará limpio */ }
+
+      // Si hay ciclo activo válido, ir directo a Cycle
+      const ciclo = await obtenerCicloActivo();
+      if (!mounted.current) return;
+      if (ciclo) {
+        navigation.replace('Cycle', {
+          maquina_id: ciclo.maquina_id,
+          edificio_id: ciclo.edificio_id,
+          tipo: ciclo.tipo,
+          duracion_min: ciclo.duracion_min,
+          nombre_maquina: ciclo.nombre_maquina,
+        });
       } else {
         navigation.replace('Select');
       }

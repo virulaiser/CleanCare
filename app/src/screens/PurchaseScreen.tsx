@@ -6,13 +6,13 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  comprarFichas, cambiarPinCompra, obtenerConfigEdificio, getUsuarioGuardado,
+  comprarFichas, cambiarPinCompra, obtenerConfigEdificio, getUsuarioGuardado, getMe,
 } from '../services/api.service';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../constants/colors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Purchase'>;
-type Step = 'pin' | 'buy' | 'change';
+type Step = 'pin' | 'buy' | 'change' | 'no-titular';
 
 export default function PurchaseScreen() {
   const navigation = useNavigation<Nav>();
@@ -30,6 +30,14 @@ export default function PurchaseScreen() {
       try {
         const u = await getUsuarioGuardado();
         if (!u?.edificio_id) return;
+        // Gate: solo titular aprobado puede estar en esta pantalla
+        const me = await getMe().catch(() => null);
+        const rol = me?.usuario?.rol_apto || u.rol_apto;
+        const estado = me?.usuario?.estado_aprobacion || u.estado_aprobacion;
+        if (rol !== 'titular' || estado !== 'aprobado') {
+          setStep('no-titular');
+          return;
+        }
         const cfg = await obtenerConfigEdificio(u.edificio_id);
         setMaxCompra(cfg?.max_compra_fichas ?? 10);
       } catch { setMaxCompra(10); }
@@ -127,6 +135,19 @@ export default function PurchaseScreen() {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+
+        {step === 'no-titular' && (
+          <View style={styles.card}>
+            <Text style={styles.icon}>🔒</Text>
+            <Text style={styles.title}>Solo el titular puede comprar</Text>
+            <Text style={styles.subtitle}>
+              Las fichas las compra el titular del apto. Los miembros del apto pueden lavar con el mismo pozo de fichas.
+            </Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.goBack()}>
+              <Text style={styles.primaryBtnText}>Volver</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {step === 'pin' && (
           <View style={styles.card}>

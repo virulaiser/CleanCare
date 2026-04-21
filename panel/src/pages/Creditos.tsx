@@ -214,7 +214,7 @@ export default function Creditos() {
             <>
               <div style={styles.configRow}>
                 <label style={styles.configLabel}>
-                  Créditos mensuales por usuario
+                  Créditos mensuales por apto
                   <NumericInput min={0} value={creditosMensuales} onChange={setCreditosMensuales} style={styles.input} />
                 </label>
                 <label style={styles.configLabel}>

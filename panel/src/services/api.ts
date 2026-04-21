@@ -216,7 +216,11 @@ export async function obtenerResumenApartamento(edificioId: string, mes: number,
   return data;
 }
 
-export async function listarUsuariosEdificio(edificioId?: string): Promise<{ usuario_id: string; nombre: string; apartamento: string; email: string; edificio_id: string; saldo: number }[]> {
+export async function listarUsuariosEdificio(edificioId?: string): Promise<{
+  usuario_id: string; nombre: string; apartamento: string; email: string; edificio_id: string;
+  saldo: number; fichas_usadas?: number; fichas_extras?: number;
+  rol_apto?: 'titular' | 'miembro'; estado_aprobacion?: 'pendiente' | 'aprobado' | 'rechazado';
+}[]> {
   const params = edificioId ? { edificioId } : {};
   const { data } = await api.get('/api/usuarios', { params });
   return data.usuarios;
@@ -235,6 +239,8 @@ export async function crearUsuarioAdmin(campos: {
 export async function editarUsuarioAdmin(usuarioId: string, campos: {
   nombre?: string; email?: string; password?: string;
   telefono?: string; apartamento?: string; edificio_id?: string; unidad?: string; foto?: string;
+  rol_apto?: 'titular' | 'miembro';
+  estado_aprobacion?: 'pendiente' | 'aprobado' | 'rechazado';
 }): Promise<{ usuario_id: string; nombre: string; email: string }> {
   const { data } = await api.patch('/api/usuarios', campos, { params: { usuarioId } });
   return data.usuario;

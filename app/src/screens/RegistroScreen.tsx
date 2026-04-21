@@ -43,7 +43,7 @@ export default function RegistroScreen({ navigation }: Props) {
     }
     setLoading(true);
     try {
-      await registrarUsuario({
+      const res = await registrarUsuario({
         nombre,
         email: email.trim().toLowerCase(),
         password,
@@ -52,7 +52,17 @@ export default function RegistroScreen({ navigation }: Props) {
         telefono: telefono || undefined,
         apartamento: apartamento || undefined,
       });
-      navigation.replace('Select');
+      if (res.requiere_aprobacion) {
+        Alert.alert(
+          'Cuenta creada',
+          res.titular_nombre
+            ? `Tu cuenta queda a la espera de que ${res.titular_nombre} (titular del apto) te apruebe.`
+            : 'Tu cuenta queda a la espera de la aprobación del titular del apto.',
+          [{ text: 'OK', onPress: () => navigation.replace('WaitingApproval') }]
+        );
+      } else {
+        navigation.replace('Select');
+      }
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo registrar');
     } finally {

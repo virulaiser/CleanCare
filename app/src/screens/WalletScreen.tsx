@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { obtenerBilletera, Transaccion } from '../services/api.service';
+import { obtenerBilletera, getMe, Transaccion, Usuario } from '../services/api.service';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../constants/colors';
 
@@ -20,14 +20,16 @@ export default function WalletScreen() {
   const navigation = useNavigation<Nav>();
   const [saldo, setSaldo] = useState<number>(0);
   const [transacciones, setTransacciones] = useState<Transaccion[]>([]);
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await obtenerBilletera();
-      setSaldo(data.saldo);
-      setTransacciones(data.transacciones);
+      const [bill, me] = await Promise.all([obtenerBilletera(), getMe().catch(() => null)]);
+      setSaldo(bill.saldo);
+      setTransacciones(bill.transacciones);
+      if (me?.usuario) setUsuario(me.usuario);
     } catch { /* ignore */ }
     setLoading(false);
   }, []);
@@ -70,22 +72,31 @@ export default function WalletScreen() {
     <View style={styles.container}>
       {/* Saldo */}
       <View style={styles.saldoCard}>
-        <Text style={styles.saldoLabel}>Tu saldo</Text>
+        <Text style={styles.saldoLabel}>Saldo del apto {usuario?.apartamento ? `· ${usuario.apartamento}` : ''}</Text>
         <Text style={[styles.saldoValue, saldo <= 0 && { color: '#EF4444' }]}>
           {saldo}
         </Text>
         <Text style={styles.saldoUnit}>{saldo === 1 ? 'ficha' : 'fichas'}</Text>
       </View>
 
-      {/* Comprar fichas */}
-      <TouchableOpacity
-        style={styles.buyBtn}
-        onPress={() => navigation.navigate('Purchase')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.buyBtnIcon}>🪙</Text>
-        <Text style={styles.buyBtnText}>Comprar fichas</Text>
-      </TouchableOpacity>
+      {/* Comprar fichas — solo titular */}
+      {usuario?.rol_apto === 'titular' ? (
+        <TouchableOpacity
+          style={styles.buyBtn}
+          onPress={() => navigation.navigate('Purchase')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.buyBtnIcon}>🪙</Text>
+          <Text style={styles.buyBtnText}>Comprar fichas</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.infoMiembro}>
+          <Text style={styles.infoMiembroIcon}>ℹ️</Text>
+          <Text style={styles.infoMiembroText}>
+            Solo el titular del apto puede comprar fichas. Tus lavados se descuentan del mismo pozo.
+          </Text>
+        </View>
+      )}
 
       {/* Transacciones */}
       <Text style={styles.sectionTitle}>Movimientos recientes</Text>
@@ -159,6 +170,15 @@ const styles = StyleSheet.create({
   },
   buyBtnIcon: { fontSize: 20, marginRight: 10 },
   buyBtnText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  infoMiembro: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12, padding: 14,
+    flexDirection: 'row', alignItems: 'center',
+    marginBottom: 24, gap: 10,
+    borderLeftWidth: 3, borderLeftColor: colors.primary,
+  },
+  infoMiembroIcon: { fontSize: 16 },
+  infoMiembroText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
