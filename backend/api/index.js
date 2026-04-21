@@ -98,6 +98,7 @@ app.get('/api/apartamento/ocupaciones', verificarToken, cambioInquilinoHandler);
 
 // Historial de notificaciones enviadas (admin)
 app.get('/api/notificaciones', verificarToken, notificacionesHandler);
+app.post('/api/notificaciones/enviar', verificarToken, notificacionesHandler);
 
 // Facturación (admin / admin_edificio)
 app.get('/api/facturacion', verificarToken, facturacionHandler);
