@@ -99,15 +99,16 @@ export default function Liquidacion() {
     setError('');
     try {
       const [resumenData, maquinasData, usosData] = await Promise.all([
-        obtenerResumen(edificioId, mes, anio),
-        listarMaquinas(edificioId),
-        listarUsos(),
+        obtenerResumen(edificioId, mes, anio).catch((e) => { console.error('[liquidacion] resumen:', e); return [] as ResumenItem[]; }),
+        listarMaquinas(edificioId).catch((e) => { console.error('[liquidacion] maquinas:', e); return [] as Maquina[]; }),
+        listarUsos({ edificioId, mes, anio }).catch((e) => { console.error('[liquidacion] usos:', e); return [] as Uso[]; }),
       ]);
       setResumen(resumenData);
       setMaquinas(maquinasData);
       setUsos(usosData);
-    } catch {
-      setError('Error al cargar datos');
+    } catch (err: any) {
+      console.error('[liquidacion] fetchData:', err);
+      setError(err?.response?.data?.error || err?.message || 'Error al cargar datos');
     } finally {
       setLoading(false);
     }
@@ -203,8 +204,13 @@ export default function Liquidacion() {
           </tr>
         `).join('');
 
-    const w = window.open('', '_blank', 'width=900,height=1000');
-    if (!w) return;
+    // Sin dimensiones → abre como pestaña, no como popup (no dispara bloqueador)
+    const w = window.open('about:blank', '_blank');
+    if (!w) {
+      alert('El navegador bloqueó la ventana nueva. Desbloqueá pop-ups para panel-three-blush.vercel.app y reintentá.');
+      return;
+    }
+    w.document.open();
     w.document.write(`
       <!DOCTYPE html><html><head><title>Liquidación ${edificioNombre} — ${periodo}</title>
       <style>

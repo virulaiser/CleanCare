@@ -113,8 +113,8 @@ export async function obtenerResumen(edificioId: string, mes: number, anio: numb
   return data.resumen;
 }
 
-export async function listarUsos(): Promise<Uso[]> {
-  const { data } = await api.get('/api/usos');
+export async function listarUsos(filter: { edificioId?: string; mes?: number; anio?: number; limite?: number } = {}): Promise<Uso[]> {
+  const { data } = await api.get('/api/usos', { params: filter });
   return data.usos;
 }
 
