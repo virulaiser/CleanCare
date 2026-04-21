@@ -32,17 +32,21 @@ async function handler(req, res) {
 
       if (yaAsignado) continue;
 
-      const usuarios = await Usuario.find({
+      // 1 crédito por APTO: acreditamos al titular aprobado de cada apto
+      const titulares = await Usuario.find({
         edificio_id: config.edificio_id,
         activo: true,
-        rol: 'residente'
+        rol: 'residente',
+        rol_apto: 'titular',
+        estado_aprobacion: 'aprobado',
       }).lean();
 
-      if (usuarios.length === 0) continue;
+      if (titulares.length === 0) continue;
 
-      const transacciones = usuarios.map(u => ({
+      const transacciones = titulares.map(u => ({
         usuario_id: u.usuario_id,
         edificio_id: config.edificio_id,
+        apartamento: u.apartamento,
         tipo: 'asignacion_mensual',
         cantidad: config.creditos_mensuales,
         descripcion: `Asignación mensual ${mesLabel}`,
@@ -51,10 +55,10 @@ async function handler(req, res) {
 
       await Transaccion.insertMany(transacciones);
       edificios_procesados++;
-      usuarios_acreditados += usuarios.length;
+      usuarios_acreditados += titulares.length;
     }
 
-    return res.json({ ok: true, edificios_procesados, usuarios_acreditados });
+    return res.json({ ok: true, edificios_procesados, aptos_acreditados: usuarios_acreditados });
   } catch (err) {
     console.error('Error cron asignacion:', err);
     return res.status(500).json({ ok: false, error: 'Error interno' });

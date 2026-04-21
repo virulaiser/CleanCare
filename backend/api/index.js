@@ -16,6 +16,7 @@ const usuariosHandler = require('./usuarios');
 const edificiosHandler = require('./edificios');
 const tipsHandler = require('./tips');
 const dispositivosHandler = require('./dispositivos');
+const apartamentoHandler = require('./apartamento');
 
 const app = express();
 app.use(cors());
@@ -26,6 +27,7 @@ app.get('/api', (req, res) => {
   res.json({ ok: true, service: 'CleanCare API', version: '1.0.0' });
 });
 app.post('/api/auth', authHandler);
+app.get('/api/auth', authHandler);
 app.get('/api/edificios', edificiosHandler);
 app.get('/api/tips', tipsHandler);
 
@@ -63,6 +65,12 @@ app.get('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
 app.post('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
 app.patch('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
 app.delete('/api/dispositivos', verificarToken, soloAdmin, dispositivosHandler);
+
+// Rutas apartamento (titular/miembros)
+app.get('/api/apartamento/miembros', verificarToken, apartamentoHandler);
+app.post('/api/apartamento/aprobar', verificarToken, apartamentoHandler);
+app.post('/api/apartamento/rechazar', verificarToken, apartamentoHandler);
+app.post('/api/apartamento/transferir-titularidad', verificarToken, apartamentoHandler);
 
 // Cron (protegido por CRON_SECRET, no por JWT)
 app.get('/api/cron/asignacion-mensual', cronAsignacionHandler);

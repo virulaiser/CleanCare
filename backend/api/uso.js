@@ -1,8 +1,9 @@
 const connectDB = require('../lib/mongodb');
 const Uso = require('../models/Uso');
+const Usuario = require('../models/Usuario');
 const Transaccion = require('../models/Transaccion');
 const ConfigEdificio = require('../models/ConfigEdificio');
-const { obtenerSaldo } = require('./billetera');
+const { obtenerSaldoApto } = require('./billetera');
 
 module.exports = async (req, res) => {
   try {
@@ -27,7 +28,6 @@ async function obtenerCosto(edificio_id, tipo) {
 // POST /api/uso — Registrar inicio de un ciclo
 async function crear(req, res) {
   const { maquina_id, edificio_id, duracion_min, tipo } = req.body;
-  const residente_id = req.usuario.apartamento || req.usuario.unidad || req.usuario.email;
   const usuario_id = req.usuario.usuario_id;
   const tipoMaquina = tipo || 'lavarropas';
 
@@ -35,15 +35,24 @@ async function crear(req, res) {
     return res.status(400).json({ ok: false, error: 'Faltan campos requeridos: maquina_id, edificio_id, duracion_min' });
   }
 
+  // Usuario aprobado
+  const usuario = await Usuario.findOne({ usuario_id, activo: true }).lean();
+  if (!usuario) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+  if (usuario.estado_aprobacion !== 'aprobado') {
+    return res.status(403).json({ ok: false, error: 'Tu cuenta está pendiente de aprobación del titular del apto' });
+  }
+
+  const residente_id = usuario.apartamento || req.usuario.unidad || req.usuario.email;
+
   // Verificar que la máquina no tenga otro ciclo activo
   const activoEnMaquina = await Uso.findOne({ maquina_id, estado: 'activo' }).lean();
   if (activoEnMaquina) {
     return res.status(409).json({ ok: false, error: 'La máquina ya está en uso', uso_activo: activoEnMaquina });
   }
 
-  // Verificar saldo
+  // Verificar saldo (del apto)
   const costo = await obtenerCosto(edificio_id, tipoMaquina);
-  const saldo = await obtenerSaldo(usuario_id);
+  const saldo = await obtenerSaldoApto(usuario.edificio_id, usuario.apartamento);
 
   if (saldo < costo) {
     return res.status(400).json({ ok: false, error: 'Saldo insuficiente', saldo, costo });
@@ -60,10 +69,11 @@ async function crear(req, res) {
     completado: false,
   });
 
-  // Descontar crédito
+  // Descontar crédito del apto (se registra al usuario que inició, pero suma a la billetera del apto)
   await Transaccion.create({
     usuario_id,
     edificio_id,
+    apartamento: usuario.apartamento,
     tipo: 'uso_maquina',
     cantidad: -costo,
     descripcion: `Uso ${maquina_id} (${tipoMaquina})`,
@@ -104,10 +114,12 @@ async function actualizar(req, res) {
   if (estado === 'cancelado' || estado === 'averia') {
     const costo = await obtenerCosto(uso.edificio_id, uso.tipo);
     const usuario_id = req.usuario.usuario_id;
+    const usuario = await Usuario.findOne({ usuario_id }, { apartamento: 1 }).lean();
 
     await Transaccion.create({
       usuario_id,
       edificio_id: uso.edificio_id,
+      apartamento: usuario?.apartamento,
       tipo: 'devolucion',
       cantidad: costo,
       descripcion: `Devolución por ${estado}: ${uso.maquina_id}`,

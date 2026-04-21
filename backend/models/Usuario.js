@@ -18,6 +18,12 @@ const usuarioSchema = new mongoose.Schema({
   unidad:      { type: String },
   foto:        { type: String },
   pin_compra:  { type: String },
+  // Modelo titular/miembro por apto: el titular es el dueño de la billetera del apto,
+  // único que puede comprar fichas. Los miembros gastan del mismo pozo, previa aprobación.
+  rol_apto:           { type: String, enum: ['titular', 'miembro'], default: 'miembro' },
+  estado_aprobacion:  { type: String, enum: ['pendiente', 'aprobado', 'rechazado'], default: 'aprobado' },
+  aprobado_por:       { type: String, default: null },
+  aprobado_en:        { type: Date, default: null },
   activo:      { type: Boolean, default: true },
   creado:      { type: Date, default: Date.now }
 });
