@@ -4,6 +4,8 @@ const Unidad = require('../models/Unidad');
 const Ocupacion = require('../models/Ocupacion');
 const { generarToken, verificarToken } = require('../lib/auth');
 const { obtenerSaldo } = require('./billetera');
+const { notificar } = require('../lib/notificar');
+const { nuevoMiembroPendiente } = require('../lib/email-templates');
 
 module.exports = async (req, res) => {
   try {
@@ -111,6 +113,21 @@ async function registro(req, res) {
   const usuario = await Usuario.create(campos);
   const token = generarToken(usuario);
   const saldo = await obtenerSaldo(usuario.usuario_id);
+
+  // Notificar al titular (si existe) que hay un nuevo pendiente
+  if (titularExistente?.email) {
+    const { subject, html } = nuevoMiembroPendiente({
+      apartamento, nuevoNombre: nombre, nuevoEmail: email,
+    });
+    notificar({
+      tipo: 'nuevo_miembro_pendiente',
+      destinatario_usuario_id: titularExistente.usuario_id,
+      destinatario_email: titularExistente.email,
+      canal: 'email',
+      subject, html,
+      relacionado: { tipo: 'usuario', ref_id: usuario.usuario_id },
+    }).catch((e) => console.warn('No se pudo notificar titular:', e.message));
+  }
 
   res.status(201).json({
     ok: true,

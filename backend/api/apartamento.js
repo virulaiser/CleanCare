@@ -1,4 +1,6 @@
 const Usuario = require('../models/Usuario');
+const { notificar } = require('../lib/notificar');
+const { miembroAprobado } = require('../lib/email-templates');
 
 async function asegurarTitular(req, res) {
   const usuario = await Usuario.findOne({ usuario_id: req.usuario.usuario_id, activo: true }).lean();
@@ -63,6 +65,19 @@ async function handler(req, res) {
       miembro.aprobado_en = new Date();
       miembro.rol_apto = 'miembro';
       await miembro.save();
+
+      // Notificar al miembro aprobado
+      if (miembro.email) {
+        const { subject, html } = miembroAprobado({ apartamento: miembro.apartamento, titularNombre: titular.nombre });
+        notificar({
+          tipo: 'miembro_aprobado',
+          destinatario_usuario_id: miembro.usuario_id,
+          destinatario_email: miembro.email,
+          canal: 'email',
+          subject, html,
+          relacionado: { tipo: 'usuario', ref_id: miembro.usuario_id },
+        }).catch((e) => console.warn('No se pudo notificar miembro:', e.message));
+      }
 
       return res.json({ ok: true, miembro: resumirMiembro(miembro) });
     }

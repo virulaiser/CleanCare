@@ -6,6 +6,8 @@ const Edificio = require('../models/Edificio');
 const Uso = require('../models/Uso');
 const { pdfCierreInquilino, pdfApertura, uploadPDF } = require('../lib/pdf-ocupacion');
 const { obtenerSaldoApto } = require('./billetera');
+const { notificar } = require('../lib/notificar');
+const { cierreInquilino: tplCierre, aperturaInquilino: tplApertura } = require('../lib/email-templates');
 
 function esAdminOEdificio(u, edificio_id) {
   if (!u) return false;
@@ -111,6 +113,20 @@ module.exports = async (req, res) => {
         { $set: { activo: false, fecha_baja: new Date(), motivo_baja: 'cambio_inquilino' } }
       );
 
+      // 9. Notificar al titular saliente
+      if (titular?.email) {
+        const { subject, html } = tplCierre({ edificio, apartamento, titular, saldoFinal: saldoActual, pdfUrl });
+        await notificar({
+          tipo: 'cierre_ocupacion',
+          destinatario_usuario_id: titular.usuario_id,
+          destinatario_email: titular.email,
+          canal: 'email',
+          subject, html,
+          attachments: [{ filename: `cierre-${apartamento}.pdf`, url: pdfUrl }],
+          relacionado: { tipo: 'ocupacion', ref_id: ocupacion.ocupacion_id },
+        }).catch((e) => console.warn('No se pudo notificar cierre:', e.message));
+      }
+
       return res.json({
         ok: true,
         ocupacion: ocupacion.toObject(),
@@ -156,13 +172,26 @@ module.exports = async (req, res) => {
           miembros_usuario_ids: [],
         });
 
-        // PDF de apertura
+        // PDF de apertura + email de bienvenida
         try {
           const edificio = await Edificio.findOne({ edificio_id: candidato.edificio_id }).lean() || { edificio_id: candidato.edificio_id };
           const pdfBuf = await pdfApertura({ edificio, apartamento: candidato.apartamento, titular: candidato.toObject(), ocupacionId: ocupacion.ocupacion_id });
           const url = await uploadPDF(pdfBuf, `ocupaciones/${candidato.edificio_id}/${candidato.apartamento}/${ocupacion.ocupacion_id}-apertura.pdf`);
           ocupacion.pdf_apertura_url = url;
           await ocupacion.save();
+
+          if (candidato.email) {
+            const { subject, html } = tplApertura({ edificio, apartamento: candidato.apartamento, titular: candidato.toObject(), pdfUrl: url });
+            await notificar({
+              tipo: 'apertura_ocupacion',
+              destinatario_usuario_id: candidato.usuario_id,
+              destinatario_email: candidato.email,
+              canal: 'email',
+              subject, html,
+              attachments: [{ filename: `bienvenida-${candidato.apartamento}.pdf`, url }],
+              relacionado: { tipo: 'ocupacion', ref_id: ocupacion.ocupacion_id },
+            }).catch((e) => console.warn('No se pudo notificar apertura:', e.message));
+          }
         } catch (err) {
           console.warn('No se pudo generar PDF apertura:', err.message);
         }
