@@ -18,11 +18,14 @@ module.exports = async (req, res) => {
   }
 };
 
-// Obtener costo de uso según tipo y edificio
+// Obtener costo de uso según tipo y edificio.
+// Fuerza entero ≥ 1 — el campo representa FICHAS, no pesos.
 async function obtenerCosto(edificio_id, tipo) {
   const config = await ConfigEdificio.findOne({ edificio_id }).lean();
-  if (!config) return 1; // default
-  return tipo === 'secadora' ? (config.costo_secado || 1) : (config.costo_lavado || 1);
+  if (!config) return 1;
+  const raw = tipo === 'secadora' ? config.costo_secado : config.costo_lavado;
+  const n = Math.round(Number(raw));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
 // POST /api/uso — Registrar inicio de un ciclo

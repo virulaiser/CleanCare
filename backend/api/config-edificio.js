@@ -36,6 +36,18 @@ async function handler(req, res) {
         for (const k of Object.keys(DEFAULTS)) {
           if (config[k] == null) config[k] = DEFAULTS[k];
         }
+        // Auto-corrección: si costo_lavado / costo_secado vienen con decimal
+        // (típico mistake: se cargó el valor en pesos), redondear y persistir.
+        const patch = {};
+        const clCorr = Math.max(1, Math.round(Number(config.costo_lavado)));
+        const csCorr = Math.max(1, Math.round(Number(config.costo_secado)));
+        if (clCorr !== config.costo_lavado) patch.costo_lavado = clCorr;
+        if (csCorr !== config.costo_secado) patch.costo_secado = csCorr;
+        if (Object.keys(patch).length > 0) {
+          await ConfigEdificio.updateOne({ edificio_id }, { $set: patch });
+          Object.assign(config, patch);
+          console.log(`[config] corregido costo_lavado/secado en ${edificio_id}:`, patch);
+        }
       }
 
       return res.json({ ok: true, config });
@@ -53,6 +65,21 @@ async function handler(req, res) {
         if (k === 'activo') continue;
         update[k] = body[k] !== undefined ? body[k] : DEFAULTS[k];
       }
+
+      // Normalizar enteros donde corresponde (fichas, no pesos ni decimales)
+      const INT_FIELDS = [
+        'creditos_mensuales', 'costo_lavado', 'costo_secado',
+        'duracion_lavado', 'duracion_secado',
+        'max_compra_fichas', 'precio_ficha_residente', 'comision_cleancare',
+        'facturacion_dia',
+      ];
+      for (const k of INT_FIELDS) {
+        const n = Math.round(Number(update[k]));
+        update[k] = Number.isFinite(n) && n >= 0 ? n : DEFAULTS[k];
+      }
+      // costo_lavado y costo_secado son fichas — mínimo 1
+      if (update.costo_lavado < 1) update.costo_lavado = 1;
+      if (update.costo_secado < 1) update.costo_secado = 1;
 
       const config = await ConfigEdificio.findOneAndUpdate(
         { edificio_id }, update, { upsert: true, new: true }

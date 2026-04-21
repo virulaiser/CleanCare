@@ -340,12 +340,14 @@ export default function Creditos() {
                   <NumericInput min={0} value={creditosMensuales} onChange={setCreditosMensuales} style={styles.input} />
                 </label>
                 <label style={styles.configLabel}>
-                  Costo por lavado
-                  <NumericInput min={1} value={costoLavado} onChange={setCostoLavado} style={styles.input} />
+                  Fichas por lavado
+                  <NumericInput min={1} value={costoLavado} onChange={(n) => setCostoLavado(Math.max(1, Math.round(n)))} style={styles.input} />
+                  <span style={styles.hint}>cantidad de fichas que descuenta un ciclo (entero, no pesos)</span>
                 </label>
                 <label style={styles.configLabel}>
-                  Costo por secado
-                  <NumericInput min={1} value={costoSecado} onChange={setCostoSecado} style={styles.input} />
+                  Fichas por secado
+                  <NumericInput min={1} value={costoSecado} onChange={(n) => setCostoSecado(Math.max(1, Math.round(n)))} style={styles.input} />
+                  <span style={styles.hint}>cantidad de fichas que descuenta un ciclo (entero, no pesos)</span>
                 </label>
                 <label style={styles.configLabel}>
                   Duración lavado (min)
@@ -758,6 +760,7 @@ const styles: Record<string, React.CSSProperties> = {
   sectionTitle: { fontSize: 14, fontWeight: 600, color: colors.textPrimary, marginTop: 20, marginBottom: 12 },
   configRow: { display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' as const },
   configLabel: { display: 'flex', flexDirection: 'column' as const, fontSize: 13, color: colors.textSecondary, gap: 4 },
+  hint: { fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
   input: {
     padding: '8px 12px', borderRadius: 8, border: `1px solid ${colors.border}`,
     fontSize: 14, fontFamily: 'inherit', backgroundColor: colors.white,
