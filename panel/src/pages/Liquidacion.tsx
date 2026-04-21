@@ -4,6 +4,7 @@ import XLSX from 'xlsx-js-style';
 import { obtenerResumen, listarMaquinas, listarEdificios, listarUsos, ResumenItem, Maquina, Edificio, Uso, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 import NumericInput from '../components/NumericInput';
+import AdminNav from '../components/AdminNav';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -465,17 +466,7 @@ export default function Liquidacion() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
-        <nav style={styles.navLinks}>
-          <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
-          <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
-          <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
-          <button onClick={() => navigate('/liquidacion')} style={styles.navBtnActive}>Liquidación</button>
-          <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
-        </nav>
-      </header>
+      <AdminNav active="/liquidacion" />
 
       <main style={styles.main}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>

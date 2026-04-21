@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { exportExcelTable } from '../utils/excel';
+import AdminNav from '../components/AdminNav';
 import {
   obtenerConfigEdificio, actualizarConfigEdificio,
   listarUsuariosEdificio, agregarCreditos, agregarCreditosMasivo,
@@ -238,17 +239,7 @@ export default function Creditos() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
-        <nav style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/creditos')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Créditos</button>
-          <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
-          <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
-          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
-          <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
-        </nav>
-      </header>
+      <AdminNav active="/creditos" />
 
       <main style={styles.main}>
         <h2 style={styles.pageTitle}>Gestión de créditos</h2>

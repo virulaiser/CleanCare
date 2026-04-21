@@ -5,6 +5,7 @@ import {
   Factura, Edificio, Usuario,
 } from '../services/api';
 import { colors } from '../constants/colors';
+import AdminNav from '../components/AdminNav';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -88,17 +89,7 @@ export default function Facturacion() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
-        <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
-          <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
-          <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
-          <button onClick={() => navigate('/facturacion')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Facturación</button>
-          <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
-        </nav>
-      </header>
+      <AdminNav active="/facturacion" />
 
       <main style={styles.main}>
         <h2 style={styles.pageTitle}>Facturación</h2>

@@ -28,7 +28,7 @@ app.use(express.json({ limit: '5mb' }));
 
 // Rutas públicas
 app.get('/api', (req, res) => {
-  res.json({ ok: true, service: 'CleanCare API', version: '1.0.0' });
+  res.json({ ok: true, service: 'CleanCare API', version: '1.2.2' });
 });
 app.post('/api/auth', authHandler);
 app.get('/api/auth', authHandler);

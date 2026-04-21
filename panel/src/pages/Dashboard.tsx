@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { exportExcelTable } from '../utils/excel';
+import AdminNav from '../components/AdminNav';
 import { obtenerResumen, listarUsos, listarMaquinas, listarEdificios, ResumenItem, Uso, Maquina, Edificio, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
 
@@ -122,18 +123,7 @@ export default function Dashboard() {
 
   return (
     <div style={styles.page}>
-      {/* Header */}
-      <header style={styles.header}>
-        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
-        <nav style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => navigate('/dashboard')} style={{ ...styles.logoutBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Dashboard</button>
-          <button onClick={() => navigate('/creditos')} style={styles.logoutBtn}>Créditos</button>
-          <button onClick={() => navigate('/admin-usuarios')} style={styles.logoutBtn}>Usuarios</button>
-          <button onClick={() => navigate('/dispositivos')} style={styles.logoutBtn}>Dispositivos</button>
-          <button onClick={() => navigate('/liquidacion')} style={styles.logoutBtn}>Liquidación</button>
-          <button onClick={handleLogout} style={styles.logoutBtn}>Cerrar sesión</button>
-        </nav>
-      </header>
+      <AdminNav active="/dashboard" />
 
       <main style={styles.main}>
         <div style={styles.titleRow}>

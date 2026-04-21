@@ -6,6 +6,7 @@ import {
   cerrarInquilino, confirmarTitular,
   Edificio, Uso,
 } from '../services/api';
+import AdminNav from '../components/AdminNav';
 import { colors } from '../constants/colors';
 
 interface UsuarioRow {
@@ -515,17 +516,7 @@ export default function AdminUsuarios() {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
-        <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
-          <button onClick={() => navigate('/admin-usuarios')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Usuarios</button>
-          <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
-          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
-          <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
-        </nav>
-      </header>
+      <AdminNav active="/admin-usuarios" />
 
       <main style={styles.main}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>

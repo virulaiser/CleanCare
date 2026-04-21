@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listarMaquinas, crearMaquina, eliminarMaquina, crearEdificio, listarEdificios, Maquina, Edificio, Usuario } from '../services/api';
 import { colors } from '../constants/colors';
+import AdminNav from '../components/AdminNav';
 
 function getUsuario(): Usuario | null {
   const raw = localStorage.getItem('cleancare_usuario');
@@ -144,18 +145,7 @@ export default function Maquinas() {
   return (
     <div style={styles.page}>
       {/* Header */}
-      <header style={styles.header}>
-        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
-        <nav style={styles.navLinks}>
-          <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/maquinas')} style={styles.navBtnActive}>Máquinas</button>
-          <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
-          <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
-          <button onClick={() => navigate('/dispositivos')} style={styles.navBtn}>Dispositivos</button>
-          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
-          <button onClick={() => { localStorage.removeItem('cleancare_token'); localStorage.removeItem('cleancare_usuario'); navigate('/'); }} style={styles.navBtn}>Cerrar sesión</button>
-        </nav>
-      </header>
+      <AdminNav active="/maquinas" />
 
       <main style={styles.main}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>

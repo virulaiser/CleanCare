@@ -6,6 +6,7 @@ import {
   Dispositivo, Edificio, Maquina,
 } from '../services/api';
 import { colors } from '../constants/colors';
+import AdminNav from '../components/AdminNav';
 
 export default function Dispositivos() {
   const navigate = useNavigate();
@@ -149,17 +150,7 @@ export const STATUS_UUID  = '${d.status_uuid}';`;
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <img src="/logo.png" alt="CleanCare" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
-        <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/dashboard')} style={styles.navBtn}>Dashboard</button>
-          <button onClick={() => navigate('/creditos')} style={styles.navBtn}>Créditos</button>
-          <button onClick={() => navigate('/admin-usuarios')} style={styles.navBtn}>Usuarios</button>
-          <button onClick={() => navigate('/dispositivos')} style={{ ...styles.navBtn, backgroundColor: colors.primary, color: colors.white, border: 'none', fontWeight: 600 }}>Dispositivos</button>
-          <button onClick={() => navigate('/liquidacion')} style={styles.navBtn}>Liquidación</button>
-          <button onClick={handleLogout} style={styles.navBtn}>Cerrar sesión</button>
-        </nav>
-      </header>
+      <AdminNav active="/dispositivos" />
 
       <main style={styles.main}>
         {/* Subtabs */}

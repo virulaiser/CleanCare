@@ -62,11 +62,20 @@ CleanCare es un sistema de gestión de lavarropas y secadoras por domótica para
 | Admin tips | https://panel-three-blush.vercel.app/tips |
 | Repositorio | https://github.com/virulaiser/CleanCare |
 
-### Credenciales admin
-- **Email**: admin@cleancare.uy
-- **Password**: admin123
-- **Rol**: admin
-- **Edificio**: EDI-NORTE (Torre Norte)
+### Credenciales
+
+**Super-admin (CleanCare, ve todo)**
+- Email: `admin@cleancare.com`
+- Password: `admin123`
+- Rol: `admin`
+
+**Admin por edificio (ve solo su edificio)**
+- `admin.norte@cleancare.com` / `admin123` → EDI-NORTE
+- `admin.centro@cleancare.com` / `admin123` → EDI-CENTRO
+- `admin.alegria@cleancare.com` / `admin123` → EDI-ALEGRIA
+- Rol: `admin_edificio`
+
+**Residentes de seed**: password `123456`, PIN de compra default `1111`.
 
 ---
 
@@ -202,11 +211,18 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
   "nombre": "Juan Pérez",
   "telefono": "099123456",
   "apartamento": "3B",
-  "rol": "residente",
-  "edificio_id": "edificio-central",
+  "rol": "admin | admin_edificio | residente",
+  "edificio_id": "EDI-NORTE",
   "unidad": "apto-302",
   "foto": "data:image/jpeg;base64,...",
+  "pin_compra": "$2a$10$...",        // hasheado, default implícito 1111
+  "rol_apto": "titular | miembro",
+  "estado_aprobacion": "pendiente | aprobado | rechazado",
+  "aprobado_por": "USR-XXXX",
+  "aprobado_en": "2026-04-21T...",
   "activo": true,
+  "fecha_baja": null,                 // set al cambiar inquilino
+  "motivo_baja": null,                // 'cambio_inquilino' | 'solicitud_propia' | 'rechazado'
   "creado": "2026-04-09T..."
 }
 ```
@@ -217,8 +233,63 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
   "edificio_id": "EDI-NORTE",
   "nombre": "Torre Norte",
   "direccion": "Av. Rivera 1234",
+  "admin_nombre": "Carlos Gómez",
+  "admin_telefono": "099111222",
+  "pisos": 5,
+  "aptos_por_piso": 4,
+  "nomenclatura": "numerica | letras",
+  "extras": [{ "codigo": "portero", "tipo": "portero" }],
   "activo": true,
   "creado": "2026-04-10T..."
+}
+```
+
+#### `unidades` (apartamentos generados por edificio)
+```json
+{
+  "edificio_id": "EDI-NORTE",
+  "codigo": "101",       // '101' para numerica, '1A' para letras, 'portero' para extra
+  "piso": 1,
+  "numero_apto": 1,
+  "es_extra": false,
+  "tipo_extra": null,
+  "activa": true
+}
+```
+
+#### `ocupaciones` (período de cada inquilino en un apto)
+```json
+{
+  "ocupacion_id": "OCU-A1B2C3D4",
+  "edificio_id": "EDI-NORTE",
+  "apartamento": "101",
+  "desde": "2026-01-15T...",
+  "hasta": null,                                // null = vigente
+  "titular_usuario_id": "USR-DD3FAD",
+  "miembros_usuario_ids": ["USR-XXXXXX"],
+  "cerrada_por": null,
+  "motivo_cierre": null,                        // 'rotacion' al cambiar inquilino
+  "saldo_al_cierre": null,
+  "pdf_cierre_url": "",
+  "pdf_apertura_url": "",
+  "notas": ""
+}
+```
+
+#### `facturas` (PDFs mensuales por edificio)
+```json
+{
+  "factura_id": "FAC-01EE9697",
+  "edificio_id": "EDI-NORTE",
+  "mes": 3,
+  "anio": 2026,
+  "tipo": "ingreso | consumo_resumen | resumen_apto",
+  "apartamento": null,                          // solo set en resumen_apto
+  "pdf_url": "https://.../ingreso.pdf",
+  "totales": { "fichas_vendidas": 10, "lavados": 6, "kwh_totales": 29.7 },
+  "generada": "2026-04-21T...",
+  "enviada": false,
+  "canal_envio": null                           // 'email' | 'whatsapp' cuando se envíe
 }
 ```
 
@@ -267,14 +338,26 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 #### `config_edificios`
 ```json
 {
-  "edificio_id": "edificio-central",
-  "creditos_mensuales": 10,
+  "edificio_id": "EDI-NORTE",
+  "creditos_mensuales": 10,            // ahora es POR APTO, acredita al titular
   "costo_lavado": 1,
   "costo_secado": 1,
   "duracion_lavado": 45,
   "duracion_secado": 30,
+  "max_compra_fichas": 10,             // tope por compra individual
+  "precio_ficha_residente": 120,       // lo que cobra el admin al residente
+  "comision_cleancare": 33,            // lo que CleanCare cobra por ficha vendida
+  "litros_por_lavado": 60,
+  "litros_por_secado": 0,
+  "kwh_por_lavado": 1.2,
+  "kwh_por_secado": 2.5,
+  "facturacion_dia": 31,               // 31 = último día del mes
+  "facturacion_hora": "23:59",
+  "email_admin_edificio": "admin.norte@cleancare.com",
+  "whatsapp_admin_edificio": "+598 99 111 222",
+  "canal_preferido": "email | whatsapp | ninguno",
   "activo": true,
-  "actualizado": "2026-04-10T12:00:00.000Z"
+  "actualizado": "2026-04-21T..."
 }
 ```
 
@@ -285,37 +368,60 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 ### Públicos
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/api` | Health check |
-| `POST` | `/api/auth?action=login` | Login → retorna JWT + saldo |
-| `POST` | `/api/auth?action=registro` | Registro → retorna JWT + saldo |
+| `GET` | `/api` | Health check (version 1.2.2) |
+| `POST` | `/api/auth?action=login` | Login → JWT + saldo del apto + estado del usuario |
+| `POST` | `/api/auth?action=registro` | Registro → queda `pendiente` (requiere aprobación admin) |
 | `GET` | `/api/edificios` | Listar edificios activos (para dropdowns) |
+| `GET` | `/api/unidades?edificioId=X` | Unidades activas del edificio (dropdown apto en registro) |
 
 ### Protegidos (requieren Bearer token)
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/uso` | Iniciar ciclo (verifica saldo, descuenta crédito) |
+| `GET` | `/api/auth?action=me` | Estado actual del usuario (rol_apto, estado_aprobacion) |
+| `POST` | `/api/uso` | Iniciar ciclo (bloquea pendientes, verifica saldo del APTO) |
 | `PATCH` | `/api/uso?id=X` | Actualizar ciclo (devuelve crédito en cancelación/avería) |
-| `GET` | `/api/usos` | Listar usos (todos, o ?mis=true para filtrar por usuario) |
+| `GET` | `/api/usos?edificioId&mes&anio&mis=true` | Usos filtrados (admin_edificio queda fijado a su edificio) |
 | `GET` | `/api/maquinas?edificioId=X` | Listar máquinas activas |
-| `GET` | `/api/billetera` | Saldo + últimas transacciones del usuario |
+| `GET` | `/api/billetera` | Saldo + movimientos del APTO del usuario (compartido con miembros) |
+| `POST` | `/api/billetera/comprar` | Solo TITULAR aprobado. Body `{pin, cantidad}`. Valida tope. |
+| `PATCH` | `/api/billetera/pin` | Solo titular. Cambia PIN. Body `{pin_actual, pin_nuevo}`. |
+| `GET` | `/api/apartamento/miembros` | Solo titular: miembros + pendientes del apto |
+| `POST` | `/api/apartamento/aprobar` | Titular aprueba a un miembro pendiente |
+| `POST` | `/api/apartamento/rechazar` | Titular rechaza (desactiva la cuenta del pendiente) |
+| `POST` | `/api/apartamento/transferir-titularidad` | Titular cede titularidad a otro miembro |
+| `GET` | `/api/facturacion/aptos/mios` | Residente: PDFs mensuales del apto |
 
-### Solo admin
+### Admin (super-admin o admin_edificio — el 2do queda filtrado a su edificio)
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/api/resumen?edificioId&mes&anio` | Resumen facturación mensual |
+| `GET` | `/api/resumen-creditos?edificioId&mes&anio` | Resumen consumo créditos mensual |
+| `GET` | `/api/resumen-apartamento?edificioId&mes&anio` | Consumo agregado por apto |
 | `POST` | `/api/maquinas` | Crear máquina |
 | `DELETE` | `/api/maquinas?maquinaId=X` | Soft-delete máquina |
-| `GET` | `/api/billetera?usuarioId=X` | Saldo de un usuario específico |
+| `GET` | `/api/billetera?usuarioId=X` | Saldo del apto de un usuario específico |
 | `POST` | `/api/billetera/creditos` | Agregar créditos a un usuario |
-| `POST` | `/api/billetera/creditos-masivo` | Agregar créditos a todos los del edificio |
-| `GET` | `/api/config-edificio?edificioId=X` | Config créditos del edificio |
-| `PUT` | `/api/config-edificio` | Actualizar config créditos |
-| `GET` | `/api/resumen-creditos?edificioId&mes&anio` | Resumen consumo créditos mensual |
-| `GET` | `/api/usuarios?edificioId=X` | Listar usuarios con saldo, fichas_usadas, fichas_extras, foto |
-| `POST` | `/api/usuarios` | Crear usuario (admin, con foto) |
-| `PATCH` | `/api/usuarios?usuarioId=X` | Editar usuario (nombre, email, pass, foto, etc.) |
+| `POST` | `/api/billetera/creditos-masivo` | Agregar créditos a todos los titulares del edificio |
+| `GET` | `/api/config-edificio?edificioId=X` | Config del edificio (tarifas, consumo, facturación) |
+| `PUT` | `/api/config-edificio` | Actualizar config del edificio |
+| `GET` | `/api/usuarios?edificioId=X&rol=Y` | Listar usuarios (admin_edificio nunca ve super-admins) |
+| `POST` | `/api/usuarios` | Crear usuario (admin_edificio solo residente; super puede crear admin_edificio/admin) |
+| `PATCH` | `/api/usuarios?usuarioId=X` | Editar usuario (rol, rol_apto, estado_aprobacion, etc.) |
 | `DELETE` | `/api/usuarios?usuarioId=X` | Soft-delete usuario |
-| `POST` | `/api/edificios` | Crear edificio |
+| `POST` | `/api/unidades` | Crear unidad manual |
+| `PATCH` | `/api/unidades?id=X` | Activar/desactivar unidad |
+| `DELETE` | `/api/unidades?id=X` | Borrar unidad |
+| `GET` | `/api/dispositivos` | ESP32 / Pico registrados |
+| `GET` | `/api/facturacion?edificioId&mes&anio&tipo` | Listar facturas generadas |
+| `POST` | `/api/facturacion/generar` | Forzar generación manual del mes (idempotente) |
+| `POST` | `/api/apartamento/cerrar-inquilino` | Cerrar ocupación: saldo→0, PDF cierre, usuarios inactivos |
+| `POST` | `/api/apartamento/confirmar-titular` | Aprobar pendiente y abrir ocupación nueva como titular |
+| `GET` | `/api/apartamento/ocupaciones?edificioId&apartamento` | Historial de ocupaciones |
+
+### Solo super-admin
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/edificios` | Crear edificio + generar unidades automáticamente |
 | `DELETE` | `/api/edificios?edificioId=X` | Soft-delete edificio |
 | `POST` | `/api/tips` | Crear tip |
 | `DELETE` | `/api/tips?id=X` | Eliminar tip |
@@ -323,7 +429,8 @@ MONGODB_URI=mongodb://nacho1:<password>@cluster0-shard-00-00.uspcw.mongodb.net:2
 ### Cron (Vercel)
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/api/cron/asignacion-mensual` | Asigna créditos mensuales (1ro de cada mes, 3am UTC) |
+| `GET` | `/api/cron/asignacion-mensual` | Asigna créditos mensuales por apto (1ro del mes, 3am UTC) |
+| `GET` | `/api/cron/facturacion-mensual` | Genera PDFs mensuales el día configurado (diario 23:59 UTC) |
 
 ---
 
