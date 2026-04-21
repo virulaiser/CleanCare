@@ -56,8 +56,8 @@ export default function Home() {
             </a>
             <a href="#como-funciona" style={styles.btnSecondary}>Ver cómo funciona</a>
             <a
-              href="https://uptqmihghclt3xkt.public.blob.vercel-storage.com/cleancare-v1.2.3-lFtgKTEvbEUZRBtjw23xjXy6l1qS5y.apk"
-              download="cleancare-v1.2.3.apk"
+              href="https://uptqmihghclt3xkt.public.blob.vercel-storage.com/cleancare-v1.2.4-vRco9NI6fBWceHflteHllrQOdrD8w5.apk"
+              download="cleancare-v1.2.4.apk"
               style={styles.btnDownload}
             >
               📲 Bajar App (Android)
