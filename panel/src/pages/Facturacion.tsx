@@ -30,6 +30,7 @@ export default function Facturacion() {
   const [loading, setLoading] = useState(false);
   const [generando, setGenerando] = useState(false);
   const [msg, setMsg] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     if (!localStorage.getItem('cleancare_token')) navigate('/login');
@@ -94,7 +95,16 @@ export default function Facturacion() {
 
       <main style={styles.main}>
         <SubTabs items={DASHBOARD_TABS} active="/facturacion" />
-        <h2 style={styles.pageTitle}>Facturación</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <h2 style={{ ...styles.pageTitle, marginBottom: 0 }}>Facturación</h2>
+          <button
+            onClick={() => setShowHelp(true)}
+            style={styles.helpBtn}
+            title="¿Qué es esto?"
+          >
+            ? ¿Qué es esto?
+          </button>
+        </div>
         {msg && <p style={{ fontSize: 13, marginBottom: 12, color: msg.includes('Error') ? colors.error : colors.success }}>{msg}</p>}
 
         <div style={styles.card}>
@@ -172,6 +182,55 @@ export default function Facturacion() {
           )}
         </div>
       </main>
+
+      {showHelp && (
+        <div style={styles.overlay} onClick={() => setShowHelp(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>¿Cómo funciona la facturación?</h3>
+            <p style={styles.modalIntro}>
+              Cada mes el sistema cierra el período y genera PDFs automáticamente. Se suben al storage y quedan disponibles para descargar acá.
+            </p>
+
+            <div style={styles.helpSection}>
+              <div style={styles.helpRow}>
+                <span style={styles.helpEmoji}>💰</span>
+                <div>
+                  <strong style={styles.helpLabel}>Ingreso admin</strong>
+                  <p style={styles.helpText}>
+                    Factura de comisión CleanCare. Muestra fichas vendidas, precio al residente y el total que el admin del edificio le debe pagar a CleanCare. <em>1 por edificio por mes.</em>
+                  </p>
+                </div>
+              </div>
+              <div style={styles.helpRow}>
+                <span style={styles.helpEmoji}>📊</span>
+                <div>
+                  <strong style={styles.helpLabel}>Consumo</strong>
+                  <p style={styles.helpText}>
+                    Resumen operativo del edificio: lavados y secados completados, estimación de litros de agua y kWh según la configuración del edificio. <em>1 por edificio por mes.</em>
+                  </p>
+                </div>
+              </div>
+              <div style={styles.helpRow}>
+                <span style={styles.helpEmoji}>🏠</span>
+                <div>
+                  <strong style={styles.helpLabel}>Apto</strong>
+                  <p style={styles.helpText}>
+                    Resumen individual de cada apartamento: saldo al cierre y todos los movimientos del mes (asignaciones, compras, usos, devoluciones). <em>1 por apto por mes.</em> Es el único que ven los residentes en la app.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.helpHint}>
+              <strong>💡 Generación automática:</strong> se disparan el día configurado en "Créditos → Configuración del edificio → Día de facturación". El botón <em>Generar ahora</em> fuerza la corrida manualmente (sobrescribe PDFs del mes actual).
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <button onClick={() => setShowHelp(false)} style={styles.btnPrimary}>Entendido</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -216,4 +275,45 @@ const styles: Record<string, React.CSSProperties> = {
   },
   td: { padding: 12, fontSize: 14, color: colors.textPrimary, borderBottom: `1px solid ${colors.border}` },
   link: { color: colors.primary, textDecoration: 'none', fontWeight: 600 },
+  helpBtn: {
+    padding: '6px 14px', borderRadius: 999, border: `1px solid ${colors.primary}`,
+    backgroundColor: colors.bgBlueLight, color: colors.primary,
+    fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  },
+  overlay: {
+    position: 'fixed' as const, inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20,
+  },
+  modal: {
+    backgroundColor: colors.white, borderRadius: 16, padding: 28,
+    maxWidth: 560, width: '100%', maxHeight: '85vh',
+    overflowY: 'auto' as const, boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+  },
+  modalTitle: {
+    fontSize: 20, fontWeight: 700, color: colors.textPrimary,
+    marginBottom: 6, marginTop: 0,
+  },
+  modalIntro: {
+    fontSize: 14, color: colors.textSecondary, marginTop: 0, marginBottom: 20, lineHeight: 1.5,
+  },
+  helpSection: { display: 'flex', flexDirection: 'column' as const, gap: 16 },
+  helpRow: {
+    display: 'flex', gap: 12, alignItems: 'flex-start',
+    padding: 14, borderRadius: 10,
+    backgroundColor: colors.bgPage, border: `1px solid ${colors.border}`,
+  },
+  helpEmoji: { fontSize: 26, lineHeight: 1 },
+  helpLabel: {
+    fontSize: 14, fontWeight: 700, color: colors.textPrimary,
+    display: 'block', marginBottom: 4,
+  },
+  helpText: {
+    fontSize: 13, color: colors.textSecondary, margin: 0, lineHeight: 1.5,
+  },
+  helpHint: {
+    marginTop: 16, padding: 14, borderRadius: 10,
+    backgroundColor: colors.bgBlueLight, color: colors.textPrimary,
+    fontSize: 13, lineHeight: 1.5,
+  },
 };
