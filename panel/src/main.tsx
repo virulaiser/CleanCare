@@ -14,6 +14,7 @@ import AdminUsuarios from './pages/AdminUsuarios';
 import Dispositivos from './pages/Dispositivos';
 import Liquidacion from './pages/Liquidacion';
 import Facturacion from './pages/Facturacion';
+import Notificaciones from './pages/Notificaciones';
 import './styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/dispositivos" element={<Dispositivos />} />
         <Route path="/liquidacion" element={<Liquidacion />} />
         <Route path="/facturacion" element={<Facturacion />} />
+        <Route path="/notificaciones" element={<Notificaciones />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

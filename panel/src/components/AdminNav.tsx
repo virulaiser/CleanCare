@@ -13,6 +13,7 @@ const ITEMS: Item[] = [
   { label: 'Dispositivos', path: '/dispositivos' },
   { label: 'Liquidación',  path: '/liquidacion' },
   { label: 'Facturación',  path: '/facturacion' },
+  { label: 'Notificaciones', path: '/notificaciones' },
   { label: 'Tips',         path: '/tips', adminOnly: true },
 ];
 

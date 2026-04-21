@@ -415,6 +415,34 @@ export async function confirmarTitular(usuario_id: string): Promise<{ usuario: a
   return data;
 }
 
+// --- Notificaciones ---
+export interface Notificacion {
+  _id: string;
+  notificacion_id: string;
+  tipo: string;
+  destinatario_usuario_id: string | null;
+  destinatario_email: string | null;
+  canal: 'email' | 'whatsapp' | 'in_app';
+  subject: string;
+  estado: 'pendiente' | 'enviada' | 'error' | 'descartada';
+  proveedor: string | null;
+  proveedor_id: string | null;
+  error: string | null;
+  relacionado: { tipo?: string; ref_id?: string } | null;
+  creada: string;
+  enviada_en: string | null;
+}
+
+export async function listarNotificaciones(filter: { tipo?: string; estado?: string; email?: string; limite?: number } = {}): Promise<Notificacion[]> {
+  const { data } = await api.get('/api/notificaciones', { params: filter });
+  return data.notificaciones;
+}
+
+export async function enviarNotificacionTest(to: string, subject: string, html?: string): Promise<any> {
+  const { data } = await api.post('/api/notificaciones/enviar', { to, subject, html });
+  return data;
+}
+
 export async function listarOcupaciones(edificioId: string, apartamento?: string): Promise<Ocupacion[]> {
   const { data } = await api.get('/api/apartamento/ocupaciones', { params: { edificioId, apartamento } });
   return data.ocupaciones;
